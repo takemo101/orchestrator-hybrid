@@ -3,3 +3,5 @@ dist/
 .agent/
 *.log
 .DS_Store
+dist/
+node_modules/

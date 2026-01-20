@@ -103,7 +103,7 @@ ensure_directories() {
 fetch_issue() {
     local issue_number="$1"
     
-    log_info "Fetching issue #${issue_number}..."
+    log_info "Fetching issue #${issue_number}..." >&2
     
     local issue_data
     issue_data=$(gh issue view "$issue_number" --json title,body,labels,assignees,state 2>/dev/null) || {
@@ -509,7 +509,7 @@ main() {
                 exit 1
             fi
             log_info "Status for issue #${issue_number}:"
-            fetch_issue "$issue_number" | jq '.'
+            gh issue view "$issue_number" --json title,body,labels,state | jq '.'
             echo ""
             log_info "Scratchpad:"
             read_scratchpad
