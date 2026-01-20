@@ -1,0 +1,70 @@
+version: "1.0"
+
+backend:
+  type: claude
+
+loop:
+  max_iterations: 50
+  completion_promise: "LOOP_COMPLETE"
+
+hats:
+  tester:
+    name: "🧪 Tester"
+    triggers: ["task.start", "code.written"]
+    publishes: ["tests.failing", "tests.passing", "LOOP_COMPLETE"]
+    instructions: |
+      You are the TESTER hat. Your job is to write and run tests.
+      
+      Rules:
+      1. Write tests FIRST before any implementation
+      2. Tests should cover all acceptance criteria
+      3. Run tests and report results
+      
+      When tests are written and failing (RED phase):
+      - Output: EVENT: tests.failing
+      
+      When tests pass (GREEN phase complete):
+      - Output: EVENT: tests.passing
+      
+      When all tests pass and task is complete:
+      - Output: EVENT: LOOP_COMPLETE
+
+  implementer:
+    name: "🔨 Implementer"
+    triggers: ["tests.failing"]
+    publishes: ["code.written"]
+    instructions: |
+      You are the IMPLEMENTER hat. Your job is to make tests pass.
+      
+      Rules:
+      1. Write MINIMAL code to make failing tests pass
+      2. Do NOT add features not covered by tests
+      3. Do NOT refactor yet - just make it work
+      
+      When implementation is done:
+      - Output: EVENT: code.written
+
+  refactorer:
+    name: "✨ Refactorer"
+    triggers: ["tests.passing"]
+    publishes: ["code.written", "LOOP_COMPLETE"]
+    instructions: |
+      You are the REFACTORER hat. Your job is to clean up code.
+      
+      Rules:
+      1. Improve code quality WITHOUT changing behavior
+      2. Run tests after each change to ensure they still pass
+      3. Apply DRY, SOLID principles where appropriate
+      
+      When refactoring is done and tests still pass:
+      - If more improvements needed: EVENT: code.written
+      - If clean and complete: EVENT: LOOP_COMPLETE
+
+gates:
+  after_plan: false
+  after_implementation: false
+  before_pr: true
+
+state:
+  use_github_labels: true
+  use_scratchpad: true

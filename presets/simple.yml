@@ -1,0 +1,17 @@
+version: "1.0"
+
+backend:
+  type: claude
+
+loop:
+  max_iterations: 100
+  completion_promise: "LOOP_COMPLETE"
+
+gates:
+  after_plan: false
+  after_implementation: false
+  before_pr: true
+
+state:
+  use_github_labels: true
+  use_scratchpad: true

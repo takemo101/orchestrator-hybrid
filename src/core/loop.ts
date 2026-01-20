@@ -5,9 +5,16 @@ import { type Backend, createBackend } from "../adapters/index.js";
 import { requestApproval } from "../gates/approval.js";
 import { fetchIssue, updateIssueLabel } from "../input/github.js";
 import { generatePrompt } from "../input/prompt.js";
+import { EventBus } from "./event.js";
+import {
+	buildHatPrompt,
+	extractPublishedEvent,
+	type HatDefinition,
+	HatRegistry,
+} from "./hat.js";
 import { logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
-import type { Config, Issue, LoopContext } from "./types.js";
+import type { Config, LoopContext } from "./types.js";
 
 export interface LoopOptions {
 	issueNumber: number;
@@ -24,11 +31,13 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	const scratchpadPath =
 		config.state?.scratchpad_path ?? ".agent/scratchpad.md";
 	const promptPath = ".agent/PROMPT.md";
+	const useHats = config.hats && Object.keys(config.hats).length > 0;
 
 	logger.info(`Starting orchestration loop for issue #${issueNumber}`);
 	logger.info(`Max iterations: ${maxIter}`);
 	logger.info(`Backend: ${config.backend.type}`);
 	logger.info(`Completion promise: ${completionPromise}`);
+	logger.info(`Hat mode: ${useHats ? "enabled" : "disabled"}`);
 	console.log("");
 
 	const issue = await fetchIssue(issueNumber);
@@ -63,10 +72,145 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 
 	const backend = createBackend(config.backend.type as "claude" | "opencode");
 
-	await executeLoop(context, backend, issueNumber);
+	if (useHats && config.hats) {
+		const hatRegistry = new HatRegistry();
+		hatRegistry.registerFromConfig(config.hats);
+
+		const eventBus = new EventBus();
+
+		await executeHatLoop(context, backend, issueNumber, hatRegistry, eventBus);
+	} else {
+		await executeSimpleLoop(context, backend, issueNumber);
+	}
 }
 
-async function executeLoop(
+async function executeHatLoop(
+	context: LoopContext,
+	backend: Backend,
+	issueNumber: number,
+	hatRegistry: HatRegistry,
+	eventBus: EventBus,
+): Promise<void> {
+	let consecutiveFailures = 0;
+	const maxConsecutiveFailures = 5;
+	const historyPath = ".agent/output_history.txt";
+
+	mkdirSync(dirname(historyPath), { recursive: true });
+
+	eventBus.emit("task.start", undefined, { issueNumber });
+
+	let currentEvent = eventBus.getLastEvent();
+
+	while (context.iteration < context.maxIterations) {
+		context.iteration++;
+
+		const activeHat = currentEvent
+			? hatRegistry.findByTrigger(currentEvent.type)
+			: hatRegistry.getAll()[0];
+
+		if (!activeHat) {
+			logger.warn(`No hat found for event: ${currentEvent?.type ?? "none"}`);
+			break;
+		}
+
+		hatRegistry.setActive(activeHat.id);
+
+		printIterationHeader(context.iteration, context.maxIterations, activeHat);
+
+		const basePrompt = readFileSync(context.promptPath, "utf-8");
+		const prompt = buildHatPrompt(activeHat, basePrompt, {
+			eventBus,
+			currentEvent,
+			iteration: context.iteration,
+		});
+
+		logger.info(
+			`Iteration ${context.iteration}: ${activeHat.name ?? activeHat.id} executing...`,
+		);
+
+		const result = await backend.execute(prompt);
+
+		logger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
+
+		if (result.exitCode !== 0) {
+			consecutiveFailures++;
+			logger.error(`Backend exited with code ${result.exitCode}`);
+
+			if (consecutiveFailures >= maxConsecutiveFailures) {
+				logger.error(
+					`Too many consecutive failures (${consecutiveFailures}). Stopping.`,
+				);
+				await updateIssueLabel(issueNumber, "env:blocked");
+				throw new Error("Max consecutive failures reached");
+			}
+			continue;
+		}
+
+		consecutiveFailures = 0;
+
+		const publishedEvent = extractPublishedEvent(result.output, activeHat);
+
+		if (publishedEvent) {
+			logger.info(`Hat ${activeHat.id} published: ${publishedEvent}`);
+			eventBus.emit(publishedEvent, activeHat.id);
+			currentEvent = eventBus.getLastEvent();
+		}
+
+		if (
+			checkCompletion(result.output, context.completionPromise) ||
+			publishedEvent === context.completionPromise
+		) {
+			console.log("");
+			logger.success(`Task completed! (${context.completionPromise} detected)`);
+			await updateIssueLabel(issueNumber, "env:pr-created");
+
+			const postApproval = await requestApproval({
+				gateName: "Post-Completion",
+				message: "Task appears complete. Review before creating PR.",
+				autoMode: context.autoMode,
+				scratchpadPath: context.scratchpadPath,
+			});
+
+			if (postApproval === "abort") {
+				return;
+			}
+
+			console.log("");
+			logger.success(
+				`Orchestration complete after ${context.iteration} iterations`,
+			);
+			printEventSummary(eventBus);
+			return;
+		}
+
+		if (checkLoopDetection(result.output, historyPath)) {
+			logger.warn(
+				"Possible infinite loop detected. Requesting human intervention.",
+			);
+
+			const loopApproval = await requestApproval({
+				gateName: "Loop Detection",
+				message: "Output is similar to previous iterations. Continue?",
+				autoMode: false,
+				scratchpadPath: context.scratchpadPath,
+			});
+
+			if (loopApproval === "abort") {
+				return;
+			}
+		}
+
+		await sleep(1000);
+	}
+
+	logger.error(
+		`Max iterations (${context.maxIterations}) reached without completion`,
+	);
+	await updateIssueLabel(issueNumber, "env:blocked");
+	throw new Error("Max iterations reached");
+}
+
+async function executeSimpleLoop(
 	context: LoopContext,
 	backend: Backend,
 	issueNumber: number,
@@ -156,16 +300,38 @@ async function executeLoop(
 	throw new Error("Max iterations reached");
 }
 
-function printIterationHeader(iteration: number, max: number): void {
+function printIterationHeader(
+	iteration: number,
+	max: number,
+	hat?: HatDefinition,
+): void {
 	console.log("");
 	console.log(
 		chalk.cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
 	);
-	console.log(chalk.cyan(`  ITERATION ${iteration}/${max}`));
+	if (hat) {
+		console.log(
+			chalk.cyan(`  ITERATION ${iteration}/${max} │ ${hat.name ?? hat.id}`),
+		);
+	} else {
+		console.log(chalk.cyan(`  ITERATION ${iteration}/${max}`));
+	}
 	console.log(
 		chalk.cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
 	);
 	console.log("");
+}
+
+function printEventSummary(eventBus: EventBus): void {
+	const events = eventBus.getHistory();
+	if (events.length === 0) return;
+
+	console.log("");
+	console.log(chalk.gray("Event History:"));
+	for (const event of events) {
+		const hatInfo = event.hatId ? ` (${event.hatId})` : "";
+		console.log(chalk.gray(`  → ${event.type}${hatInfo}`));
+	}
 }
 
 function checkCompletion(output: string, promise: string): boolean {
