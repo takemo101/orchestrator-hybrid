@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
@@ -39,6 +39,13 @@ program
 		Number.parseInt,
 	)
 	.option("-a, --auto", "Auto-approve all gates")
+	.option("--create-pr", "Create PR after completion")
+	.option("--draft", "Create PR as draft")
+	.option("--container", "Run in isolated container-use environment")
+	.option(
+		"--report [path]",
+		"Generate execution report (default: .agent/report.md)",
+	)
 	.option("-c, --config <path>", "Config file path")
 	.option("-v, --verbose", "Verbose output")
 	.action(async (options) => {
@@ -47,7 +54,7 @@ program
 				setVerbose(true);
 			}
 
-			let config;
+			let config: ReturnType<typeof loadConfig>;
 
 			if (options.preset) {
 				config = loadPreset(options.preset);
@@ -65,6 +72,15 @@ program
 				config,
 				autoMode: options.auto ?? false,
 				maxIterations: options.maxIterations,
+				createPR: options.createPr ?? false,
+				draftPR: options.draft ?? false,
+				useContainer: options.container ?? false,
+				generateReport: options.report !== undefined,
+				reportPath:
+					typeof options.report === "string"
+						? options.report
+						: ".agent/report.md",
+				preset: options.preset,
 			});
 		} catch (error) {
 			logger.error(error instanceof Error ? error.message : String(error));
@@ -143,7 +159,7 @@ program
 		let content: string;
 
 		if (options.preset) {
-			const preset = loadPreset(options.preset);
+			loadPreset(options.preset);
 			content = readFileSync(getPresetPath(options.preset), "utf-8");
 			logger.info(`Initialized with preset: ${options.preset}`);
 		} else {

@@ -99,7 +99,7 @@ function printHatSwitch(hat: HatDefinition): void {
 export function buildHatPrompt(
 	hat: HatDefinition,
 	basePrompt: string,
-	context: HatContext,
+	_context: HatContext,
 ): string {
 	const hatSection = `
 ## Current Role: ${hat.name ?? hat.id}
@@ -119,30 +119,86 @@ For example: EVENT: ${hat.publishes[0]}
 	return hatSection + basePrompt;
 }
 
+const EVENT_PATTERNS = [
+	/EVENT:\s*(\S+)/gi,
+	/\[EVENT\]\s*(\S+)/gi,
+	/\*\*EVENT\*\*:\s*(\S+)/gi,
+	/`EVENT:\s*(\S+)`/gi,
+	/^>\s*EVENT:\s*(\S+)/gim,
+];
+
 export function extractPublishedEvent(
 	output: string,
 	hat: HatDefinition,
 ): string | null {
-	const eventPattern = /EVENT:\s*(\S+)/i;
-	const match = output.match(eventPattern);
+	const candidates = extractEventCandidates(output);
 
-	if (match) {
-		const eventType = match[1];
-		if (hat.publishes.includes(eventType)) {
-			return eventType;
+	for (const candidate of candidates) {
+		if (hat.publishes.includes(candidate)) {
+			logger.debug(`Detected authorized event: ${candidate}`);
+			return candidate;
 		}
+	}
+
+	if (candidates.length > 0) {
 		logger.warn(
-			`Hat ${hat.id} tried to publish unauthorized event: ${eventType}`,
+			`Hat ${hat.id} tried to publish unauthorized event(s): ${candidates.join(", ")}`,
 		);
 	}
 
+	return extractEventFromKeywords(output, hat);
+}
+
+function extractEventCandidates(output: string): string[] {
+	const candidates: string[] = [];
+	const seen = new Set<string>();
+
+	for (const pattern of EVENT_PATTERNS) {
+		pattern.lastIndex = 0;
+		const matches = output.matchAll(pattern);
+		for (const match of matches) {
+			const event = match[1];
+			if (!seen.has(event)) {
+				seen.add(event);
+				candidates.push(event);
+			}
+		}
+	}
+
+	return candidates;
+}
+
+function extractEventFromKeywords(
+	output: string,
+	hat: HatDefinition,
+): string | null {
+	const lines = output.split("\n");
+	const lastLines = lines.slice(-50);
+
 	for (const publishable of hat.publishes) {
-		if (output.includes(publishable)) {
-			return publishable;
+		for (const line of lastLines) {
+			if (isEventKeywordMatch(line, publishable)) {
+				logger.debug(`Detected event from keyword in output: ${publishable}`);
+				return publishable;
+			}
 		}
 	}
 
 	return null;
+}
+
+function isEventKeywordMatch(line: string, keyword: string): boolean {
+	const patterns = [
+		new RegExp(`^${escapeRegex(keyword)}$`),
+		new RegExp(`\\b${escapeRegex(keyword)}\\b`),
+		new RegExp(`["'\`]${escapeRegex(keyword)}["'\`]`),
+	];
+
+	return patterns.some((p) => p.test(line));
+}
+
+function escapeRegex(str: string): string {
+	return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export const globalHatRegistry = new HatRegistry();

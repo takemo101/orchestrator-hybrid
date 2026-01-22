@@ -18,3 +18,10 @@ export {
 	updateIssueLabel,
 } from "./input/github.js";
 export { generatePrompt } from "./input/prompt.js";
+export {
+	type CreatePROptions,
+	checkForUncommittedChanges,
+	createPR,
+	getCurrentBranch,
+	type PRResult,
+} from "./output/pr.js";

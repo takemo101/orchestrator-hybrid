@@ -5,6 +5,13 @@ import { type Backend, createBackend } from "../adapters/index.js";
 import { requestApproval } from "../gates/approval.js";
 import { fetchIssue, updateIssueLabel } from "../input/github.js";
 import { generatePrompt } from "../input/prompt.js";
+import { checkForUncommittedChanges, createPR } from "../output/pr.js";
+import {
+	createReportCollector,
+	generateReport,
+	type ReportCollector,
+	type ReportData,
+} from "../output/report.js";
 import { EventBus } from "./event.js";
 import {
 	buildHatPrompt,
@@ -21,10 +28,27 @@ export interface LoopOptions {
 	config: Config;
 	autoMode: boolean;
 	maxIterations?: number;
+	createPR?: boolean;
+	draftPR?: boolean;
+	useContainer?: boolean;
+	generateReport?: boolean;
+	reportPath?: string;
+	preset?: string;
 }
 
 export async function runLoop(options: LoopOptions): Promise<void> {
-	const { issueNumber, config, autoMode, maxIterations } = options;
+	const {
+		issueNumber,
+		config,
+		autoMode,
+		maxIterations,
+		createPR: shouldCreatePR = false,
+		draftPR = false,
+		useContainer = false,
+		generateReport: shouldGenerateReport = false,
+		reportPath = ".agent/report.md",
+		preset,
+	} = options;
 
 	const maxIter = maxIterations ?? config.loop.max_iterations;
 	const completionPromise = config.loop.completion_promise;
@@ -33,11 +57,18 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	const promptPath = ".agent/PROMPT.md";
 	const useHats = config.hats && Object.keys(config.hats).length > 0;
 
+	const containerEnabled = useContainer || config.container?.enabled;
+
 	logger.info(`Starting orchestration loop for issue #${issueNumber}`);
 	logger.info(`Max iterations: ${maxIter}`);
-	logger.info(`Backend: ${config.backend.type}`);
+	logger.info(
+		`Backend: ${containerEnabled ? "container" : config.backend.type}`,
+	);
 	logger.info(`Completion promise: ${completionPromise}`);
 	logger.info(`Hat mode: ${useHats ? "enabled" : "disabled"}`);
+	if (containerEnabled) {
+		logger.info("Container mode: enabled (isolated environment)");
+	}
 	console.log("");
 
 	const issue = await fetchIssue(issueNumber);
@@ -68,9 +99,28 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 		promptPath,
 		completionPromise,
 		autoMode,
+		createPR: shouldCreatePR,
+		draftPR,
+		useContainer: containerEnabled ?? false,
+		generateReport: shouldGenerateReport,
+		reportPath,
+		preset,
 	};
 
-	const backend = createBackend(config.backend.type as "claude" | "opencode");
+	const backendType = containerEnabled
+		? "container"
+		: (config.backend.type as "claude" | "opencode");
+
+	const backend = createBackend(backendType, {
+		container: config.container
+			? {
+					image: config.container.image,
+					envId: config.container.env_id,
+				}
+			: undefined,
+	});
+
+	const collector = shouldGenerateReport ? createReportCollector() : null;
 
 	if (useHats && config.hats) {
 		const hatRegistry = new HatRegistry();
@@ -78,9 +128,17 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 
 		const eventBus = new EventBus();
 
-		await executeHatLoop(context, backend, issueNumber, hatRegistry, eventBus);
+		await executeHatLoop(
+			context,
+			backend,
+			issueNumber,
+			hatRegistry,
+			eventBus,
+			config,
+			collector,
+		);
 	} else {
-		await executeSimpleLoop(context, backend, issueNumber);
+		await executeSimpleLoop(context, backend, issueNumber, config, collector);
 	}
 }
 
@@ -90,10 +148,14 @@ async function executeHatLoop(
 	issueNumber: number,
 	hatRegistry: HatRegistry,
 	eventBus: EventBus,
+	config: Config,
+	collector: ReportCollector | null,
 ): Promise<void> {
 	let consecutiveFailures = 0;
 	const maxConsecutiveFailures = 5;
 	const historyPath = ".agent/output_history.txt";
+	let completionReason: ReportData["completionReason"] = "max_iterations";
+	let prResult: { url: string; number: number; branch: string } | undefined;
 
 	mkdirSync(dirname(historyPath), { recursive: true });
 
@@ -103,6 +165,7 @@ async function executeHatLoop(
 
 	while (context.iteration < context.maxIterations) {
 		context.iteration++;
+		const iterStartTime = new Date();
 
 		const activeHat = currentEvent
 			? hatRegistry.findByTrigger(currentEvent.type)
@@ -129,8 +192,21 @@ async function executeHatLoop(
 		);
 
 		const result = await backend.execute(prompt);
+		const iterEndTime = new Date();
 
 		logger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
+
+		const publishedEvent = extractPublishedEvent(result.output, activeHat);
+
+		collector?.recordIteration({
+			hatId: activeHat.id,
+			hatName: activeHat.name,
+			startTime: iterStartTime,
+			endTime: iterEndTime,
+			durationMs: iterEndTime.getTime() - iterStartTime.getTime(),
+			exitCode: result.exitCode,
+			publishedEvent: publishedEvent ?? undefined,
+		});
 
 		if (result.exitCode !== 0) {
 			consecutiveFailures++;
@@ -141,14 +217,21 @@ async function executeHatLoop(
 					`Too many consecutive failures (${consecutiveFailures}). Stopping.`,
 				);
 				await updateIssueLabel(issueNumber, "env:blocked");
+				completionReason = "error";
+				await finalizeReport(
+					context,
+					config,
+					collector,
+					eventBus,
+					completionReason,
+					prResult,
+				);
 				throw new Error("Max consecutive failures reached");
 			}
 			continue;
 		}
 
 		consecutiveFailures = 0;
-
-		const publishedEvent = extractPublishedEvent(result.output, activeHat);
 
 		if (publishedEvent) {
 			logger.info(`Hat ${activeHat.id} published: ${publishedEvent}`);
@@ -172,6 +255,15 @@ async function executeHatLoop(
 			});
 
 			if (postApproval === "abort") {
+				completionReason = "aborted";
+				await finalizeReport(
+					context,
+					config,
+					collector,
+					eventBus,
+					completionReason,
+					prResult,
+				);
 				return;
 			}
 
@@ -180,6 +272,20 @@ async function executeHatLoop(
 				`Orchestration complete after ${context.iteration} iterations`,
 			);
 			printEventSummary(eventBus);
+
+			if (context.createPR) {
+				prResult = await handlePRCreation(context);
+			}
+
+			completionReason = "completed";
+			await finalizeReport(
+				context,
+				config,
+				collector,
+				eventBus,
+				completionReason,
+				prResult,
+			);
 			return;
 		}
 
@@ -196,6 +302,15 @@ async function executeHatLoop(
 			});
 
 			if (loopApproval === "abort") {
+				completionReason = "aborted";
+				await finalizeReport(
+					context,
+					config,
+					collector,
+					eventBus,
+					completionReason,
+					prResult,
+				);
 				return;
 			}
 		}
@@ -207,6 +322,15 @@ async function executeHatLoop(
 		`Max iterations (${context.maxIterations}) reached without completion`,
 	);
 	await updateIssueLabel(issueNumber, "env:blocked");
+	completionReason = "max_iterations";
+	await finalizeReport(
+		context,
+		config,
+		collector,
+		eventBus,
+		completionReason,
+		prResult,
+	);
 	throw new Error("Max iterations reached");
 }
 
@@ -214,15 +338,20 @@ async function executeSimpleLoop(
 	context: LoopContext,
 	backend: Backend,
 	issueNumber: number,
+	config: Config,
+	collector: ReportCollector | null,
 ): Promise<void> {
 	let consecutiveFailures = 0;
 	const maxConsecutiveFailures = 5;
 	const historyPath = ".agent/output_history.txt";
+	let completionReason: ReportData["completionReason"] = "max_iterations";
+	let prResult: { url: string; number: number; branch: string } | undefined;
 
 	mkdirSync(dirname(historyPath), { recursive: true });
 
 	while (context.iteration < context.maxIterations) {
 		context.iteration++;
+		const iterStartTime = new Date();
 
 		printIterationHeader(context.iteration, context.maxIterations);
 
@@ -231,8 +360,16 @@ async function executeSimpleLoop(
 		logger.info(`Iteration ${context.iteration}: Executing ${backend.name}...`);
 
 		const result = await backend.execute(prompt);
+		const iterEndTime = new Date();
 
 		logger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
+
+		collector?.recordIteration({
+			startTime: iterStartTime,
+			endTime: iterEndTime,
+			durationMs: iterEndTime.getTime() - iterStartTime.getTime(),
+			exitCode: result.exitCode,
+		});
 
 		if (result.exitCode !== 0) {
 			consecutiveFailures++;
@@ -243,6 +380,15 @@ async function executeSimpleLoop(
 					`Too many consecutive failures (${consecutiveFailures}). Stopping.`,
 				);
 				await updateIssueLabel(issueNumber, "env:blocked");
+				completionReason = "error";
+				await finalizeReport(
+					context,
+					config,
+					collector,
+					null,
+					completionReason,
+					prResult,
+				);
 				throw new Error("Max consecutive failures reached");
 			}
 			continue;
@@ -263,12 +409,35 @@ async function executeSimpleLoop(
 			});
 
 			if (postApproval === "abort") {
+				completionReason = "aborted";
+				await finalizeReport(
+					context,
+					config,
+					collector,
+					null,
+					completionReason,
+					prResult,
+				);
 				return;
 			}
 
 			console.log("");
 			logger.success(
 				`Orchestration complete after ${context.iteration} iterations`,
+			);
+
+			if (context.createPR) {
+				prResult = await handlePRCreation(context);
+			}
+
+			completionReason = "completed";
+			await finalizeReport(
+				context,
+				config,
+				collector,
+				null,
+				completionReason,
+				prResult,
 			);
 			return;
 		}
@@ -286,6 +455,15 @@ async function executeSimpleLoop(
 			});
 
 			if (loopApproval === "abort") {
+				completionReason = "aborted";
+				await finalizeReport(
+					context,
+					config,
+					collector,
+					null,
+					completionReason,
+					prResult,
+				);
 				return;
 			}
 		}
@@ -297,6 +475,15 @@ async function executeSimpleLoop(
 		`Max iterations (${context.maxIterations}) reached without completion`,
 	);
 	await updateIssueLabel(issueNumber, "env:blocked");
+	completionReason = "max_iterations";
+	await finalizeReport(
+		context,
+		config,
+		collector,
+		null,
+		completionReason,
+		prResult,
+	);
 	throw new Error("Max iterations reached");
 }
 
@@ -356,4 +543,79 @@ function checkLoopDetection(output: string, historyPath: string): boolean {
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function handlePRCreation(
+	context: LoopContext,
+): Promise<{ url: string; number: number; branch: string } | undefined> {
+	const hasChanges = await checkForUncommittedChanges();
+
+	if (!hasChanges) {
+		logger.warn("No uncommitted changes found. Skipping PR creation.");
+		return undefined;
+	}
+
+	console.log("");
+	console.log(
+		chalk.green("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
+	);
+	console.log(chalk.green("  CREATING PULL REQUEST"));
+	console.log(
+		chalk.green("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
+	);
+	console.log("");
+
+	try {
+		const result = await createPR({
+			issue: context.issue,
+			scratchpadPath: context.scratchpadPath,
+			draft: context.draftPR,
+		});
+
+		console.log("");
+		logger.success(`PR created: ${result.url}`);
+		console.log(chalk.gray(`  Branch: ${result.branch}`));
+		console.log(chalk.gray(`  PR #${result.number}`));
+
+		return result;
+	} catch (error) {
+		logger.error(
+			`Failed to create PR: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return undefined;
+	}
+}
+
+async function finalizeReport(
+	context: LoopContext,
+	config: Config,
+	collector: ReportCollector | null,
+	eventBus: EventBus | null,
+	completionReason: ReportData["completionReason"],
+	prResult?: { url: string; number: number; branch: string },
+): Promise<void> {
+	if (!context.generateReport || !collector) {
+		return;
+	}
+
+	const reportData: ReportData = {
+		issue: context.issue,
+		startTime: collector.getStartTime(),
+		endTime: new Date(),
+		totalIterations: collector.getTotalIterations(),
+		successful: completionReason === "completed",
+		completionReason,
+		iterations: collector.getIterations(),
+		events: eventBus?.getHistory() ?? [],
+		config: {
+			backend: config.backend.type,
+			maxIterations: context.maxIterations,
+			completionPromise: context.completionPromise,
+			useContainer: context.useContainer,
+			preset: context.preset,
+		},
+		prCreated: prResult,
+	};
+
+	generateReport(reportData, context.reportPath);
 }

@@ -7,12 +7,23 @@ export const HatSchema = z.object({
 	instructions: z.string().optional(),
 });
 
+export const ContainerConfigSchema = z
+	.object({
+		enabled: z.boolean().default(false),
+		image: z.string().default("node:20"),
+		env_id: z.string().optional(),
+	})
+	.optional();
+
 export const ConfigSchema = z.object({
 	version: z.string().default("1.0"),
 	backend: z.object({
-		type: z.enum(["claude", "opencode", "gemini"]).default("claude"),
+		type: z
+			.enum(["claude", "opencode", "gemini", "container"])
+			.default("claude"),
 		model: z.string().optional(),
 	}),
+	container: ContainerConfigSchema,
 	loop: z.object({
 		max_iterations: z.number().default(100),
 		completion_promise: z.string().default("LOOP_COMPLETE"),
@@ -60,6 +71,12 @@ export interface LoopContext {
 	promptPath: string;
 	completionPromise: string;
 	autoMode: boolean;
+	createPR: boolean;
+	draftPR: boolean;
+	useContainer: boolean;
+	generateReport: boolean;
+	reportPath: string;
+	preset?: string;
 }
 
 export interface BackendResult {
