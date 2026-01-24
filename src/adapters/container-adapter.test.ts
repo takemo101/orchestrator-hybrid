@@ -4,7 +4,7 @@
  * container-use環境でコードを実行するアダプターのテスト
  */
 
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { describe, expect, it, mock, spyOn } from "bun:test";
 import { logger } from "../core/logger.js";
 import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { ContainerAdapter, type ContainerAdapterConfig } from "./container-adapter.js";
@@ -144,7 +144,7 @@ describe("ContainerAdapter", () => {
 		it("should run command in container", async () => {
 			let runArgs: string[] = [];
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[]) => {
+				spawn: mock(async (_command: string, args: string[]) => {
 					if (args.includes("run")) {
 						runArgs = args;
 					}
@@ -164,7 +164,7 @@ describe("ContainerAdapter", () => {
 		it("should pass timeout option", async () => {
 			let spawnOptions: { timeout?: number } = {};
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[], options?: { timeout?: number }) => {
+				spawn: mock(async (_command: string, args: string[], options?: { timeout?: number }) => {
 					if (args.includes("run")) {
 						spawnOptions = options ?? {};
 					}
