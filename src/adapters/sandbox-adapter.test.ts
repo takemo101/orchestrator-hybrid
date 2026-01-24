@@ -92,7 +92,8 @@ describe("SandboxAdapter インターフェース", () => {
 					return true;
 				},
 
-				async execute(command: string, options?: ExecuteOptions): Promise<ExecuteResult> {
+				async execute(command: string, _options?: ExecuteOptions): Promise<ExecuteResult> {
+					void _options; // unused in mock
 					return {
 						stdout: `executed: ${command}`,
 						stderr: "",
