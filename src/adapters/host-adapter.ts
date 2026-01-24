@@ -8,10 +8,10 @@
  * @module
  */
 
-import type { SandboxAdapter, ExecuteOptions, ExecuteResult } from "./sandbox-adapter.js";
-import type { ProcessExecutor } from "../core/process-executor.js";
 import { BunProcessExecutor } from "../core/bun-process-executor.js";
 import { logger } from "../core/logger.js";
+import type { ProcessExecutor } from "../core/process-executor.js";
+import type { ExecuteOptions, ExecuteResult, SandboxAdapter } from "./sandbox-adapter.js";
 
 /**
  * ホスト環境設定
@@ -60,7 +60,10 @@ export class HostAdapter implements SandboxAdapter {
 	 * @param config ホスト環境設定
 	 * @param executor ProcessExecutor（テスト時のモック用）
 	 */
-	constructor(config: HostAdapterConfig = {}, executor: ProcessExecutor = new BunProcessExecutor()) {
+	constructor(
+		config: HostAdapterConfig = {},
+		executor: ProcessExecutor = new BunProcessExecutor(),
+	) {
 		this.config = config;
 		this.executor = executor;
 	}

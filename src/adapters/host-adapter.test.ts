@@ -5,14 +5,16 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { logger } from "../core/logger.js";
+import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { HostAdapter, type HostAdapterConfig } from "./host-adapter.js";
 
 /**
  * モックProcessExecutorを作成
  */
-function createMockExecutor(defaultResult: ProcessResult = { stdout: "", stderr: "", exitCode: 0 }): {
+function createMockExecutor(
+	defaultResult: ProcessResult = { stdout: "", stderr: "", exitCode: 0 },
+): {
 	executor: ProcessExecutor;
 	spawnMock: ReturnType<typeof mock>;
 } {
@@ -62,7 +64,11 @@ describe("HostAdapter", () => {
 
 	describe("execute", () => {
 		it("should execute command via sh -c", async () => {
-			const { executor, spawnMock } = createMockExecutor({ stdout: "Hello", stderr: "", exitCode: 0 });
+			const { executor, spawnMock } = createMockExecutor({
+				stdout: "Hello",
+				stderr: "",
+				exitCode: 0,
+			});
 
 			const adapter = new HostAdapter({ warnOnStart: false }, executor);
 			const result = await adapter.execute("echo Hello");
