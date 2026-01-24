@@ -5,8 +5,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { logger } from "../core/logger.js";
+import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { ContainerAdapter, type ContainerAdapterConfig } from "./container-adapter.js";
 
 /**
@@ -314,7 +314,10 @@ describe("ContainerAdapter", () => {
 			const executor = createMockExecutor(new Map());
 
 			// Type check: can be assigned to SandboxAdapter
-			const adapter: { name: string; isAvailable: () => Promise<boolean> } = new ContainerAdapter({}, executor);
+			const adapter: { name: string; isAvailable: () => Promise<boolean> } = new ContainerAdapter(
+				{},
+				executor,
+			);
 
 			expect(adapter.name).toBe("container-use");
 		});
