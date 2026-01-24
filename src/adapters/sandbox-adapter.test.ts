@@ -6,12 +6,8 @@
  * ここではインターフェースの使用例をテストとして記述し、
  * 型が正しく定義されていることを確認する。
  */
-import { describe, it, expect } from "bun:test";
-import type {
-	ExecuteOptions,
-	ExecuteResult,
-	SandboxAdapter,
-} from "./sandbox-adapter.js";
+import { describe, expect, it } from "bun:test";
+import type { ExecuteOptions, ExecuteResult, SandboxAdapter } from "./sandbox-adapter.js";
 
 describe("SandboxAdapter インターフェース", () => {
 	describe("ExecuteOptions型", () => {
@@ -96,10 +92,7 @@ describe("SandboxAdapter インターフェース", () => {
 					return true;
 				},
 
-				async execute(
-					command: string,
-					options?: ExecuteOptions
-				): Promise<ExecuteResult> {
+				async execute(command: string, options?: ExecuteOptions): Promise<ExecuteResult> {
 					return {
 						stdout: `executed: ${command}`,
 						stderr: "",
