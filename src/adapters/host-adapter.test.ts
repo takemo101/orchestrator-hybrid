@@ -4,7 +4,7 @@
  * ホスト環境で直接コードを実行するアダプターのテスト
  */
 
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { describe, expect, it, mock, spyOn } from "bun:test";
 import { logger } from "../core/logger.js";
 import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { HostAdapter, type HostAdapterConfig } from "./host-adapter.js";
