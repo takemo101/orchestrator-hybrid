@@ -10,6 +10,7 @@ export {
 } from "./core/hat.js";
 export { createTaskLogger, logger, setVerbose } from "./core/logger.js";
 export { runLoop, runMultipleLoops } from "./core/loop.js";
+export { BunProcessExecutor } from "./core/bun-process-executor.js";
 export type {
 	ProcessExecutor,
 	ProcessResult,
