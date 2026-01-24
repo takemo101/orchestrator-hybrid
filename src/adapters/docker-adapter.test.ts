@@ -5,8 +5,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { ImagePullError } from "../core/errors.js";
+import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { DockerAdapter, type DockerAdapterConfig } from "./docker-adapter.js";
 
 /**
@@ -52,7 +52,9 @@ describe("DockerAdapter", () => {
 	describe("isAvailable", () => {
 		it("should return true when docker is available", async () => {
 			const executor = createMockExecutor(
-				new Map([["docker --version", { stdout: "Docker version 24.0.0", stderr: "", exitCode: 0 }]]),
+				new Map([
+					["docker --version", { stdout: "Docker version 24.0.0", stderr: "", exitCode: 0 }],
+				]),
 			);
 
 			const adapter = new DockerAdapter({ image: "node:20-alpine" }, executor);
@@ -187,7 +189,10 @@ describe("DockerAdapter", () => {
 				}),
 			};
 
-			const adapter = new DockerAdapter({ image: "node:20-alpine", workdir: "/test/dir" }, executor);
+			const adapter = new DockerAdapter(
+				{ image: "node:20-alpine", workdir: "/test/dir" },
+				executor,
+			);
 			await adapter.execute("echo test");
 
 			expect(runArgs).toContain("-v");
@@ -227,7 +232,10 @@ describe("DockerAdapter", () => {
 				}),
 			};
 
-			const adapter = new DockerAdapter({ image: "node:20-alpine", workdir: "/config/dir" }, executor);
+			const adapter = new DockerAdapter(
+				{ image: "node:20-alpine", workdir: "/config/dir" },
+				executor,
+			);
 			await adapter.execute("echo test", { cwd: "/options/dir" });
 
 			const volumeIndex = runArgs.indexOf("-v");
