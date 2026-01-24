@@ -4,7 +4,7 @@
  * SandboxFactory が設定に基づいて適切な SandboxAdapter を返すことを検証
  */
 
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { EnvironmentUnavailableError } from "../core/errors.js";
 import type { ProcessExecutor, ProcessResult, SpawnOptions } from "../core/process-executor.js";
 import type { Config } from "../core/types.js";
