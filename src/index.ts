@@ -1,4 +1,9 @@
 export { type Backend, createBackend } from "./adapters/index.js";
+export type {
+	ProcessExecutor,
+	ProcessResult,
+	SpawnOptions,
+} from "./core/process-executor.js";
 export { loadConfig } from "./core/config.js";
 export { EventBus, globalEventBus, type OrchEvent } from "./core/event.js";
 export {
