@@ -10,6 +10,11 @@ export {
 } from "./core/hat.js";
 export { createTaskLogger, logger, setVerbose } from "./core/logger.js";
 export { runLoop, runMultipleLoops } from "./core/loop.js";
+export type {
+	ProcessExecutor,
+	ProcessResult,
+	SpawnOptions,
+} from "./core/process-executor.js";
 export {
 	createTaskState,
 	generateTaskId,
