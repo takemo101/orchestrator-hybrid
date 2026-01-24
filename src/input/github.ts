@@ -1,11 +1,11 @@
-import { execa } from "execa";
+import { exec } from "../core/exec.js";
 import { logger } from "../core/logger.js";
 import type { Issue } from "../core/types.js";
 
 export async function fetchIssue(issueNumber: number): Promise<Issue> {
 	logger.info(`Fetching issue #${issueNumber}...`);
 
-	const { stdout } = await execa("gh", [
+	const { stdout } = await exec("gh", [
 		"issue",
 		"view",
 		String(issueNumber),
@@ -31,7 +31,7 @@ export async function updateIssueLabel(
 	logger.info(`Adding label '${label}' to issue #${issueNumber}...`);
 
 	try {
-		await execa("gh", [
+		await exec("gh", [
 			"issue",
 			"edit",
 			String(issueNumber),
@@ -50,7 +50,7 @@ export async function addIssueComment(
 	logger.info(`Adding comment to issue #${issueNumber}...`);
 
 	try {
-		await execa("gh", [
+		await exec("gh", [
 			"issue",
 			"comment",
 			String(issueNumber),

@@ -19,9 +19,14 @@ import {
 	type HatDefinition,
 	HatRegistry,
 } from "./hat.js";
-import { logger } from "./logger.js";
+import { createTaskLogger, logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
-import type { Config, LoopContext } from "./types.js";
+import {
+	type TaskManager,
+	type TaskStateCallback,
+	TaskStore,
+} from "./task-manager.js";
+import type { Config, Issue, LoopContext } from "./types.js";
 
 export interface LoopOptions {
 	issueNumber: number;
@@ -33,6 +38,21 @@ export interface LoopOptions {
 	useContainer?: boolean;
 	generateReport?: boolean;
 	reportPath?: string;
+	preset?: string;
+	taskId?: string;
+	onStateChange?: TaskStateCallback;
+	signal?: AbortSignal;
+}
+
+export interface MultiLoopOptions {
+	issueNumbers: number[];
+	config: Config;
+	autoMode: boolean;
+	maxIterations?: number;
+	createPR?: boolean;
+	draftPR?: boolean;
+	useContainer?: boolean;
+	generateReport?: boolean;
 	preset?: string;
 }
 
@@ -48,30 +68,39 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 		generateReport: shouldGenerateReport = false,
 		reportPath = ".agent/report.md",
 		preset,
+		taskId,
+		onStateChange,
+		signal,
 	} = options;
+
+	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 
 	const maxIter = maxIterations ?? config.loop.max_iterations;
 	const completionPromise = config.loop.completion_promise;
 	const scratchpadPath =
 		config.state?.scratchpad_path ?? ".agent/scratchpad.md";
-	const promptPath = ".agent/PROMPT.md";
+	const promptPath = taskId ? `.agent/${taskId}/PROMPT.md` : ".agent/PROMPT.md";
 	const useHats = config.hats && Object.keys(config.hats).length > 0;
 
 	const containerEnabled = useContainer || config.container?.enabled;
 
-	logger.info(`Starting orchestration loop for issue #${issueNumber}`);
-	logger.info(`Max iterations: ${maxIter}`);
-	logger.info(
+	taskLogger.info(`Starting orchestration loop for issue #${issueNumber}`);
+	taskLogger.info(`Max iterations: ${maxIter}`);
+	taskLogger.info(
 		`Backend: ${containerEnabled ? "container" : config.backend.type}`,
 	);
-	logger.info(`Completion promise: ${completionPromise}`);
-	logger.info(`Hat mode: ${useHats ? "enabled" : "disabled"}`);
+	taskLogger.info(`Completion promise: ${completionPromise}`);
+	taskLogger.info(`Hat mode: ${useHats ? "enabled" : "disabled"}`);
 	if (containerEnabled) {
-		logger.info("Container mode: enabled (isolated environment)");
+		taskLogger.info("Container mode: enabled (isolated environment)");
 	}
-	console.log("");
 
 	const issue = await fetchIssue(issueNumber);
+
+	onStateChange?.({ issueTitle: issue.title });
+
+	const taskPromptDir = taskId ? `.agent/${taskId}` : ".agent";
+	mkdirSync(taskPromptDir, { recursive: true });
 
 	generatePrompt({ issue, completionPromise, scratchpadPath }, promptPath);
 
@@ -136,10 +165,78 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 			eventBus,
 			config,
 			collector,
+			taskId,
+			onStateChange,
+			signal,
 		);
 	} else {
-		await executeSimpleLoop(context, backend, issueNumber, config, collector);
+		await executeSimpleLoop(
+			context,
+			backend,
+			issueNumber,
+			config,
+			collector,
+			taskId,
+			onStateChange,
+			signal,
+		);
 	}
+}
+
+export async function runMultipleLoops(
+	options: MultiLoopOptions,
+	taskManager: TaskManager,
+): Promise<void> {
+	const {
+		issueNumbers,
+		config,
+		autoMode,
+		maxIterations,
+		createPR: shouldCreatePR = false,
+		draftPR = false,
+		useContainer = false,
+		generateReport: shouldGenerateReport = false,
+		preset,
+	} = options;
+
+	const issues: Issue[] = [];
+	for (const issueNumber of issueNumbers) {
+		const issue = await fetchIssue(issueNumber);
+		issues.push(issue);
+	}
+
+	const maxIter = maxIterations ?? config.loop.max_iterations;
+
+	const tasks = issues.map((issue) => ({
+		issue,
+		maxIterations: maxIter,
+		runner: async (onStateChange: TaskStateCallback, signal: AbortSignal) => {
+			const taskState = taskManager
+				.getAllTasks()
+				.find((t) => t.issueNumber === issue.number);
+			const taskId = taskState?.id;
+
+			await runLoop({
+				issueNumber: issue.number,
+				config,
+				autoMode,
+				maxIterations: maxIter,
+				createPR: shouldCreatePR,
+				draftPR,
+				useContainer,
+				generateReport: shouldGenerateReport,
+				reportPath: taskId
+					? `.agent/${taskId}/report.md`
+					: `.agent/report-${issue.number}.md`,
+				preset,
+				taskId,
+				onStateChange,
+				signal,
+			});
+		},
+	}));
+
+	await taskManager.runParallel(tasks);
 }
 
 async function executeHatLoop(
@@ -150,10 +247,16 @@ async function executeHatLoop(
 	eventBus: EventBus,
 	config: Config,
 	collector: ReportCollector | null,
+	taskId?: string,
+	onStateChange?: TaskStateCallback,
+	signal?: AbortSignal,
 ): Promise<void> {
+	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 	let consecutiveFailures = 0;
 	const maxConsecutiveFailures = 5;
-	const historyPath = ".agent/output_history.txt";
+	const historyPath = taskId
+		? `.agent/${taskId}/output_history.txt`
+		: ".agent/output_history.txt";
 	let completionReason: ReportData["completionReason"] = "max_iterations";
 	let prResult: { url: string; number: number; branch: string } | undefined;
 
@@ -164,6 +267,11 @@ async function executeHatLoop(
 	let currentEvent = eventBus.getLastEvent();
 
 	while (context.iteration < context.maxIterations) {
+		if (signal?.aborted) {
+			taskLogger.warn("Task cancelled");
+			return;
+		}
+
 		context.iteration++;
 		const iterStartTime = new Date();
 
@@ -172,13 +280,25 @@ async function executeHatLoop(
 			: hatRegistry.getAll()[0];
 
 		if (!activeHat) {
-			logger.warn(`No hat found for event: ${currentEvent?.type ?? "none"}`);
+			taskLogger.warn(
+				`No hat found for event: ${currentEvent?.type ?? "none"}`,
+			);
 			break;
 		}
 
 		hatRegistry.setActive(activeHat.id);
 
-		printIterationHeader(context.iteration, context.maxIterations, activeHat);
+		onStateChange?.({
+			iteration: context.iteration,
+			currentHat: activeHat.name ?? activeHat.id,
+		});
+
+		printIterationHeader(
+			context.iteration,
+			context.maxIterations,
+			activeHat,
+			taskId,
+		);
 
 		const basePrompt = readFileSync(context.promptPath, "utf-8");
 		const prompt = buildHatPrompt(activeHat, basePrompt, {
@@ -187,16 +307,20 @@ async function executeHatLoop(
 			iteration: context.iteration,
 		});
 
-		logger.info(
+		taskLogger.info(
 			`Iteration ${context.iteration}: ${activeHat.name ?? activeHat.id} executing...`,
 		);
 
 		const result = await backend.execute(prompt);
 		const iterEndTime = new Date();
 
-		logger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
+		taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
 
 		const publishedEvent = extractPublishedEvent(result.output, activeHat);
+
+		if (publishedEvent) {
+			onStateChange?.({ lastEvent: publishedEvent });
+		}
 
 		collector?.recordIteration({
 			hatId: activeHat.id,
@@ -210,10 +334,10 @@ async function executeHatLoop(
 
 		if (result.exitCode !== 0) {
 			consecutiveFailures++;
-			logger.error(`Backend exited with code ${result.exitCode}`);
+			taskLogger.error(`Backend exited with code ${result.exitCode}`);
 
 			if (consecutiveFailures >= maxConsecutiveFailures) {
-				logger.error(
+				taskLogger.error(
 					`Too many consecutive failures (${consecutiveFailures}). Stopping.`,
 				);
 				await updateIssueLabel(issueNumber, "env:blocked");
@@ -234,7 +358,7 @@ async function executeHatLoop(
 		consecutiveFailures = 0;
 
 		if (publishedEvent) {
-			logger.info(`Hat ${activeHat.id} published: ${publishedEvent}`);
+			taskLogger.info(`Hat ${activeHat.id} published: ${publishedEvent}`);
 			eventBus.emit(publishedEvent, activeHat.id);
 			currentEvent = eventBus.getLastEvent();
 		}
@@ -243,8 +367,9 @@ async function executeHatLoop(
 			checkCompletion(result.output, context.completionPromise) ||
 			publishedEvent === context.completionPromise
 		) {
-			console.log("");
-			logger.success(`Task completed! (${context.completionPromise} detected)`);
+			taskLogger.success(
+				`Task completed! (${context.completionPromise} detected)`,
+			);
 			await updateIssueLabel(issueNumber, "env:pr-created");
 
 			const postApproval = await requestApproval({
@@ -267,14 +392,13 @@ async function executeHatLoop(
 				return;
 			}
 
-			console.log("");
-			logger.success(
+			taskLogger.success(
 				`Orchestration complete after ${context.iteration} iterations`,
 			);
-			printEventSummary(eventBus);
+			printEventSummary(eventBus, taskId);
 
 			if (context.createPR) {
-				prResult = await handlePRCreation(context);
+				prResult = await handlePRCreation(context, taskId);
 			}
 
 			completionReason = "completed";
@@ -289,8 +413,8 @@ async function executeHatLoop(
 			return;
 		}
 
-		if (checkLoopDetection(result.output, historyPath)) {
-			logger.warn(
+		if (checkLoopDetection(result.output, historyPath, taskLogger)) {
+			taskLogger.warn(
 				"Possible infinite loop detected. Requesting human intervention.",
 			);
 
@@ -318,7 +442,7 @@ async function executeHatLoop(
 		await sleep(1000);
 	}
 
-	logger.error(
+	taskLogger.error(
 		`Max iterations (${context.maxIterations}) reached without completion`,
 	);
 	await updateIssueLabel(issueNumber, "env:blocked");
@@ -340,29 +464,51 @@ async function executeSimpleLoop(
 	issueNumber: number,
 	config: Config,
 	collector: ReportCollector | null,
+	taskId?: string,
+	onStateChange?: TaskStateCallback,
+	signal?: AbortSignal,
 ): Promise<void> {
+	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 	let consecutiveFailures = 0;
 	const maxConsecutiveFailures = 5;
-	const historyPath = ".agent/output_history.txt";
+	const historyPath = taskId
+		? `.agent/${taskId}/output_history.txt`
+		: ".agent/output_history.txt";
 	let completionReason: ReportData["completionReason"] = "max_iterations";
 	let prResult: { url: string; number: number; branch: string } | undefined;
 
 	mkdirSync(dirname(historyPath), { recursive: true });
 
 	while (context.iteration < context.maxIterations) {
+		if (signal?.aborted) {
+			taskLogger.warn("Task cancelled");
+			return;
+		}
+
 		context.iteration++;
 		const iterStartTime = new Date();
 
-		printIterationHeader(context.iteration, context.maxIterations);
+		onStateChange?.({
+			iteration: context.iteration,
+		});
+
+		printIterationHeader(
+			context.iteration,
+			context.maxIterations,
+			undefined,
+			taskId,
+		);
 
 		const prompt = readFileSync(context.promptPath, "utf-8");
 
-		logger.info(`Iteration ${context.iteration}: Executing ${backend.name}...`);
+		taskLogger.info(
+			`Iteration ${context.iteration}: Executing ${backend.name}...`,
+		);
 
 		const result = await backend.execute(prompt);
 		const iterEndTime = new Date();
 
-		logger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
+		taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
 
 		collector?.recordIteration({
 			startTime: iterStartTime,
@@ -373,10 +519,10 @@ async function executeSimpleLoop(
 
 		if (result.exitCode !== 0) {
 			consecutiveFailures++;
-			logger.error(`Backend exited with code ${result.exitCode}`);
+			taskLogger.error(`Backend exited with code ${result.exitCode}`);
 
 			if (consecutiveFailures >= maxConsecutiveFailures) {
-				logger.error(
+				taskLogger.error(
 					`Too many consecutive failures (${consecutiveFailures}). Stopping.`,
 				);
 				await updateIssueLabel(issueNumber, "env:blocked");
@@ -397,8 +543,9 @@ async function executeSimpleLoop(
 		consecutiveFailures = 0;
 
 		if (checkCompletion(result.output, context.completionPromise)) {
-			console.log("");
-			logger.success(`Task completed! (${context.completionPromise} detected)`);
+			taskLogger.success(
+				`Task completed! (${context.completionPromise} detected)`,
+			);
 			await updateIssueLabel(issueNumber, "env:pr-created");
 
 			const postApproval = await requestApproval({
@@ -421,13 +568,12 @@ async function executeSimpleLoop(
 				return;
 			}
 
-			console.log("");
-			logger.success(
+			taskLogger.success(
 				`Orchestration complete after ${context.iteration} iterations`,
 			);
 
 			if (context.createPR) {
-				prResult = await handlePRCreation(context);
+				prResult = await handlePRCreation(context, taskId);
 			}
 
 			completionReason = "completed";
@@ -442,8 +588,8 @@ async function executeSimpleLoop(
 			return;
 		}
 
-		if (checkLoopDetection(result.output, historyPath)) {
-			logger.warn(
+		if (checkLoopDetection(result.output, historyPath, taskLogger)) {
+			taskLogger.warn(
 				"Possible infinite loop detected. Requesting human intervention.",
 			);
 
@@ -471,7 +617,7 @@ async function executeSimpleLoop(
 		await sleep(1000);
 	}
 
-	logger.error(
+	taskLogger.error(
 		`Max iterations (${context.maxIterations}) reached without completion`,
 	);
 	await updateIssueLabel(issueNumber, "env:blocked");
@@ -491,17 +637,21 @@ function printIterationHeader(
 	iteration: number,
 	max: number,
 	hat?: HatDefinition,
+	taskId?: string,
 ): void {
+	const taskPrefix = taskId ? `[${taskId}] ` : "";
 	console.log("");
 	console.log(
 		chalk.cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
 	);
 	if (hat) {
 		console.log(
-			chalk.cyan(`  ITERATION ${iteration}/${max} │ ${hat.name ?? hat.id}`),
+			chalk.cyan(
+				`  ${taskPrefix}ITERATION ${iteration}/${max} │ ${hat.name ?? hat.id}`,
+			),
 		);
 	} else {
-		console.log(chalk.cyan(`  ITERATION ${iteration}/${max}`));
+		console.log(chalk.cyan(`  ${taskPrefix}ITERATION ${iteration}/${max}`));
 	}
 	console.log(
 		chalk.cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
@@ -509,12 +659,13 @@ function printIterationHeader(
 	console.log("");
 }
 
-function printEventSummary(eventBus: EventBus): void {
+function printEventSummary(eventBus: EventBus, taskId?: string): void {
 	const events = eventBus.getHistory();
 	if (events.length === 0) return;
 
+	const taskPrefix = taskId ? `[${taskId}] ` : "";
 	console.log("");
-	console.log(chalk.gray("Event History:"));
+	console.log(chalk.gray(`${taskPrefix}Event History:`));
 	for (const event of events) {
 		const hatInfo = event.hatId ? ` (${event.hatId})` : "";
 		console.log(chalk.gray(`  → ${event.type}${hatInfo}`));
@@ -525,14 +676,18 @@ function checkCompletion(output: string, promise: string): boolean {
 	return output.includes(promise);
 }
 
-function checkLoopDetection(output: string, historyPath: string): boolean {
+function checkLoopDetection(
+	output: string,
+	historyPath: string,
+	taskLogger: typeof logger,
+): boolean {
 	if (existsSync(historyPath)) {
 		const history = readFileSync(historyPath, "utf-8");
 		const lines = history.split("\n---OUTPUT---\n").filter(Boolean);
 		const lastOutput = lines[lines.length - 1] ?? "";
 
 		if (output === lastOutput) {
-			logger.warn("Loop detected: output identical to previous iteration");
+			taskLogger.warn("Loop detected: output identical to previous iteration");
 			return true;
 		}
 	}
@@ -547,19 +702,22 @@ function sleep(ms: number): Promise<void> {
 
 async function handlePRCreation(
 	context: LoopContext,
+	taskId?: string,
 ): Promise<{ url: string; number: number; branch: string } | undefined> {
+	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 	const hasChanges = await checkForUncommittedChanges();
 
 	if (!hasChanges) {
-		logger.warn("No uncommitted changes found. Skipping PR creation.");
+		taskLogger.warn("No uncommitted changes found. Skipping PR creation.");
 		return undefined;
 	}
 
+	const taskPrefix = taskId ? `[${taskId}] ` : "";
 	console.log("");
 	console.log(
 		chalk.green("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
 	);
-	console.log(chalk.green("  CREATING PULL REQUEST"));
+	console.log(chalk.green(`  ${taskPrefix}CREATING PULL REQUEST`));
 	console.log(
 		chalk.green("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
 	);
@@ -573,13 +731,13 @@ async function handlePRCreation(
 		});
 
 		console.log("");
-		logger.success(`PR created: ${result.url}`);
+		taskLogger.success(`PR created: ${result.url}`);
 		console.log(chalk.gray(`  Branch: ${result.branch}`));
 		console.log(chalk.gray(`  PR #${result.number}`));
 
 		return result;
 	} catch (error) {
-		logger.error(
+		taskLogger.error(
 			`Failed to create PR: ${error instanceof Error ? error.message : String(error)}`,
 		);
 		return undefined;

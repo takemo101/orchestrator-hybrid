@@ -1,4 +1,4 @@
-import { execa } from "execa";
+import { exec } from "../core/exec.js";
 import { logger } from "../core/logger.js";
 import type { BackendResult } from "../core/types.js";
 import { BaseBackend } from "./base.js";
@@ -42,7 +42,7 @@ export class ContainerBackend extends BaseBackend {
 	private async createEnvironment(): Promise<void> {
 		logger.info("Creating container-use environment...");
 
-		const { stdout } = await execa("cu", [
+		const { stdout } = await exec("cu", [
 			"environment",
 			"create",
 			"--source",
@@ -63,7 +63,7 @@ export class ContainerBackend extends BaseBackend {
 			throw new Error("No environment ID available");
 		}
 
-		const { stdout, exitCode } = await execa(
+		const { stdout, exitCode } = await exec(
 			"cu",
 			[
 				"environment",
@@ -80,7 +80,7 @@ export class ContainerBackend extends BaseBackend {
 
 		return {
 			output: stdout,
-			exitCode: exitCode ?? 0,
+			exitCode,
 		};
 	}
 
@@ -92,7 +92,7 @@ export class ContainerBackend extends BaseBackend {
 		logger.info(`Cleaning up environment: ${this.envId}`);
 
 		try {
-			await execa("cu", [
+			await exec("cu", [
 				"environment",
 				"delete",
 				"--id",

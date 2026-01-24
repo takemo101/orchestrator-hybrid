@@ -1,4 +1,4 @@
-import { execa } from "execa";
+import { exec } from "../core/exec.js";
 import { logger } from "../core/logger.js";
 import { readScratchpad } from "../core/scratchpad.js";
 import type { Issue } from "../core/types.js";
@@ -59,7 +59,7 @@ function generateBranchName(issue: Issue): string {
 }
 
 async function ensureBranchExists(branchName: string): Promise<void> {
-	const { stdout: currentBranch } = await execa("git", [
+	const { stdout: currentBranch } = await exec("git", [
 		"branch",
 		"--show-current",
 	]);
@@ -69,23 +69,23 @@ async function ensureBranchExists(branchName: string): Promise<void> {
 	}
 
 	try {
-		await execa("git", ["checkout", "-b", branchName]);
+		await exec("git", ["checkout", "-b", branchName]);
 		logger.info(`Created branch: ${branchName}`);
 	} catch {
-		await execa("git", ["checkout", branchName]);
+		await exec("git", ["checkout", branchName]);
 		logger.info(`Switched to branch: ${branchName}`);
 	}
 }
 
 async function commitChanges(issue: Issue): Promise<void> {
-	const { stdout: status } = await execa("git", ["status", "--porcelain"]);
+	const { stdout: status } = await exec("git", ["status", "--porcelain"]);
 
 	if (!status.trim()) {
 		logger.info("No changes to commit");
 		return;
 	}
 
-	await execa("git", ["add", "-A"]);
+	await exec("git", ["add", "-A"]);
 
 	const commitMessage = `feat: ${issue.title}
 
@@ -93,17 +93,17 @@ Implements #${issue.number}
 
 Co-authored-by: orchestrator-hybrid <orchestrator@local>`;
 
-	await execa("git", ["commit", "-m", commitMessage]);
+	await exec("git", ["commit", "-m", commitMessage]);
 
 	logger.info("Committed changes");
 }
 
 async function pushBranch(branchName: string): Promise<void> {
 	try {
-		await execa("git", ["push", "-u", "origin", branchName]);
+		await exec("git", ["push", "-u", "origin", branchName]);
 		logger.info(`Pushed branch: ${branchName}`);
 	} catch {
-		await execa("git", [
+		await exec("git", [
 			"push",
 			"--force-with-lease",
 			"-u",
@@ -190,7 +190,7 @@ async function createGitHubPR(options: CreateGitHubPROptions): Promise<string> {
 		args.push("--draft");
 	}
 
-	const { stdout } = await execa("gh", args);
+	const { stdout } = await exec("gh", args);
 
 	return stdout.trim();
 }
@@ -201,11 +201,11 @@ function extractPRNumber(url: string): number {
 }
 
 export async function checkForUncommittedChanges(): Promise<boolean> {
-	const { stdout } = await execa("git", ["status", "--porcelain"]);
+	const { stdout } = await exec("git", ["status", "--porcelain"]);
 	return stdout.trim().length > 0;
 }
 
 export async function getCurrentBranch(): Promise<string> {
-	const { stdout } = await execa("git", ["branch", "--show-current"]);
+	const { stdout } = await exec("git", ["branch", "--show-current"]);
 	return stdout.trim();
 }

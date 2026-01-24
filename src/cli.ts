@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, watch, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import chalk from "chalk";
 import { Command } from "commander";
 import { parse as parseYaml } from "yaml";
 import { loadConfig } from "./core/config.js";
 import { EventBus } from "./core/event.js";
 import { logger, setVerbose } from "./core/logger.js";
-import { runLoop } from "./core/loop.js";
+import { runLoop, runMultipleLoops } from "./core/loop.js";
 import { readScratchpad } from "./core/scratchpad.js";
+import type { TaskState } from "./core/task-manager.js";
+import { TaskManager, TaskStore } from "./core/task-manager.js";
 import { fetchIssue } from "./input/github.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,7 +30,11 @@ program
 program
 	.command("run")
 	.description("Start orchestration loop")
-	.requiredOption("-i, --issue <number>", "GitHub issue number")
+	.option("-i, --issue <number>", "GitHub issue number (single)")
+	.option(
+		"--issues <numbers>",
+		"GitHub issue numbers (comma-separated for parallel)",
+	)
 	.option("-b, --backend <type>", "Backend: claude, opencode")
 	.option(
 		"-p, --preset <name>",
@@ -54,6 +61,11 @@ program
 				setVerbose(true);
 			}
 
+			if (!options.issue && !options.issues) {
+				logger.error("Either --issue or --issues is required");
+				process.exit(1);
+			}
+
 			let config: ReturnType<typeof loadConfig>;
 
 			if (options.preset) {
@@ -67,21 +79,57 @@ program
 				config.backend.type = options.backend;
 			}
 
-			await runLoop({
-				issueNumber: Number.parseInt(options.issue, 10),
-				config,
-				autoMode: options.auto ?? false,
-				maxIterations: options.maxIterations,
-				createPR: options.createPr ?? false,
-				draftPR: options.draft ?? false,
-				useContainer: options.container ?? false,
-				generateReport: options.report !== undefined,
-				reportPath:
-					typeof options.report === "string"
-						? options.report
-						: ".agent/report.md",
-				preset: options.preset,
-			});
+			if (options.issues) {
+				const issueNumbers = options.issues
+					.split(",")
+					.map((n: string) => Number.parseInt(n.trim(), 10))
+					.filter((n: number) => !Number.isNaN(n));
+
+				if (issueNumbers.length === 0) {
+					logger.error("No valid issue numbers provided");
+					process.exit(1);
+				}
+
+				logger.info(
+					`Starting parallel execution for issues: ${issueNumbers.join(", ")}`,
+				);
+
+				const taskManager = new TaskManager();
+
+				await runMultipleLoops(
+					{
+						issueNumbers,
+						config,
+						autoMode: options.auto ?? false,
+						maxIterations: options.maxIterations,
+						createPR: options.createPr ?? false,
+						draftPR: options.draft ?? false,
+						useContainer: options.container ?? false,
+						generateReport: options.report !== undefined,
+						preset: options.preset,
+					},
+					taskManager,
+				);
+
+				const tasks = taskManager.getAllTasks();
+				printTaskSummary(tasks);
+			} else {
+				await runLoop({
+					issueNumber: Number.parseInt(options.issue, 10),
+					config,
+					autoMode: options.auto ?? false,
+					maxIterations: options.maxIterations,
+					createPR: options.createPr ?? false,
+					draftPR: options.draft ?? false,
+					useContainer: options.container ?? false,
+					generateReport: options.report !== undefined,
+					reportPath:
+						typeof options.report === "string"
+							? options.report
+							: ".agent/report.md",
+					preset: options.preset,
+				});
+			}
 		} catch (error) {
 			logger.error(error instanceof Error ? error.message : String(error));
 			process.exit(1);
@@ -90,25 +138,80 @@ program
 
 program
 	.command("status")
-	.description("Show current status")
-	.requiredOption("-i, --issue <number>", "GitHub issue number")
+	.description("Show task status")
+	.option("-i, --issue <number>", "GitHub issue number")
+	.option("-t, --task <id>", "Task ID")
+	.option("-a, --all", "Show all tasks")
 	.option("-c, --config <path>", "Config file path")
 	.action(async (options) => {
 		try {
-			const config = loadConfig(options.config);
-			const issueNumber = Number.parseInt(options.issue, 10);
+			const store = new TaskStore();
 
-			logger.info(`Status for issue #${issueNumber}:`);
+			if (options.all) {
+				const tasks = store.getAll();
+				if (tasks.length === 0) {
+					logger.info("No tasks found");
+					return;
+				}
+				printTaskTable(tasks);
+				return;
+			}
 
-			const issue = await fetchIssue(issueNumber);
-			console.log(JSON.stringify(issue, null, 2));
+			if (options.task) {
+				const task = store.get(options.task);
+				if (!task) {
+					logger.error(`Task not found: ${options.task}`);
+					process.exit(1);
+				}
+				printTaskDetail(task);
+				return;
+			}
 
-			console.log("");
-			logger.info("Scratchpad:");
+			if (options.issue) {
+				const config = loadConfig(options.config);
+				const issueNumber = Number.parseInt(options.issue, 10);
 
-			const scratchpadPath =
-				config.state?.scratchpad_path ?? ".agent/scratchpad.md";
-			console.log(readScratchpad(scratchpadPath));
+				logger.info(`Status for issue #${issueNumber}:`);
+
+				const issue = await fetchIssue(issueNumber);
+				console.log(JSON.stringify(issue, null, 2));
+
+				console.log("");
+				logger.info("Scratchpad:");
+
+				const scratchpadPath =
+					config.state?.scratchpad_path ?? ".agent/scratchpad.md";
+				console.log(readScratchpad(scratchpadPath));
+
+				const tasks = store
+					.getAll()
+					.filter((t) => t.issueNumber === issueNumber);
+				if (tasks.length > 0) {
+					console.log("");
+					logger.info("Related tasks:");
+					printTaskTable(tasks);
+				}
+				return;
+			}
+
+			const runningTasks = store.getByStatus("running");
+			if (runningTasks.length > 0) {
+				logger.info("Running tasks:");
+				printTaskTable(runningTasks);
+			} else {
+				logger.info("No running tasks");
+
+				const recentTasks = store
+					.getAll()
+					.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+					.slice(0, 5);
+
+				if (recentTasks.length > 0) {
+					console.log("");
+					logger.info("Recent tasks:");
+					printTaskTable(recentTasks);
+				}
+			}
 		} catch (error) {
 			logger.error(error instanceof Error ? error.message : String(error));
 			process.exit(1);
@@ -190,10 +293,161 @@ state:
 
 program
 	.command("cancel")
-	.description("Cancel running orchestration")
-	.requiredOption("-i, --issue <number>", "GitHub issue number")
-	.action(() => {
-		logger.warn("Cancel not yet implemented");
+	.description("Cancel running task(s)")
+	.option("-t, --task <id>", "Task ID to cancel")
+	.option("-a, --all", "Cancel all running tasks")
+	.action((options) => {
+		const taskManager = new TaskManager();
+
+		if (options.all) {
+			const runningTasks = taskManager.getRunningTasks();
+			if (runningTasks.length === 0) {
+				logger.info("No running tasks to cancel");
+				return;
+			}
+
+			for (const task of runningTasks) {
+				if (taskManager.cancelTask(task.id)) {
+					logger.success(`Cancelled task: ${task.id}`);
+				}
+			}
+			return;
+		}
+
+		if (options.task) {
+			if (taskManager.cancelTask(options.task)) {
+				logger.success(`Cancelled task: ${options.task}`);
+			} else {
+				logger.error(`Task not found or not running: ${options.task}`);
+				process.exit(1);
+			}
+			return;
+		}
+
+		logger.error("Specify --task <id> or --all");
+		process.exit(1);
+	});
+
+program
+	.command("clear")
+	.description("Clear task history")
+	.option("-f, --force", "Skip confirmation")
+	.action((options) => {
+		if (!options.force) {
+			logger.warn("This will clear all task history. Use --force to confirm.");
+			return;
+		}
+
+		const store = new TaskStore();
+		store.clear();
+		logger.success("Task history cleared");
+	});
+
+program
+	.command("logs")
+	.description("Watch task status in real-time")
+	.option("-f, --follow", "Follow mode (watch for changes)")
+	.option("-t, --task <id>", "Watch specific task")
+	.option("-n, --interval <ms>", "Refresh interval in ms", Number.parseInt)
+	.action((options) => {
+		const store = new TaskStore();
+		const interval = options.interval ?? 1000;
+
+		if (!options.follow) {
+			const tasks = options.task
+				? [store.get(options.task)].filter(Boolean)
+				: store.getAll();
+
+			if (tasks.length === 0) {
+				logger.info("No tasks found");
+				return;
+			}
+
+			printTaskTable(tasks as TaskState[]);
+			return;
+		}
+
+		logger.info("Watching tasks... (Ctrl+C to stop)");
+		console.log("");
+
+		let lastSnapshot = "";
+
+		const printUpdate = () => {
+			const tasks = options.task
+				? [store.get(options.task)].filter(Boolean)
+				: store.getAll();
+
+			const snapshot = JSON.stringify(
+				tasks.map((t) => ({
+					id: t?.id,
+					status: t?.status,
+					iteration: t?.iteration,
+					hat: t?.currentHat,
+					event: t?.lastEvent,
+				})),
+			);
+
+			if (snapshot === lastSnapshot) {
+				return;
+			}
+			lastSnapshot = snapshot;
+
+			console.clear();
+			console.log(
+				chalk.bold(`Task Monitor - ${new Date().toLocaleTimeString()}`),
+			);
+			console.log("");
+
+			if (tasks.length === 0) {
+				console.log(chalk.gray("No tasks found"));
+				return;
+			}
+
+			for (const task of tasks) {
+				if (!task) continue;
+				const statusIcon = getStatusIcon(task.status);
+				const hat = task.currentHat ?? "-";
+				const iter = `${task.iteration}/${task.maxIterations}`;
+				const event = task.lastEvent ?? "-";
+
+				console.log(
+					`${statusIcon} ${chalk.bold(task.id)} ` +
+						`#${task.issueNumber} ` +
+						`[${iter}] ` +
+						chalk.cyan(hat) +
+						(event !== "-" ? ` → ${chalk.yellow(event)}` : ""),
+				);
+			}
+
+			const running = tasks.filter((t) => t?.status === "running").length;
+			const completed = tasks.filter((t) => t?.status === "completed").length;
+			const failed = tasks.filter((t) => t?.status === "failed").length;
+
+			console.log("");
+			console.log(
+				chalk.gray(
+					`Running: ${running} | Completed: ${completed} | Failed: ${failed}`,
+				),
+			);
+		};
+
+		printUpdate();
+
+		const taskStorePath = ".agent/tasks.json";
+		if (existsSync(taskStorePath)) {
+			watch(taskStorePath, () => {
+				setTimeout(() => printUpdate(), 100);
+			});
+		}
+
+		const intervalId = setInterval(printUpdate, interval);
+
+		process.on("SIGINT", () => {
+			clearInterval(intervalId);
+			console.log("");
+			logger.info("Stopped watching");
+			process.exit(0);
+		});
 	});
 
 program.parse();
@@ -252,5 +506,163 @@ function listPresets(): void {
 	console.log("");
 	console.log("Usage: orch init --preset <name>");
 	console.log("       orch run --issue <n> --preset <name>");
+	console.log("");
+}
+
+function formatDuration(ms: number): string {
+	const seconds = Math.floor(ms / 1000);
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+	const hours = Math.floor(minutes / 60);
+	return `${hours}h ${minutes % 60}m`;
+}
+
+function formatRelativeTime(date: Date): string {
+	const now = Date.now();
+	const diff = now - date.getTime();
+	const seconds = Math.floor(diff / 1000);
+
+	if (seconds < 60) return `${seconds}s ago`;
+	const minutes = Math.floor(seconds / 60);
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+}
+
+function getStatusIcon(status: string): string {
+	switch (status) {
+		case "pending":
+			return chalk.gray("○");
+		case "running":
+			return chalk.blue("●");
+		case "completed":
+			return chalk.green("✓");
+		case "failed":
+			return chalk.red("✗");
+		case "cancelled":
+			return chalk.yellow("⊘");
+		default:
+			return "?";
+	}
+}
+
+function printTaskTable(
+	tasks: Array<{
+		id: string;
+		issueNumber: number;
+		issueTitle: string;
+		status: string;
+		currentHat: string | null;
+		iteration: number;
+		maxIterations: number;
+		updatedAt: Date;
+	}>,
+): void {
+	console.log("");
+	console.log(
+		chalk.gray(
+			"ID".padEnd(20) +
+				"Issue".padEnd(8) +
+				"Status".padEnd(12) +
+				"Hat".padEnd(15) +
+				"Iter".padEnd(10) +
+				"Updated",
+		),
+	);
+	console.log(chalk.gray("─".repeat(80)));
+
+	for (const task of tasks) {
+		const statusIcon = getStatusIcon(task.status);
+		const hat = task.currentHat ?? "-";
+		const iter = `${task.iteration}/${task.maxIterations}`;
+		const updated = formatRelativeTime(task.updatedAt);
+
+		console.log(
+			`${task.id.padEnd(20)}` +
+				`#${task.issueNumber.toString().padEnd(7)}` +
+				`${statusIcon} ${task.status.padEnd(10)}` +
+				`${hat.substring(0, 13).padEnd(15)}` +
+				`${iter.padEnd(10)}` +
+				`${updated}`,
+		);
+	}
+	console.log("");
+}
+
+function printTaskDetail(task: {
+	id: string;
+	issueNumber: number;
+	issueTitle: string;
+	status: string;
+	currentHat: string | null;
+	iteration: number;
+	maxIterations: number;
+	lastEvent: string | null;
+	error: string | null;
+	startedAt: Date | null;
+	updatedAt: Date;
+	completedAt: Date | null;
+}): void {
+	console.log("");
+	console.log(chalk.bold(`Task: ${task.id}`));
+	console.log(chalk.gray("─".repeat(50)));
+	console.log(`Issue:       #${task.issueNumber} - ${task.issueTitle}`);
+	console.log(`Status:      ${getStatusIcon(task.status)} ${task.status}`);
+	console.log(`Iteration:   ${task.iteration}/${task.maxIterations}`);
+	console.log(`Current Hat: ${task.currentHat ?? "-"}`);
+	console.log(`Last Event:  ${task.lastEvent ?? "-"}`);
+
+	if (task.startedAt) {
+		console.log(`Started:     ${task.startedAt.toISOString()}`);
+	}
+	console.log(`Updated:     ${task.updatedAt.toISOString()}`);
+	if (task.completedAt) {
+		console.log(`Completed:   ${task.completedAt.toISOString()}`);
+		if (task.startedAt) {
+			const duration = task.completedAt.getTime() - task.startedAt.getTime();
+			console.log(`Duration:    ${formatDuration(duration)}`);
+		}
+	}
+
+	if (task.error) {
+		console.log("");
+		console.log(chalk.red(`Error: ${task.error}`));
+	}
+	console.log("");
+}
+
+function printTaskSummary(
+	tasks: Array<{
+		id: string;
+		issueNumber: number;
+		status: string;
+		error: string | null;
+	}>,
+): void {
+	console.log("");
+	console.log(chalk.bold("Execution Summary"));
+	console.log(chalk.gray("─".repeat(50)));
+
+	const completed = tasks.filter((t) => t.status === "completed").length;
+	const failed = tasks.filter((t) => t.status === "failed").length;
+	const cancelled = tasks.filter((t) => t.status === "cancelled").length;
+
+	console.log(`Total:     ${tasks.length}`);
+	console.log(`Completed: ${chalk.green(completed.toString())}`);
+	if (failed > 0) console.log(`Failed:    ${chalk.red(failed.toString())}`);
+	if (cancelled > 0)
+		console.log(`Cancelled: ${chalk.yellow(cancelled.toString())}`);
+
+	const failedTasks = tasks.filter((t) => t.status === "failed");
+	if (failedTasks.length > 0) {
+		console.log("");
+		console.log(chalk.red("Failed tasks:"));
+		for (const task of failedTasks) {
+			console.log(`  - #${task.issueNumber}: ${task.error ?? "Unknown error"}`);
+		}
+	}
 	console.log("");
 }

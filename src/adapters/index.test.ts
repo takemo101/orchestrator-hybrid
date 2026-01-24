@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { ClaudeBackend } from "./claude.js";
 import { ContainerBackend } from "./container.js";
 import { createBackend } from "./index.js";

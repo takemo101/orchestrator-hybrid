@@ -1,4 +1,4 @@
-import { execa } from "execa";
+import { exec } from "../core/exec.js";
 import type { BackendResult } from "../core/types.js";
 import { BaseBackend } from "./base.js";
 
@@ -7,7 +7,7 @@ export class ClaudeBackend extends BaseBackend {
 
 	async execute(prompt: string): Promise<BackendResult> {
 		try {
-			const { stdout, exitCode } = await execa(
+			const { stdout, exitCode } = await exec(
 				"claude",
 				["-p", prompt, "--allowedTools", "Edit,Write,Bash,Read,Glob,Grep"],
 				{ reject: false },
@@ -15,7 +15,7 @@ export class ClaudeBackend extends BaseBackend {
 
 			return {
 				output: stdout,
-				exitCode: exitCode ?? 0,
+				exitCode,
 			};
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);

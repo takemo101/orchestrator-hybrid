@@ -1,5 +1,5 @@
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventBus } from "./event.js";
 
 describe("EventBus", () => {
@@ -51,18 +51,21 @@ describe("EventBus", () => {
 	describe("on/off", () => {
 		it("should call listener when event is emitted", () => {
 			const bus = new EventBus();
-			const callback = vi.fn();
+			const callback = mock(() => {});
 
 			bus.on("test.event", callback);
 			bus.emit("test.event");
 
 			expect(callback).toHaveBeenCalledTimes(1);
-			expect(callback.mock.calls[0][0].type).toBe("test.event");
+			expect((callback.mock.calls[0] as unknown[])[0]).toHaveProperty(
+				"type",
+				"test.event",
+			);
 		});
 
 		it("should call wildcard listener for all events", () => {
 			const bus = new EventBus();
-			const callback = vi.fn();
+			const callback = mock(() => {});
 
 			bus.on("*", callback);
 			bus.emit("event.one");
@@ -73,7 +76,7 @@ describe("EventBus", () => {
 
 		it("should remove listener with off", () => {
 			const bus = new EventBus();
-			const callback = vi.fn();
+			const callback = mock(() => {});
 
 			bus.on("test.event", callback);
 			bus.off("test.event", callback);
@@ -135,7 +138,7 @@ describe("EventBus", () => {
 	describe("clear", () => {
 		it("should clear history and listeners", () => {
 			const bus = new EventBus();
-			const callback = vi.fn();
+			const callback = mock(() => {});
 
 			bus.on("test", callback);
 			bus.emit("test");

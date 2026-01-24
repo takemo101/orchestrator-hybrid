@@ -23,7 +23,7 @@ GitHub Issue → AIエージェント自動実行 → 完了検出 → PR作成
 
 ### 前提条件
 
-- Node.js 20以上
+- [Bun](https://bun.sh/) 1.0以上
 - `gh` (GitHub CLI) がインストール・認証済み
 - `claude` または `opencode` がインストール済み
 
@@ -32,21 +32,30 @@ GitHub Issue → AIエージェント自動実行 → 完了検出 → PR作成
 ```bash
 git clone https://github.com/takemo101/orchestrator-hybrid.git
 cd orchestrator-hybrid
-npm install
-npm run build
+bun install
+```
+
+### バイナリとして使用（推奨）
+
+```bash
+# バイナリをビルド
+bun run build:binary
+
+# 実行
+./orch run --issue 123 --auto
 ```
 
 ### 最も簡単な使い方
 
 ```bash
 # Issue #123 を自動実行（承認ゲートあり）
-npm run dev -- run --issue 123
+bun run dev run --issue 123
 
 # 承認ゲートをスキップして完全自動実行
-npm run dev -- run --issue 123 --auto
+bun run dev run --issue 123 --auto
 
 # 完了後にPRも自動作成
-npm run dev -- run --issue 123 --auto --create-pr
+bun run dev run --issue 123 --auto --create-pr
 ```
 
 ---
@@ -57,13 +66,13 @@ npm run dev -- run --issue 123 --auto --create-pr
 
 ```bash
 # デフォルト設定で初期化
-npm run dev -- init
+bun run dev init
 
 # プリセットから初期化
-npm run dev -- init --preset tdd
+bun run dev init --preset tdd
 
 # 利用可能なプリセット一覧
-npm run dev -- init --list-presets
+bun run dev init --list-presets
 ```
 
 これにより `orch.yml` が作成されます。設定ファイルがない場合はデフォルト値が使用されます。
@@ -71,7 +80,7 @@ npm run dev -- init --list-presets
 ### 2. タスクの実行
 
 ```bash
-npm run dev -- run --issue <Issue番号> [オプション]
+bun run dev run --issue <Issue番号> [オプション]
 ```
 
 #### 主要オプション
@@ -94,41 +103,91 @@ npm run dev -- run --issue <Issue番号> [オプション]
 
 ```bash
 # 基本実行（承認ゲートで一時停止）
-npm run dev -- run --issue 42
+bun run dev run --issue 42
 
 # 完全自動実行（人間の介入なし）
-npm run dev -- run --issue 42 --auto
+bun run dev run --issue 42 --auto
 
 # TDDプリセットで実行
-npm run dev -- run --issue 42 --preset tdd --auto
+bun run dev run --issue 42 --preset tdd --auto
 
 # OpenCodeバックエンドで実行
-npm run dev -- run --issue 42 --backend opencode --auto
+bun run dev run --issue 42 --backend opencode --auto
 
 # 最大30回の反復で実行
-npm run dev -- run --issue 42 --max-iterations 30 --auto
+bun run dev run --issue 42 --max-iterations 30 --auto
 
 # 完了後にドラフトPRを作成
-npm run dev -- run --issue 42 --auto --create-pr --draft
+bun run dev run --issue 42 --auto --create-pr --draft
 
 # container-use環境で隔離実行
-npm run dev -- run --issue 42 --auto --container
+bun run dev run --issue 42 --auto --container
 
 # 実行レポートを生成
-npm run dev -- run --issue 42 --auto --report
+bun run dev run --issue 42 --auto --report
 
 # カスタムパスにレポートを生成
-npm run dev -- run --issue 42 --auto --report ./reports/issue-42.md
+bun run dev run --issue 42 --auto --report ./reports/issue-42.md
 ```
 
 ### 3. 状態の確認
 
 ```bash
 # Issue #42 の現在の状態を表示
-npm run dev -- status --issue 42
+bun run dev status --issue 42
 
 # イベント履歴を表示
-npm run dev -- events
+bun run dev events
+```
+
+---
+
+## 並列タスク実行
+
+複数のIssueを同時に実行し、状態を監視できます。
+
+### 複数Issueの並列実行
+
+```bash
+# 複数Issueを同時実行
+bun run dev run --issues 42,43,44 --auto
+
+# バイナリの場合
+./orch run --issues 42,43,44 --auto
+```
+
+### タスク状態の確認
+
+```bash
+# 全タスクの状態を表示
+bun run dev status --all
+
+# 特定タスクの詳細を表示
+bun run dev status --task <task-id>
+```
+
+### リアルタイム監視
+
+```bash
+# タスク状態をリアルタイムで監視（1秒間隔で更新）
+bun run dev logs --follow
+```
+
+### タスクのキャンセル
+
+```bash
+# 特定タスクをキャンセル
+bun run dev cancel --task <task-id>
+
+# 全タスクをキャンセル
+bun run dev cancel --all
+```
+
+### タスク履歴のクリア
+
+```bash
+# 完了・キャンセル済みタスクをクリア
+bun run dev clear --force
 ```
 
 ---
@@ -196,7 +255,7 @@ npm run dev -- events
 Hatなしの単純なループ。AIが `LOOP_COMPLETE` を出力するまで反復。
 
 ```bash
-npm run dev -- run --issue 42 --preset simple
+bun run dev run --issue 42 --preset simple
 ```
 
 ### `tdd` - テスト駆動開発
@@ -210,7 +269,7 @@ Red → Green → Refactor のTDDサイクルを強制。
 | ✨ Refactorer | `tests.passing` | `code.written`, `LOOP_COMPLETE` |
 
 ```bash
-npm run dev -- run --issue 42 --preset tdd
+bun run dev run --issue 42 --preset tdd
 ```
 
 ### `spec-driven` - 仕様駆動開発
@@ -224,7 +283,7 @@ npm run dev -- run --issue 42 --preset tdd
 | 🔍 Reviewer | `build.done` | `review.approved`, `review.revise`, `LOOP_COMPLETE` |
 
 ```bash
-npm run dev -- run --issue 42 --preset spec-driven
+bun run dev run --issue 42 --preset spec-driven
 ```
 
 ---
@@ -305,10 +364,10 @@ hats:
 
 ```bash
 # デフォルトパス（.agent/report.md）に生成
-npm run dev -- run --issue 42 --auto --report
+bun run dev run --issue 42 --auto --report
 
 # カスタムパスに生成
-npm run dev -- run --issue 42 --auto --report ./reports/issue-42.md
+bun run dev run --issue 42 --auto --report ./reports/issue-42.md
 ```
 
 ### 出力ファイル
@@ -366,7 +425,7 @@ npm run dev -- run --issue 42 --auto --report ./reports/issue-42.md
 
 ```bash
 # CLIフラグで有効化
-npm run dev -- run --issue 42 --auto --container
+bun run dev run --issue 42 --auto --container
 
 # 設定ファイルで常に有効化
 # orch.yml に以下を追加:
@@ -404,7 +463,7 @@ AIが完了キーワードを出力しないと、最大反復回数に達する
 `--auto` フラグをつけると承認ゲートをスキップできます。
 
 ```bash
-npm run dev -- run --issue 42 --auto
+bun run dev run --issue 42 --auto
 ```
 
 ### GitHub認証エラー
@@ -434,31 +493,43 @@ which opencode
 ### ビルド
 
 ```bash
-npm run build
+# JavaScriptにビルド
+bun run build
+
+# シングルバイナリにコンパイル（推奨）
+bun run build:binary
+
+# クロスプラットフォームビルド
+bun run build:binary:linux    # Linux x64
+bun run build:binary:macos    # macOS ARM64
+bun run build:binary:windows  # Windows x64
 ```
 
 ### テスト
 
 ```bash
-# テスト実行
-npm test
-
-# 単発実行
-npm test -- --run
+bun test
 ```
 
-### Lint
+### 型チェック
 
 ```bash
-npm run lint
-npm run format
+bun run typecheck
+```
+
+### Lint & Format
+
+```bash
+bun run lint
+bun run format
 ```
 
 ### グローバルインストール
 
 ```bash
-npm run build
-npm link
+# バイナリをビルドしてパスの通った場所に配置
+bun run build:binary
+sudo mv orch /usr/local/bin/
 
 # これで `orch` コマンドが使えるようになる
 orch run --issue 42
@@ -479,11 +550,14 @@ src/
 │   ├── config.ts       # 設定読み込み
 │   ├── scratchpad.ts   # Scratchpad管理
 │   ├── logger.ts       # ロガー
+│   ├── task-manager.ts # 並列タスク管理
+│   ├── exec.ts         # Bun.spawn ラッパー
 │   └── types.ts        # 型定義
 ├── adapters/
 │   ├── base.ts         # バックエンド抽象基底
 │   ├── claude.ts       # Claude Code アダプター
-│   └── opencode.ts     # OpenCode アダプター
+│   ├── opencode.ts     # OpenCode アダプター
+│   └── container.ts    # Container-use アダプター
 ├── input/
 │   ├── github.ts       # GitHub Issue取得
 │   └── prompt.ts       # プロンプト生成

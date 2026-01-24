@@ -8,8 +8,17 @@ export {
 	type HatDefinition,
 	HatRegistry,
 } from "./core/hat.js";
-export { logger, setVerbose } from "./core/logger.js";
-export { runLoop } from "./core/loop.js";
+export { createTaskLogger, logger, setVerbose } from "./core/logger.js";
+export { runLoop, runMultipleLoops } from "./core/loop.js";
+export {
+	createTaskState,
+	generateTaskId,
+	TaskManager,
+	type TaskState,
+	type TaskStateCallback,
+	type TaskStatus,
+	TaskStore,
+} from "./core/task-manager.js";
 export type { Config, Hat, Issue, LoopContext } from "./core/types.js";
 export { requestApproval } from "./gates/approval.js";
 export {
