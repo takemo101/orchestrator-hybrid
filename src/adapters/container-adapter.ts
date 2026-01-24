@@ -110,9 +110,20 @@ export class ContainerAdapter implements SandboxAdapter {
 		try {
 			const workdir = this.config.workdir ?? process.cwd();
 
-			await this.executor.spawn("cu", ["environment", "delete", "--id", this.envId, "--source", workdir]);
+			const result = await this.executor.spawn("cu", [
+				"environment",
+				"delete",
+				"--id",
+				this.envId,
+				"--source",
+				workdir,
+			]);
 
-			logger.success("環境を削除しました");
+			if (result.exitCode !== 0) {
+				logger.warn(`環境削除に失敗: ${result.stderr || "Unknown error"}`);
+			} else {
+				logger.success("環境を削除しました");
+			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			logger.warn(`環境削除に失敗: ${message}`);
