@@ -1,4 +1,5 @@
 export { type Backend, createBackend } from "./adapters/index.js";
+export { BunProcessExecutor } from "./core/bun-process-executor.js";
 export { loadConfig } from "./core/config.js";
 export { EventBus, globalEventBus, type OrchEvent } from "./core/event.js";
 export {
