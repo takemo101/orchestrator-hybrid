@@ -11,3 +11,11 @@ bun.lockb
 orch
 orch-*
 *.exe
+
+# OpenCode workflow
+.serena/
+environments.json
+environments.json.lock
+
+# Fro Orchestrator Hybrid
+*.exe
