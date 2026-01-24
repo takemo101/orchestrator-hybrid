@@ -37,14 +37,25 @@ export class BunProcessExecutor implements ProcessExecutor {
 		args: string[],
 		options: SpawnOptions = {},
 	): Promise<ProcessResult> {
+		let proc: Subprocess;
+
 		// 1. Bun.spawnを呼び出し
-		const proc = Bun.spawn([command, ...args], {
-			cwd: options.cwd,
-			env: options.env,
-			stdin: options.stdin ? "pipe" : undefined,
-			stdout: options.stdout ?? "pipe",
-			stderr: options.stderr ?? "pipe",
-		});
+		try {
+			proc = Bun.spawn([command, ...args], {
+				cwd: options.cwd,
+				env: options.env,
+				stdin: options.stdin ? "pipe" : undefined,
+				stdout: options.stdout ?? "pipe",
+				stderr: options.stderr ?? "pipe",
+			});
+		} catch (error) {
+			// コマンドが見つからない場合などはエラーを返す
+			return {
+				stdout: "",
+				stderr: error instanceof Error ? error.message : String(error),
+				exitCode: 127, // Command not found
+			};
+		}
 
 		// 2. タイムアウト処理を設定
 		let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -110,10 +121,10 @@ export class BunProcessExecutor implements ProcessExecutor {
 			throw new Error("stdin is not available");
 		}
 
-		const writer = proc.stdin.getWriter();
+		// Bun's stdin is a FileSink, use write() and end()
 		try {
-			await writer.write(new TextEncoder().encode(data));
-			await writer.close();
+			proc.stdin.write(data);
+			proc.stdin.end();
 		} catch (error) {
 			throw new Error("Failed to write to stdin", { cause: error });
 		}
