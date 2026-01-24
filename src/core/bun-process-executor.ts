@@ -5,11 +5,7 @@
  */
 
 import type { Subprocess } from "bun";
-import type {
-	ProcessExecutor,
-	ProcessResult,
-	SpawnOptions,
-} from "./process-executor.js";
+import type { ProcessExecutor, ProcessResult, SpawnOptions } from "./process-executor.js";
 
 /**
  * Bun.spawnを使用したProcessExecutor実装
@@ -32,11 +28,7 @@ export class BunProcessExecutor implements ProcessExecutor {
 	 * @param options 実行オプション
 	 * @returns 実行結果のPromise
 	 */
-	async spawn(
-		command: string,
-		args: string[],
-		options: SpawnOptions = {},
-	): Promise<ProcessResult> {
+	async spawn(command: string, args: string[], options: SpawnOptions = {}): Promise<ProcessResult> {
 		let proc: Subprocess;
 
 		// 1. Bun.spawnを呼び出し
@@ -71,12 +63,8 @@ export class BunProcessExecutor implements ProcessExecutor {
 		// 4. 実行完了を待機
 		try {
 			const [stdout, stderr, exitCode] = await Promise.all([
-				options.stdout === "inherit"
-					? Promise.resolve("")
-					: new Response(proc.stdout).text(),
-				options.stderr === "inherit"
-					? Promise.resolve("")
-					: new Response(proc.stderr).text(),
+				options.stdout === "inherit" ? Promise.resolve("") : new Response(proc.stdout).text(),
+				options.stderr === "inherit" ? Promise.resolve("") : new Response(proc.stderr).text(),
 				proc.exited,
 			]);
 
@@ -98,10 +86,7 @@ export class BunProcessExecutor implements ProcessExecutor {
 	 * タイムアウト処理を設定
 	 * @private
 	 */
-	private setupTimeout(
-		proc: Subprocess,
-		timeout: number,
-	): ReturnType<typeof setTimeout> {
+	private setupTimeout(proc: Subprocess, timeout: number): ReturnType<typeof setTimeout> {
 		const timeoutId = setTimeout(() => {
 			proc.kill();
 		}, timeout);
