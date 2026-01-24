@@ -4,7 +4,7 @@
  * Docker環境でコードを実行するアダプターのテスト
  */
 
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
 import { ImagePullError } from "../core/errors.js";
 import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 import { DockerAdapter, type DockerAdapterConfig } from "./docker-adapter.js";
@@ -146,7 +146,7 @@ describe("DockerAdapter", () => {
 		it("should use --rm flag for auto-cleanup", async () => {
 			let runArgs: string[] = [];
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[]) => {
+				spawn: mock(async (_command: string, args: string[]) => {
 					if (args[0] === "run") {
 						runArgs = args;
 					}
@@ -163,7 +163,7 @@ describe("DockerAdapter", () => {
 		it("should apply network setting", async () => {
 			let runArgs: string[] = [];
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[]) => {
+				spawn: mock(async (_command: string, args: string[]) => {
 					if (args[0] === "run") {
 						runArgs = args;
 					}
@@ -181,7 +181,7 @@ describe("DockerAdapter", () => {
 		it("should mount workdir", async () => {
 			let runArgs: string[] = [];
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[]) => {
+				spawn: mock(async (_command: string, args: string[]) => {
 					if (args[0] === "run") {
 						runArgs = args;
 					}
@@ -203,7 +203,7 @@ describe("DockerAdapter", () => {
 		it("should pass environment variables", async () => {
 			let runArgs: string[] = [];
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[]) => {
+				spawn: mock(async (_command: string, args: string[]) => {
 					if (args[0] === "run") {
 						runArgs = args;
 					}
@@ -224,7 +224,7 @@ describe("DockerAdapter", () => {
 		it("should use options.cwd over config.workdir", async () => {
 			let runArgs: string[] = [];
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[]) => {
+				spawn: mock(async (_command: string, args: string[]) => {
 					if (args[0] === "run") {
 						runArgs = args;
 					}
@@ -245,7 +245,7 @@ describe("DockerAdapter", () => {
 		it("should pass timeout to executor", async () => {
 			let spawnOptions: { timeout?: number } = {};
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[], options?: { timeout?: number }) => {
+				spawn: mock(async (_command: string, args: string[], options?: { timeout?: number }) => {
 					if (args[0] === "run") {
 						spawnOptions = options ?? {};
 					}
@@ -262,7 +262,7 @@ describe("DockerAdapter", () => {
 		it("should use options.timeout over config.timeout", async () => {
 			let spawnOptions: { timeout?: number } = {};
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[], options?: { timeout?: number }) => {
+				spawn: mock(async (_command: string, args: string[], options?: { timeout?: number }) => {
 					if (args[0] === "run") {
 						spawnOptions = options ?? {};
 					}
@@ -290,7 +290,7 @@ describe("DockerAdapter", () => {
 		it("should use sh -c to run command", async () => {
 			let runArgs: string[] = [];
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[]) => {
+				spawn: mock(async (_command: string, args: string[]) => {
 					if (args[0] === "run") {
 						runArgs = args;
 					}
@@ -309,7 +309,7 @@ describe("DockerAdapter", () => {
 		it("should include -i flag for interactive mode", async () => {
 			let runArgs: string[] = [];
 			const executor: ProcessExecutor = {
-				spawn: mock(async (command: string, args: string[]) => {
+				spawn: mock(async (_command: string, args: string[]) => {
 					if (args[0] === "run") {
 						runArgs = args;
 					}
