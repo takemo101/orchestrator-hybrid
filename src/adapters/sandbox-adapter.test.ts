@@ -156,7 +156,8 @@ describe("SandboxAdapter インターフェース", () => {
 				async isAvailable() {
 					return true;
 				},
-				async execute(command: string, options?: ExecuteOptions) {
+				async execute(_command: string, options?: ExecuteOptions) {
+					void _command; // unused - testing options capture
 					receivedOptions = options;
 					return { stdout: "", stderr: "", exitCode: 0 };
 				},
