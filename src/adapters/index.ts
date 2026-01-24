@@ -9,10 +9,7 @@ export interface CreateBackendOptions {
 	container?: ContainerConfig;
 }
 
-export function createBackend(
-	type: BackendType,
-	options: CreateBackendOptions = {},
-): Backend {
+export function createBackend(type: BackendType, options: CreateBackendOptions = {}): Backend {
 	switch (type) {
 		case "claude":
 			return new ClaudeBackend();

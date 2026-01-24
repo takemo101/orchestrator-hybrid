@@ -2,12 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Issue } from "./types.js";
 
-export type TaskStatus =
-	| "pending"
-	| "running"
-	| "completed"
-	| "failed"
-	| "cancelled";
+export type TaskStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
 export interface TaskState {
 	id: string;
@@ -61,9 +56,7 @@ export class TaskStore {
 		}
 
 		try {
-			const data = JSON.parse(
-				readFileSync(this.filePath, "utf-8"),
-			) as TaskStoreData;
+			const data = JSON.parse(readFileSync(this.filePath, "utf-8")) as TaskStoreData;
 
 			for (const [id, serialized] of Object.entries(data.tasks)) {
 				this.tasks.set(id, this.deserialize(serialized));
@@ -82,10 +75,7 @@ export class TaskStore {
 		const data: TaskStoreData = {
 			version: "1.0",
 			tasks: Object.fromEntries(
-				Array.from(this.tasks.entries()).map(([id, state]) => [
-					id,
-					this.serialize(state),
-				]),
+				Array.from(this.tasks.entries()).map(([id, state]) => [id, this.serialize(state)]),
 			),
 		};
 
@@ -164,11 +154,7 @@ export function generateTaskId(): string {
 	return `task-${timestamp}-${random}`;
 }
 
-export function createTaskState(
-	id: string,
-	issue: Issue,
-	maxIterations: number,
-): TaskState {
+export function createTaskState(id: string, issue: Issue, maxIterations: number): TaskState {
 	return {
 		id,
 		issueNumber: issue.number,
@@ -223,10 +209,7 @@ export class TaskManager {
 
 	async startTask(
 		id: string,
-		runner: (
-			onStateChange: TaskStateCallback,
-			signal: AbortSignal,
-		) => Promise<void>,
+		runner: (onStateChange: TaskStateCallback, signal: AbortSignal) => Promise<void>,
 	): Promise<void> {
 		const task = this.store.get(id);
 		if (!task) {
@@ -307,10 +290,7 @@ export class TaskManager {
 		tasks: Array<{
 			issue: Issue;
 			maxIterations: number;
-			runner: (
-				onStateChange: TaskStateCallback,
-				signal: AbortSignal,
-			) => Promise<void>;
+			runner: (onStateChange: TaskStateCallback, signal: AbortSignal) => Promise<void>;
 		}>,
 	): Promise<TaskState[]> {
 		const taskStates: TaskState[] = [];
@@ -324,8 +304,6 @@ export class TaskManager {
 
 		await this.waitForAll();
 
-		return taskStates
-			.map((t) => this.store.get(t.id))
-			.filter(Boolean) as TaskState[];
+		return taskStates.map((t) => this.store.get(t.id)).filter(Boolean) as TaskState[];
 	}
 }

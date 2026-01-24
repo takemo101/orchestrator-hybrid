@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import {
-	createReportCollector,
-	generateReport,
-	type ReportData,
-} from "./report.js";
+import { createReportCollector, generateReport, type ReportData } from "./report.js";
 
 describe("report", () => {
 	const testDir = ".test-report";

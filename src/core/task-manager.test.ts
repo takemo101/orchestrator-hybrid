@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, rmSync } from "node:fs";
-import {
-	createTaskState,
-	generateTaskId,
-	TaskManager,
-	TaskStore,
-} from "./task-manager.js";
+import { createTaskState, generateTaskId, TaskManager, TaskStore } from "./task-manager.js";
 import type { Issue } from "./types.js";
 
 const TEST_STORE_PATH = ".test-tasks/tasks.json";
@@ -190,18 +185,15 @@ describe("task-manager", () => {
 
 			const task = manager.createTask(mockIssue, 10);
 
-			const runPromise = manager.startTask(
-				task.id,
-				async (_onStateChange, signal) => {
-					await new Promise((resolve, reject) => {
-						const timeout = setTimeout(resolve, 10000);
-						signal.addEventListener("abort", () => {
-							clearTimeout(timeout);
-							reject(new Error("Cancelled"));
-						});
+			const runPromise = manager.startTask(task.id, async (_onStateChange, signal) => {
+				await new Promise((resolve, reject) => {
+					const timeout = setTimeout(resolve, 10000);
+					signal.addEventListener("abort", () => {
+						clearTimeout(timeout);
+						reject(new Error("Cancelled"));
 					});
-				},
-			);
+				});
+			});
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -218,9 +210,9 @@ describe("task-manager", () => {
 			const store = new TaskStore(TEST_STORE_PATH);
 			const manager = new TaskManager(store);
 
-			await expect(
-				manager.startTask("non-existent", async () => {}),
-			).rejects.toThrow("Task non-existent not found");
+			await expect(manager.startTask("non-existent", async () => {})).rejects.toThrow(
+				"Task non-existent not found",
+			);
 		});
 
 		it("should throw when starting already running task", async () => {
@@ -235,9 +227,7 @@ describe("task-manager", () => {
 
 			await new Promise((resolve) => setTimeout(resolve, 50));
 
-			await expect(manager.startTask(task.id, async () => {})).rejects.toThrow(
-				"already running",
-			);
+			await expect(manager.startTask(task.id, async () => {})).rejects.toThrow("already running");
 		});
 
 		it("should run multiple tasks in parallel", async () => {
@@ -283,7 +273,7 @@ describe("task-manager", () => {
 			const manager = new TaskManager(store);
 
 			const task1 = manager.createTask(mockIssue, 10);
-			const task2 = manager.createTask({ ...mockIssue, number: 43 }, 10);
+			manager.createTask({ ...mockIssue, number: 43 }, 10);
 
 			manager.startTask(task1.id, async () => {
 				await new Promise((resolve) => setTimeout(resolve, 500));

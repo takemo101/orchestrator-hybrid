@@ -2,10 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 describe("PR helper functions", () => {
 	describe("generateBranchName", () => {
-		function generateBranchName(issue: {
-			number: number;
-			title: string;
-		}): string {
+		function generateBranchName(issue: { number: number; title: string }): string {
 			const sanitized = issue.title
 				.toLowerCase()
 				.replace(/[^a-z0-9]+/g, "-")
@@ -61,12 +58,8 @@ describe("PR helper functions", () => {
 
 	describe("extractChangesFromScratchpad", () => {
 		function extractChangesFromScratchpad(scratchpad: string): string {
-			const progressMatch = scratchpad.match(
-				/## Progress Log\n([\s\S]*?)(?=\n##|$)/,
-			);
-			const decisionsMatch = scratchpad.match(
-				/## Decisions Made\n([\s\S]*?)(?=\n##|$)/,
-			);
+			const progressMatch = scratchpad.match(/## Progress Log\n([\s\S]*?)(?=\n##|$)/);
+			const decisionsMatch = scratchpad.match(/## Decisions Made\n([\s\S]*?)(?=\n##|$)/);
 
 			const parts: string[] = [];
 
@@ -124,9 +117,7 @@ Some notes here`;
 `;
 
 			const result = extractChangesFromScratchpad(scratchpad);
-			expect(result).toBe(
-				"- Implementation completed as per issue requirements",
-			);
+			expect(result).toBe("- Implementation completed as per issue requirements");
 		});
 	});
 });

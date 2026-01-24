@@ -21,9 +21,7 @@ function formatPrefix(level: LogLevel, taskId?: string | null): string {
 	const taskPrefix = taskId ? chalk.magenta(`[${taskId}]`) : "";
 	const levelPrefix = getLevelPrefix(level);
 
-	return taskId
-		? `${timestamp} ${taskPrefix} ${levelPrefix}`
-		: `${levelPrefix}`;
+	return taskId ? `${timestamp} ${taskPrefix} ${levelPrefix}` : `${levelPrefix}`;
 }
 
 function getLevelPrefix(level: LogLevel): string {
@@ -39,11 +37,7 @@ function getLevelPrefix(level: LogLevel): string {
 	}
 }
 
-export function log(
-	level: LogLevel,
-	message: string,
-	taskId?: string | null,
-): void {
+export function log(level: LogLevel, message: string, taskId?: string | null): void {
 	const effectiveTaskId = taskId ?? globalTaskContext;
 	const prefix = formatPrefix(level, effectiveTaskId);
 	const output = `${prefix} ${message}`;

@@ -18,9 +18,7 @@ export const ContainerConfigSchema = z
 export const ConfigSchema = z.object({
 	version: z.string().default("1.0"),
 	backend: z.object({
-		type: z
-			.enum(["claude", "opencode", "gemini", "container"])
-			.default("claude"),
+		type: z.enum(["claude", "opencode", "gemini", "container"]).default("claude"),
 		model: z.string().optional(),
 	}),
 	container: ContainerConfigSchema,

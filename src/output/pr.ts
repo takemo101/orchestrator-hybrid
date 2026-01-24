@@ -59,10 +59,7 @@ function generateBranchName(issue: Issue): string {
 }
 
 async function ensureBranchExists(branchName: string): Promise<void> {
-	const { stdout: currentBranch } = await exec("git", [
-		"branch",
-		"--show-current",
-	]);
+	const { stdout: currentBranch } = await exec("git", ["branch", "--show-current"]);
 
 	if (currentBranch.trim() === branchName) {
 		return;
@@ -103,13 +100,7 @@ async function pushBranch(branchName: string): Promise<void> {
 		await exec("git", ["push", "-u", "origin", branchName]);
 		logger.info(`Pushed branch: ${branchName}`);
 	} catch {
-		await exec("git", [
-			"push",
-			"--force-with-lease",
-			"-u",
-			"origin",
-			branchName,
-		]);
+		await exec("git", ["push", "--force-with-lease", "-u", "origin", branchName]);
 		logger.info(`Force pushed branch: ${branchName}`);
 	}
 }
@@ -138,12 +129,8 @@ ${issue.body.slice(0, 500)}${issue.body.length > 500 ? "..." : ""}
 }
 
 function extractChangesFromScratchpad(scratchpad: string): string {
-	const progressMatch = scratchpad.match(
-		/## Progress Log\n([\s\S]*?)(?=\n##|$)/,
-	);
-	const decisionsMatch = scratchpad.match(
-		/## Decisions Made\n([\s\S]*?)(?=\n##|$)/,
-	);
+	const progressMatch = scratchpad.match(/## Progress Log\n([\s\S]*?)(?=\n##|$)/);
+	const decisionsMatch = scratchpad.match(/## Decisions Made\n([\s\S]*?)(?=\n##|$)/);
 
 	const parts: string[] = [];
 

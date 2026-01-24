@@ -127,10 +127,7 @@ const EVENT_PATTERNS = [
 	/^>\s*EVENT:\s*(\S+)/gim,
 ];
 
-export function extractPublishedEvent(
-	output: string,
-	hat: HatDefinition,
-): string | null {
+export function extractPublishedEvent(output: string, hat: HatDefinition): string | null {
 	const candidates = extractEventCandidates(output);
 
 	for (const candidate of candidates) {
@@ -141,9 +138,7 @@ export function extractPublishedEvent(
 	}
 
 	if (candidates.length > 0) {
-		logger.warn(
-			`Hat ${hat.id} tried to publish unauthorized event(s): ${candidates.join(", ")}`,
-		);
+		logger.warn(`Hat ${hat.id} tried to publish unauthorized event(s): ${candidates.join(", ")}`);
 	}
 
 	return extractEventFromKeywords(output, hat);
@@ -168,10 +163,7 @@ function extractEventCandidates(output: string): string[] {
 	return candidates;
 }
 
-function extractEventFromKeywords(
-	output: string,
-	hat: HatDefinition,
-): string | null {
+function extractEventFromKeywords(output: string, hat: HatDefinition): string | null {
 	const lines = output.split("\n");
 	const lastLines = lines.slice(-50);
 

@@ -13,19 +13,10 @@ import {
 	type ReportData,
 } from "../output/report.js";
 import { EventBus } from "./event.js";
-import {
-	buildHatPrompt,
-	extractPublishedEvent,
-	type HatDefinition,
-	HatRegistry,
-} from "./hat.js";
+import { buildHatPrompt, extractPublishedEvent, type HatDefinition, HatRegistry } from "./hat.js";
 import { createTaskLogger, logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
-import {
-	type TaskManager,
-	type TaskStateCallback,
-	TaskStore,
-} from "./task-manager.js";
+import type { TaskManager, TaskStateCallback } from "./task-manager.js";
 import type { Config, Issue, LoopContext } from "./types.js";
 
 export interface LoopOptions {
@@ -57,104 +48,140 @@ export interface MultiLoopOptions {
 }
 
 export async function runLoop(options: LoopOptions): Promise<void> {
-	const {
-		issueNumber,
-		config,
-		autoMode,
-		maxIterations,
-		createPR: shouldCreatePR = false,
-		draftPR = false,
-		useContainer = false,
-		generateReport: shouldGenerateReport = false,
-		reportPath = ".agent/report.md",
-		preset,
-		taskId,
-		onStateChange,
-		signal,
-	} = options;
+	const { issueNumber, config, autoMode, taskId, onStateChange, signal } = options;
 
 	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
+	const loopConfig = buildLoopConfig(options, config);
 
-	const maxIter = maxIterations ?? config.loop.max_iterations;
-	const completionPromise = config.loop.completion_promise;
-	const scratchpadPath =
-		config.state?.scratchpad_path ?? ".agent/scratchpad.md";
-	const promptPath = taskId ? `.agent/${taskId}/PROMPT.md` : ".agent/PROMPT.md";
-	const useHats = config.hats && Object.keys(config.hats).length > 0;
-
-	const containerEnabled = useContainer || config.container?.enabled;
-
-	taskLogger.info(`Starting orchestration loop for issue #${issueNumber}`);
-	taskLogger.info(`Max iterations: ${maxIter}`);
-	taskLogger.info(
-		`Backend: ${containerEnabled ? "container" : config.backend.type}`,
-	);
-	taskLogger.info(`Completion promise: ${completionPromise}`);
-	taskLogger.info(`Hat mode: ${useHats ? "enabled" : "disabled"}`);
-	if (containerEnabled) {
-		taskLogger.info("Container mode: enabled (isolated environment)");
-	}
+	logLoopStart(taskLogger, issueNumber, loopConfig);
 
 	const issue = await fetchIssue(issueNumber);
-
 	onStateChange?.({ issueTitle: issue.title });
 
-	const taskPromptDir = taskId ? `.agent/${taskId}` : ".agent";
-	mkdirSync(taskPromptDir, { recursive: true });
-
-	generatePrompt({ issue, completionPromise, scratchpadPath }, promptPath);
-
-	initScratchpad(scratchpadPath);
-
-	await updateIssueLabel(issueNumber, "env:active");
+	await initializeLoopEnvironment(issue, loopConfig, taskId);
 
 	const preApproval = await requestApproval({
 		gateName: "Pre-Loop",
-		message:
-			"About to start the orchestration loop. Review the generated prompt.",
+		message: "About to start the orchestration loop. Review the generated prompt.",
 		autoMode,
-		scratchpadPath,
+		scratchpadPath: loopConfig.scratchpadPath,
 	});
 
 	if (preApproval === "abort") {
 		return;
 	}
 
-	const context: LoopContext = {
+	const context = buildLoopContext(issue, loopConfig, options);
+	const backend = createLoopBackend(config, loopConfig.containerEnabled);
+	const collector = loopConfig.shouldGenerateReport ? createReportCollector() : null;
+
+	await executeLoop(
+		context,
+		backend,
+		issueNumber,
+		config,
+		collector,
+		taskId,
+		onStateChange,
+		signal,
+	);
+}
+
+interface LoopConfig {
+	maxIter: number;
+	completionPromise: string;
+	scratchpadPath: string;
+	promptPath: string;
+	useHats: boolean;
+	containerEnabled: boolean;
+	shouldGenerateReport: boolean;
+	reportPath: string;
+}
+
+function buildLoopConfig(options: LoopOptions, config: Config): LoopConfig {
+	const containerEnabled = options.useContainer || config.container?.enabled || false;
+	return {
+		maxIter: options.maxIterations ?? config.loop.max_iterations,
+		completionPromise: config.loop.completion_promise,
+		scratchpadPath: config.state?.scratchpad_path ?? ".agent/scratchpad.md",
+		promptPath: options.taskId ? `.agent/${options.taskId}/PROMPT.md` : ".agent/PROMPT.md",
+		useHats: !!(config.hats && Object.keys(config.hats).length > 0),
+		containerEnabled,
+		shouldGenerateReport: options.generateReport ?? false,
+		reportPath: options.reportPath ?? ".agent/report.md",
+	};
+}
+
+function logLoopStart(taskLogger: typeof logger, issueNumber: number, config: LoopConfig): void {
+	taskLogger.info(`Starting orchestration loop for issue #${issueNumber}`);
+	taskLogger.info(`Max iterations: ${config.maxIter}`);
+	taskLogger.info(`Backend: ${config.containerEnabled ? "container" : "claude"}`);
+	taskLogger.info(`Completion promise: ${config.completionPromise}`);
+	taskLogger.info(`Hat mode: ${config.useHats ? "enabled" : "disabled"}`);
+	if (config.containerEnabled) {
+		taskLogger.info("Container mode: enabled (isolated environment)");
+	}
+}
+
+async function initializeLoopEnvironment(
+	issue: Issue,
+	config: LoopConfig,
+	taskId?: string,
+): Promise<void> {
+	const taskPromptDir = taskId ? `.agent/${taskId}` : ".agent";
+	mkdirSync(taskPromptDir, { recursive: true });
+	generatePrompt(
+		{ issue, completionPromise: config.completionPromise, scratchpadPath: config.scratchpadPath },
+		config.promptPath,
+	);
+	initScratchpad(config.scratchpadPath);
+	await updateIssueLabel(issue.number, "env:active");
+}
+
+function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions): LoopContext {
+	return {
 		issue,
 		iteration: 0,
-		maxIterations: maxIter,
-		scratchpadPath,
-		promptPath,
-		completionPromise,
-		autoMode,
-		createPR: shouldCreatePR,
-		draftPR,
-		useContainer: containerEnabled ?? false,
-		generateReport: shouldGenerateReport,
-		reportPath,
-		preset,
+		maxIterations: config.maxIter,
+		scratchpadPath: config.scratchpadPath,
+		promptPath: config.promptPath,
+		completionPromise: config.completionPromise,
+		autoMode: options.autoMode,
+		createPR: options.createPR ?? false,
+		draftPR: options.draftPR ?? false,
+		useContainer: config.containerEnabled,
+		generateReport: config.shouldGenerateReport,
+		reportPath: config.reportPath,
+		preset: options.preset,
 	};
+}
 
+function createLoopBackend(config: Config, containerEnabled: boolean): Backend {
 	const backendType = containerEnabled
 		? "container"
 		: (config.backend.type as "claude" | "opencode");
-
-	const backend = createBackend(backendType, {
+	return createBackend(backendType, {
 		container: config.container
-			? {
-					image: config.container.image,
-					envId: config.container.env_id,
-				}
+			? { image: config.container.image, envId: config.container.env_id }
 			: undefined,
 	});
+}
 
-	const collector = shouldGenerateReport ? createReportCollector() : null;
+async function executeLoop(
+	context: LoopContext,
+	backend: Backend,
+	issueNumber: number,
+	config: Config,
+	collector: ReportCollector | null,
+	taskId?: string,
+	onStateChange?: TaskStateCallback,
+	signal?: AbortSignal,
+): Promise<void> {
+	const useHats = config.hats && Object.keys(config.hats).length > 0;
 
 	if (useHats && config.hats) {
 		const hatRegistry = new HatRegistry();
 		hatRegistry.registerFromConfig(config.hats);
-
 		const eventBus = new EventBus();
 
 		await executeHatLoop(
@@ -211,9 +238,7 @@ export async function runMultipleLoops(
 		issue,
 		maxIterations: maxIter,
 		runner: async (onStateChange: TaskStateCallback, signal: AbortSignal) => {
-			const taskState = taskManager
-				.getAllTasks()
-				.find((t) => t.issueNumber === issue.number);
+			const taskState = taskManager.getAllTasks().find((t) => t.issueNumber === issue.number);
 			const taskId = taskState?.id;
 
 			await runLoop({
@@ -225,9 +250,7 @@ export async function runMultipleLoops(
 				draftPR,
 				useContainer,
 				generateReport: shouldGenerateReport,
-				reportPath: taskId
-					? `.agent/${taskId}/report.md`
-					: `.agent/report-${issue.number}.md`,
+				reportPath: taskId ? `.agent/${taskId}/report.md` : `.agent/report-${issue.number}.md`,
 				preset,
 				taskId,
 				onStateChange,
@@ -237,6 +260,23 @@ export async function runMultipleLoops(
 	}));
 
 	await taskManager.runParallel(tasks);
+}
+
+interface LoopState {
+	consecutiveFailures: number;
+	completionReason: ReportData["completionReason"];
+	prResult?: { url: string; number: number; branch: string };
+}
+
+interface HatIterationParams {
+	context: LoopContext;
+	backend: Backend;
+	hatRegistry: HatRegistry;
+	eventBus: EventBus;
+	collector: ReportCollector | null;
+	taskLogger: typeof logger;
+	taskId?: string;
+	onStateChange?: TaskStateCallback;
 }
 
 async function executeHatLoop(
@@ -252,210 +292,241 @@ async function executeHatLoop(
 	signal?: AbortSignal,
 ): Promise<void> {
 	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
-	let consecutiveFailures = 0;
-	const maxConsecutiveFailures = 5;
-	const historyPath = taskId
-		? `.agent/${taskId}/output_history.txt`
-		: ".agent/output_history.txt";
-	let completionReason: ReportData["completionReason"] = "max_iterations";
-	let prResult: { url: string; number: number; branch: string } | undefined;
+	const historyPath = taskId ? `.agent/${taskId}/output_history.txt` : ".agent/output_history.txt";
+	const state: LoopState = { consecutiveFailures: 0, completionReason: "max_iterations" };
 
 	mkdirSync(dirname(historyPath), { recursive: true });
-
 	eventBus.emit("task.start", undefined, { issueNumber });
 
+	const params: HatIterationParams = {
+		context,
+		backend,
+		hatRegistry,
+		eventBus,
+		collector,
+		taskLogger,
+		taskId,
+		onStateChange,
+	};
+
+	const loopResult = await runHatLoopIterations(params, state, signal);
+
+	if (loopResult.completed) {
+		await handleLoopEnd(context, config, collector, eventBus, state, issueNumber, taskId);
+		if (loopResult.error) throw loopResult.error;
+		return;
+	}
+
+	taskLogger.error(`Max iterations (${context.maxIterations}) reached without completion`);
+	await updateIssueLabel(issueNumber, "env:blocked");
+	await finalizeReport(
+		context,
+		config,
+		collector,
+		eventBus,
+		state.completionReason,
+		state.prResult,
+	);
+	throw new Error("Max iterations reached");
+}
+
+interface HatLoopResult {
+	completed: boolean;
+	error?: Error;
+}
+
+async function runHatLoopIterations(
+	params: HatIterationParams,
+	state: LoopState,
+	signal?: AbortSignal,
+): Promise<HatLoopResult> {
+	const { context, eventBus, taskLogger } = params;
 	let currentEvent = eventBus.getLastEvent();
 
 	while (context.iteration < context.maxIterations) {
 		if (signal?.aborted) {
 			taskLogger.warn("Task cancelled");
-			return;
+			return { completed: true };
 		}
 
-		context.iteration++;
-		const iterStartTime = new Date();
+		const iterResult = await executeHatIteration(params, currentEvent, state);
 
-		const activeHat = currentEvent
-			? hatRegistry.findByTrigger(currentEvent.type)
-			: hatRegistry.getAll()[0];
-
-		if (!activeHat) {
-			taskLogger.warn(
-				`No hat found for event: ${currentEvent?.type ?? "none"}`,
-			);
-			break;
+		if (iterResult.shouldStop) {
+			return { completed: true, error: iterResult.error };
 		}
 
-		hatRegistry.setActive(activeHat.id);
-
-		onStateChange?.({
-			iteration: context.iteration,
-			currentHat: activeHat.name ?? activeHat.id,
-		});
-
-		printIterationHeader(
-			context.iteration,
-			context.maxIterations,
-			activeHat,
-			taskId,
-		);
-
-		const basePrompt = readFileSync(context.promptPath, "utf-8");
-		const prompt = buildHatPrompt(activeHat, basePrompt, {
-			eventBus,
-			currentEvent,
-			iteration: context.iteration,
-		});
-
-		taskLogger.info(
-			`Iteration ${context.iteration}: ${activeHat.name ?? activeHat.id} executing...`,
-		);
-
-		const result = await backend.execute(prompt);
-		const iterEndTime = new Date();
-
-		taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
-
-		const publishedEvent = extractPublishedEvent(result.output, activeHat);
-
-		if (publishedEvent) {
-			onStateChange?.({ lastEvent: publishedEvent });
+		if (iterResult.newEvent) {
+			currentEvent = iterResult.newEvent;
 		}
 
-		collector?.recordIteration({
-			hatId: activeHat.id,
-			hatName: activeHat.name,
-			startTime: iterStartTime,
-			endTime: iterEndTime,
-			durationMs: iterEndTime.getTime() - iterStartTime.getTime(),
-			exitCode: result.exitCode,
-			publishedEvent: publishedEvent ?? undefined,
-		});
-
-		if (result.exitCode !== 0) {
-			consecutiveFailures++;
-			taskLogger.error(`Backend exited with code ${result.exitCode}`);
-
-			if (consecutiveFailures >= maxConsecutiveFailures) {
-				taskLogger.error(
-					`Too many consecutive failures (${consecutiveFailures}). Stopping.`,
-				);
-				await updateIssueLabel(issueNumber, "env:blocked");
-				completionReason = "error";
-				await finalizeReport(
-					context,
-					config,
-					collector,
-					eventBus,
-					completionReason,
-					prResult,
-				);
-				throw new Error("Max consecutive failures reached");
-			}
-			continue;
-		}
-
-		consecutiveFailures = 0;
-
-		if (publishedEvent) {
-			taskLogger.info(`Hat ${activeHat.id} published: ${publishedEvent}`);
-			eventBus.emit(publishedEvent, activeHat.id);
-			currentEvent = eventBus.getLastEvent();
-		}
-
-		if (
-			checkCompletion(result.output, context.completionPromise) ||
-			publishedEvent === context.completionPromise
-		) {
-			taskLogger.success(
-				`Task completed! (${context.completionPromise} detected)`,
-			);
-			await updateIssueLabel(issueNumber, "env:pr-created");
-
-			const postApproval = await requestApproval({
-				gateName: "Post-Completion",
-				message: "Task appears complete. Review before creating PR.",
-				autoMode: context.autoMode,
-				scratchpadPath: context.scratchpadPath,
-			});
-
-			if (postApproval === "abort") {
-				completionReason = "aborted";
-				await finalizeReport(
-					context,
-					config,
-					collector,
-					eventBus,
-					completionReason,
-					prResult,
-				);
-				return;
-			}
-
-			taskLogger.success(
-				`Orchestration complete after ${context.iteration} iterations`,
-			);
-			printEventSummary(eventBus, taskId);
-
-			if (context.createPR) {
-				prResult = await handlePRCreation(context, taskId);
-			}
-
-			completionReason = "completed";
-			await finalizeReport(
-				context,
-				config,
-				collector,
-				eventBus,
-				completionReason,
-				prResult,
-			);
-			return;
-		}
-
-		if (checkLoopDetection(result.output, historyPath, taskLogger)) {
-			taskLogger.warn(
-				"Possible infinite loop detected. Requesting human intervention.",
-			);
-
-			const loopApproval = await requestApproval({
-				gateName: "Loop Detection",
-				message: "Output is similar to previous iterations. Continue?",
-				autoMode: false,
-				scratchpadPath: context.scratchpadPath,
-			});
-
-			if (loopApproval === "abort") {
-				completionReason = "aborted";
-				await finalizeReport(
-					context,
-					config,
-					collector,
-					eventBus,
-					completionReason,
-					prResult,
-				);
-				return;
+		if (iterResult.loopDetected) {
+			const shouldAbort = await handleLoopDetection(context, taskLogger);
+			if (shouldAbort) {
+				state.completionReason = "aborted";
+				return { completed: true };
 			}
 		}
 
 		await sleep(1000);
 	}
 
-	taskLogger.error(
-		`Max iterations (${context.maxIterations}) reached without completion`,
-	);
-	await updateIssueLabel(issueNumber, "env:blocked");
-	completionReason = "max_iterations";
+	return { completed: false };
+}
+
+interface IterationResult {
+	shouldStop: boolean;
+	error?: Error;
+	newEvent?: ReturnType<EventBus["getLastEvent"]>;
+	loopDetected?: boolean;
+}
+
+async function executeHatIteration(
+	params: HatIterationParams,
+	currentEvent: ReturnType<EventBus["getLastEvent"]>,
+	state: LoopState,
+): Promise<IterationResult> {
+	const { context, backend, hatRegistry, eventBus, collector, taskLogger, taskId, onStateChange } =
+		params;
+	const historyPath = taskId ? `.agent/${taskId}/output_history.txt` : ".agent/output_history.txt";
+
+	context.iteration++;
+	const iterStartTime = new Date();
+
+	const activeHat = currentEvent
+		? hatRegistry.findByTrigger(currentEvent.type)
+		: hatRegistry.getAll()[0];
+
+	if (!activeHat) {
+		taskLogger.warn(`No hat found for event: ${currentEvent?.type ?? "none"}`);
+		return { shouldStop: true };
+	}
+
+	hatRegistry.setActive(activeHat.id);
+	onStateChange?.({ iteration: context.iteration, currentHat: activeHat.name ?? activeHat.id });
+	printIterationHeader(context.iteration, context.maxIterations, activeHat, taskId);
+
+	const prompt = buildHatPrompt(activeHat, readFileSync(context.promptPath, "utf-8"), {
+		eventBus,
+		currentEvent,
+		iteration: context.iteration,
+	});
+
+	taskLogger.info(`Iteration ${context.iteration}: ${activeHat.name ?? activeHat.id} executing...`);
+
+	const result = await backend.execute(prompt);
+	const iterEndTime = new Date();
+
+	taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
+
+	const publishedEvent = extractPublishedEvent(result.output, activeHat);
+	if (publishedEvent) onStateChange?.({ lastEvent: publishedEvent });
+
+	collector?.recordIteration({
+		hatId: activeHat.id,
+		hatName: activeHat.name,
+		startTime: iterStartTime,
+		endTime: iterEndTime,
+		durationMs: iterEndTime.getTime() - iterStartTime.getTime(),
+		exitCode: result.exitCode,
+		publishedEvent: publishedEvent ?? undefined,
+	});
+
+	if (result.exitCode !== 0) {
+		return handleIterationFailure(state, taskLogger);
+	}
+
+	state.consecutiveFailures = 0;
+
+	if (publishedEvent) {
+		taskLogger.info(`Hat ${activeHat.id} published: ${publishedEvent}`);
+		eventBus.emit(publishedEvent, activeHat.id);
+	}
+
+	const isComplete =
+		checkCompletion(result.output, context.completionPromise) ||
+		publishedEvent === context.completionPromise;
+
+	if (isComplete) {
+		state.completionReason = "completed";
+		return { shouldStop: true };
+	}
+
+	const loopDetected = checkLoopDetection(result.output, historyPath, taskLogger);
+	return { shouldStop: false, newEvent: eventBus.getLastEvent(), loopDetected };
+}
+
+function handleIterationFailure(state: LoopState, taskLogger: typeof logger): IterationResult {
+	state.consecutiveFailures++;
+	taskLogger.error(`Backend exited with non-zero code`);
+
+	if (state.consecutiveFailures >= 5) {
+		taskLogger.error(`Too many consecutive failures. Stopping.`);
+		state.completionReason = "error";
+		return { shouldStop: true, error: new Error("Max consecutive failures reached") };
+	}
+
+	return { shouldStop: false };
+}
+
+async function handleLoopEnd(
+	context: LoopContext,
+	config: Config,
+	collector: ReportCollector | null,
+	eventBus: EventBus | null,
+	state: LoopState,
+	issueNumber: number,
+	taskId?: string,
+): Promise<void> {
+	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
+
+	if (state.completionReason === "completed") {
+		taskLogger.success(`Task completed! (${context.completionPromise} detected)`);
+		await updateIssueLabel(issueNumber, "env:pr-created");
+
+		const postApproval = await requestApproval({
+			gateName: "Post-Completion",
+			message: "Task appears complete. Review before creating PR.",
+			autoMode: context.autoMode,
+			scratchpadPath: context.scratchpadPath,
+		});
+
+		if (postApproval === "abort") {
+			state.completionReason = "aborted";
+		} else {
+			taskLogger.success(`Orchestration complete after ${context.iteration} iterations`);
+			if (eventBus) printEventSummary(eventBus, taskId);
+			if (context.createPR) {
+				state.prResult = await handlePRCreation(context, taskId);
+			}
+		}
+	} else if (state.completionReason === "error") {
+		await updateIssueLabel(issueNumber, "env:blocked");
+	}
+
 	await finalizeReport(
 		context,
 		config,
 		collector,
 		eventBus,
-		completionReason,
-		prResult,
+		state.completionReason,
+		state.prResult,
 	);
-	throw new Error("Max iterations reached");
+}
+
+async function handleLoopDetection(
+	context: LoopContext,
+	taskLogger: typeof logger,
+): Promise<boolean> {
+	taskLogger.warn("Possible infinite loop detected. Requesting human intervention.");
+
+	const loopApproval = await requestApproval({
+		gateName: "Loop Detection",
+		message: "Output is similar to previous iterations. Continue?",
+		autoMode: false,
+		scratchpadPath: context.scratchpadPath,
+	});
+
+	return loopApproval === "abort";
 }
 
 async function executeSimpleLoop(
@@ -469,13 +540,8 @@ async function executeSimpleLoop(
 	signal?: AbortSignal,
 ): Promise<void> {
 	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
-	let consecutiveFailures = 0;
-	const maxConsecutiveFailures = 5;
-	const historyPath = taskId
-		? `.agent/${taskId}/output_history.txt`
-		: ".agent/output_history.txt";
-	let completionReason: ReportData["completionReason"] = "max_iterations";
-	let prResult: { url: string; number: number; branch: string } | undefined;
+	const historyPath = taskId ? `.agent/${taskId}/output_history.txt` : ".agent/output_history.txt";
+	const state: LoopState = { consecutiveFailures: 0, completionReason: "max_iterations" };
 
 	mkdirSync(dirname(historyPath), { recursive: true });
 
@@ -485,130 +551,34 @@ async function executeSimpleLoop(
 			return;
 		}
 
-		context.iteration++;
-		const iterStartTime = new Date();
-
-		onStateChange?.({
-			iteration: context.iteration,
-		});
-
-		printIterationHeader(
-			context.iteration,
-			context.maxIterations,
-			undefined,
+		const iterResult = await executeSimpleIteration(
+			context,
+			backend,
+			collector,
+			historyPath,
+			state,
+			taskLogger,
 			taskId,
+			onStateChange,
 		);
 
-		const prompt = readFileSync(context.promptPath, "utf-8");
-
-		taskLogger.info(
-			`Iteration ${context.iteration}: Executing ${backend.name}...`,
-		);
-
-		const result = await backend.execute(prompt);
-		const iterEndTime = new Date();
-
-		taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
-
-		collector?.recordIteration({
-			startTime: iterStartTime,
-			endTime: iterEndTime,
-			durationMs: iterEndTime.getTime() - iterStartTime.getTime(),
-			exitCode: result.exitCode,
-		});
-
-		if (result.exitCode !== 0) {
-			consecutiveFailures++;
-			taskLogger.error(`Backend exited with code ${result.exitCode}`);
-
-			if (consecutiveFailures >= maxConsecutiveFailures) {
-				taskLogger.error(
-					`Too many consecutive failures (${consecutiveFailures}). Stopping.`,
-				);
-				await updateIssueLabel(issueNumber, "env:blocked");
-				completionReason = "error";
-				await finalizeReport(
-					context,
-					config,
-					collector,
-					null,
-					completionReason,
-					prResult,
-				);
-				throw new Error("Max consecutive failures reached");
-			}
-			continue;
-		}
-
-		consecutiveFailures = 0;
-
-		if (checkCompletion(result.output, context.completionPromise)) {
-			taskLogger.success(
-				`Task completed! (${context.completionPromise} detected)`,
-			);
-			await updateIssueLabel(issueNumber, "env:pr-created");
-
-			const postApproval = await requestApproval({
-				gateName: "Post-Completion",
-				message: "Task appears complete. Review before creating PR.",
-				autoMode: context.autoMode,
-				scratchpadPath: context.scratchpadPath,
-			});
-
-			if (postApproval === "abort") {
-				completionReason = "aborted";
-				await finalizeReport(
-					context,
-					config,
-					collector,
-					null,
-					completionReason,
-					prResult,
-				);
-				return;
-			}
-
-			taskLogger.success(
-				`Orchestration complete after ${context.iteration} iterations`,
-			);
-
-			if (context.createPR) {
-				prResult = await handlePRCreation(context, taskId);
-			}
-
-			completionReason = "completed";
-			await finalizeReport(
-				context,
-				config,
-				collector,
-				null,
-				completionReason,
-				prResult,
-			);
+		if (iterResult.shouldStop) {
+			await handleLoopEnd(context, config, collector, null, state, issueNumber, taskId);
+			if (iterResult.error) throw iterResult.error;
 			return;
 		}
 
-		if (checkLoopDetection(result.output, historyPath, taskLogger)) {
-			taskLogger.warn(
-				"Possible infinite loop detected. Requesting human intervention.",
-			);
-
-			const loopApproval = await requestApproval({
-				gateName: "Loop Detection",
-				message: "Output is similar to previous iterations. Continue?",
-				autoMode: false,
-				scratchpadPath: context.scratchpadPath,
-			});
-
-			if (loopApproval === "abort") {
-				completionReason = "aborted";
+		if (iterResult.loopDetected) {
+			const shouldAbort = await handleLoopDetection(context, taskLogger);
+			if (shouldAbort) {
+				state.completionReason = "aborted";
 				await finalizeReport(
 					context,
 					config,
 					collector,
 					null,
-					completionReason,
-					prResult,
+					state.completionReason,
+					state.prResult,
 				);
 				return;
 			}
@@ -617,20 +587,56 @@ async function executeSimpleLoop(
 		await sleep(1000);
 	}
 
-	taskLogger.error(
-		`Max iterations (${context.maxIterations}) reached without completion`,
-	);
+	taskLogger.error(`Max iterations (${context.maxIterations}) reached without completion`);
 	await updateIssueLabel(issueNumber, "env:blocked");
-	completionReason = "max_iterations";
-	await finalizeReport(
-		context,
-		config,
-		collector,
-		null,
-		completionReason,
-		prResult,
-	);
+	await finalizeReport(context, config, collector, null, state.completionReason, state.prResult);
 	throw new Error("Max iterations reached");
+}
+
+async function executeSimpleIteration(
+	context: LoopContext,
+	backend: Backend,
+	collector: ReportCollector | null,
+	historyPath: string,
+	state: LoopState,
+	taskLogger: typeof logger,
+	taskId?: string,
+	onStateChange?: TaskStateCallback,
+): Promise<IterationResult> {
+	context.iteration++;
+	const iterStartTime = new Date();
+
+	onStateChange?.({ iteration: context.iteration });
+	printIterationHeader(context.iteration, context.maxIterations, undefined, taskId);
+
+	const prompt = readFileSync(context.promptPath, "utf-8");
+	taskLogger.info(`Iteration ${context.iteration}: Executing ${backend.name}...`);
+
+	const result = await backend.execute(prompt);
+	const iterEndTime = new Date();
+
+	taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
+
+	collector?.recordIteration({
+		startTime: iterStartTime,
+		endTime: iterEndTime,
+		durationMs: iterEndTime.getTime() - iterStartTime.getTime(),
+		exitCode: result.exitCode,
+	});
+
+	if (result.exitCode !== 0) {
+		return handleIterationFailure(state, taskLogger);
+	}
+
+	state.consecutiveFailures = 0;
+
+	if (checkCompletion(result.output, context.completionPromise)) {
+		state.completionReason = "completed";
+		return { shouldStop: true };
+	}
+
+	const loopDetected = checkLoopDetection(result.output, historyPath, taskLogger);
+	return { shouldStop: false, loopDetected };
 }
 
 function printIterationHeader(
@@ -641,21 +647,13 @@ function printIterationHeader(
 ): void {
 	const taskPrefix = taskId ? `[${taskId}] ` : "";
 	console.log("");
-	console.log(
-		chalk.cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
-	);
+	console.log(chalk.cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
 	if (hat) {
-		console.log(
-			chalk.cyan(
-				`  ${taskPrefix}ITERATION ${iteration}/${max} │ ${hat.name ?? hat.id}`,
-			),
-		);
+		console.log(chalk.cyan(`  ${taskPrefix}ITERATION ${iteration}/${max} │ ${hat.name ?? hat.id}`));
 	} else {
 		console.log(chalk.cyan(`  ${taskPrefix}ITERATION ${iteration}/${max}`));
 	}
-	console.log(
-		chalk.cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
-	);
+	console.log(chalk.cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
 	console.log("");
 }
 
@@ -714,13 +712,9 @@ async function handlePRCreation(
 
 	const taskPrefix = taskId ? `[${taskId}] ` : "";
 	console.log("");
-	console.log(
-		chalk.green("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
-	);
+	console.log(chalk.green("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
 	console.log(chalk.green(`  ${taskPrefix}CREATING PULL REQUEST`));
-	console.log(
-		chalk.green("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"),
-	);
+	console.log(chalk.green("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
 	console.log("");
 
 	try {

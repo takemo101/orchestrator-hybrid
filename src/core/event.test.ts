@@ -57,10 +57,7 @@ describe("EventBus", () => {
 			bus.emit("test.event");
 
 			expect(callback).toHaveBeenCalledTimes(1);
-			expect((callback.mock.calls[0] as unknown[])[0]).toHaveProperty(
-				"type",
-				"test.event",
-			);
+			expect((callback.mock.calls[0] as unknown[])[0]).toHaveProperty("type", "test.event");
 		});
 
 		it("should call wildcard listener for all events", () => {

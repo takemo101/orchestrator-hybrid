@@ -34,15 +34,11 @@ describe("createBackend", () => {
 	});
 
 	it("should throw error for 'gemini' (not implemented)", () => {
-		expect(() => createBackend("gemini")).toThrow(
-			"Gemini backend not yet implemented",
-		);
+		expect(() => createBackend("gemini")).toThrow("Gemini backend not yet implemented");
 	});
 
 	it("should throw error for unknown backend type", () => {
-		expect(() => createBackend("unknown" as "claude")).toThrow(
-			"Unknown backend type: unknown",
-		);
+		expect(() => createBackend("unknown" as "claude")).toThrow("Unknown backend type: unknown");
 	});
 });
 

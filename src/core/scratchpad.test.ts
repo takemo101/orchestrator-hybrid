@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import {
-	appendToScratchpad,
-	initScratchpad,
-	readScratchpad,
-} from "./scratchpad.js";
+import { appendToScratchpad, initScratchpad, readScratchpad } from "./scratchpad.js";
 
 describe("scratchpad", () => {
 	const testDir = ".test-scratchpad";

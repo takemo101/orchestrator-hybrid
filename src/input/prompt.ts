@@ -9,10 +9,7 @@ export interface PromptOptions {
 	scratchpadPath: string;
 }
 
-export function generatePrompt(
-	options: PromptOptions,
-	outputPath: string,
-): void {
+export function generatePrompt(options: PromptOptions, outputPath: string): void {
 	const { issue, completionPromise, scratchpadPath } = options;
 
 	const labels = issue.labels.length > 0 ? issue.labels.join(", ") : "(none)";

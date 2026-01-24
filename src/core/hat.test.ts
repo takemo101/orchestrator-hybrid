@@ -1,11 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { EventBus } from "./event.js";
-import {
-	buildHatPrompt,
-	extractPublishedEvent,
-	type HatDefinition,
-	HatRegistry,
-} from "./hat.js";
+import { buildHatPrompt, extractPublishedEvent, type HatDefinition, HatRegistry } from "./hat.js";
 
 describe("HatRegistry", () => {
 	describe("register", () => {
@@ -208,8 +203,7 @@ describe("extractPublishedEvent", () => {
 
 	describe("multiple events", () => {
 		it("should return first authorized event when multiple found", () => {
-			const output =
-				"EVENT: unauthorized.event\nEVENT: test.done\nEVENT: test.failed";
+			const output = "EVENT: unauthorized.event\nEVENT: test.done\nEVENT: test.failed";
 			const result = extractPublishedEvent(output, hat);
 			expect(result).toBe("test.done");
 		});

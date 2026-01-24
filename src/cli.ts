@@ -22,119 +22,146 @@ const program = new Command();
 
 program
 	.name("orch")
-	.description(
-		"AI agent orchestrator combining Ralph loop with GitHub Issue integration",
-	)
+	.description("AI agent orchestrator combining Ralph loop with GitHub Issue integration")
 	.version("0.1.0");
 
 program
 	.command("run")
 	.description("Start orchestration loop")
 	.option("-i, --issue <number>", "GitHub issue number (single)")
-	.option(
-		"--issues <numbers>",
-		"GitHub issue numbers (comma-separated for parallel)",
-	)
+	.option("--issues <numbers>", "GitHub issue numbers (comma-separated for parallel)")
 	.option("-b, --backend <type>", "Backend: claude, opencode")
-	.option(
-		"-p, --preset <name>",
-		"Use preset configuration (tdd, spec-driven, simple)",
-	)
-	.option(
-		"-m, --max-iterations <number>",
-		"Maximum iterations",
-		Number.parseInt,
-	)
+	.option("-p, --preset <name>", "Use preset configuration (tdd, spec-driven, simple)")
+	.option("-m, --max-iterations <number>", "Maximum iterations", Number.parseInt)
 	.option("-a, --auto", "Auto-approve all gates")
 	.option("--create-pr", "Create PR after completion")
 	.option("--draft", "Create PR as draft")
 	.option("--container", "Run in isolated container-use environment")
-	.option(
-		"--report [path]",
-		"Generate execution report (default: .agent/report.md)",
-	)
+	.option("--report [path]", "Generate execution report (default: .agent/report.md)")
 	.option("-c, --config <path>", "Config file path")
 	.option("-v, --verbose", "Verbose output")
 	.action(async (options) => {
 		try {
-			if (options.verbose) {
-				setVerbose(true);
-			}
-
-			if (!options.issue && !options.issues) {
-				logger.error("Either --issue or --issues is required");
-				process.exit(1);
-			}
-
-			let config: ReturnType<typeof loadConfig>;
-
-			if (options.preset) {
-				config = loadPreset(options.preset);
-				logger.info(`Using preset: ${options.preset}`);
-			} else {
-				config = loadConfig(options.config);
-			}
-
-			if (options.backend) {
-				config.backend.type = options.backend;
-			}
-
-			if (options.issues) {
-				const issueNumbers = options.issues
-					.split(",")
-					.map((n: string) => Number.parseInt(n.trim(), 10))
-					.filter((n: number) => !Number.isNaN(n));
-
-				if (issueNumbers.length === 0) {
-					logger.error("No valid issue numbers provided");
-					process.exit(1);
-				}
-
-				logger.info(
-					`Starting parallel execution for issues: ${issueNumbers.join(", ")}`,
-				);
-
-				const taskManager = new TaskManager();
-
-				await runMultipleLoops(
-					{
-						issueNumbers,
-						config,
-						autoMode: options.auto ?? false,
-						maxIterations: options.maxIterations,
-						createPR: options.createPr ?? false,
-						draftPR: options.draft ?? false,
-						useContainer: options.container ?? false,
-						generateReport: options.report !== undefined,
-						preset: options.preset,
-					},
-					taskManager,
-				);
-
-				const tasks = taskManager.getAllTasks();
-				printTaskSummary(tasks);
-			} else {
-				await runLoop({
-					issueNumber: Number.parseInt(options.issue, 10),
-					config,
-					autoMode: options.auto ?? false,
-					maxIterations: options.maxIterations,
-					createPR: options.createPr ?? false,
-					draftPR: options.draft ?? false,
-					useContainer: options.container ?? false,
-					generateReport: options.report !== undefined,
-					reportPath:
-						typeof options.report === "string"
-							? options.report
-							: ".agent/report.md",
-					preset: options.preset,
-				});
-			}
+			await handleRunCommand(options);
 		} catch (error) {
 			logger.error(error instanceof Error ? error.message : String(error));
 			process.exit(1);
 		}
 	});
+
+async function handleRunCommand(options: {
+	verbose?: boolean;
+	issue?: string;
+	issues?: string;
+	preset?: string;
+	config?: string;
+	backend?: string;
+	auto?: boolean;
+	maxIterations?: number;
+	createPr?: boolean;
+	draft?: boolean;
+	container?: boolean;
+	report?: string | boolean;
+}): Promise<void> {
+	if (options.verbose) {
+		setVerbose(true);
+	}
+
+	if (!options.issue && !options.issues) {
+		logger.error("Either --issue or --issues is required");
+		process.exit(1);
+	}
+
+	let config: ReturnType<typeof loadConfig>;
+	if (options.preset) {
+		logger.info(`Using preset: ${options.preset}`);
+		config = loadPreset(options.preset);
+	} else {
+		config = loadConfig(options.config);
+	}
+
+	if (options.backend) {
+		config.backend.type = options.backend as "claude" | "opencode" | "gemini" | "container";
+	}
+
+	if (options.issues) {
+		await handleMultipleIssues(options, config);
+	} else {
+		await handleSingleIssue(options, config);
+	}
+}
+
+async function handleMultipleIssues(
+	options: {
+		issues?: string;
+		auto?: boolean;
+		maxIterations?: number;
+		createPr?: boolean;
+		draft?: boolean;
+		container?: boolean;
+		report?: string | boolean;
+		preset?: string;
+	},
+	config: ReturnType<typeof loadConfig>,
+): Promise<void> {
+	const issueNumbers = (options.issues ?? "")
+		.split(",")
+		.map((n: string) => Number.parseInt(n.trim(), 10))
+		.filter((n: number) => !Number.isNaN(n));
+
+	if (issueNumbers.length === 0) {
+		logger.error("No valid issue numbers provided");
+		process.exit(1);
+	}
+
+	logger.info(`Starting parallel execution for issues: ${issueNumbers.join(", ")}`);
+
+	const taskManager = new TaskManager();
+
+	await runMultipleLoops(
+		{
+			issueNumbers,
+			config,
+			autoMode: options.auto ?? false,
+			maxIterations: options.maxIterations,
+			createPR: options.createPr ?? false,
+			draftPR: options.draft ?? false,
+			useContainer: options.container ?? false,
+			generateReport: options.report !== undefined,
+			preset: options.preset,
+		},
+		taskManager,
+	);
+
+	printTaskSummary(taskManager.getAllTasks());
+}
+
+async function handleSingleIssue(
+	options: {
+		issue?: string;
+		auto?: boolean;
+		maxIterations?: number;
+		createPr?: boolean;
+		draft?: boolean;
+		container?: boolean;
+		report?: string | boolean;
+		preset?: string;
+	},
+	config: ReturnType<typeof loadConfig>,
+): Promise<void> {
+	await runLoop({
+		issueNumber: Number.parseInt(options.issue ?? "0", 10),
+		config,
+		autoMode: options.auto ?? false,
+		maxIterations: options.maxIterations,
+		createPR: options.createPr ?? false,
+		draftPR: options.draft ?? false,
+		useContainer: options.container ?? false,
+		generateReport: options.report !== undefined,
+		reportPath: typeof options.report === "string" ? options.report : ".agent/report.md",
+		preset: options.preset,
+	});
+}
 
 program
 	.command("status")
@@ -145,78 +172,97 @@ program
 	.option("-c, --config <path>", "Config file path")
 	.action(async (options) => {
 		try {
-			const store = new TaskStore();
-
-			if (options.all) {
-				const tasks = store.getAll();
-				if (tasks.length === 0) {
-					logger.info("No tasks found");
-					return;
-				}
-				printTaskTable(tasks);
-				return;
-			}
-
-			if (options.task) {
-				const task = store.get(options.task);
-				if (!task) {
-					logger.error(`Task not found: ${options.task}`);
-					process.exit(1);
-				}
-				printTaskDetail(task);
-				return;
-			}
-
-			if (options.issue) {
-				const config = loadConfig(options.config);
-				const issueNumber = Number.parseInt(options.issue, 10);
-
-				logger.info(`Status for issue #${issueNumber}:`);
-
-				const issue = await fetchIssue(issueNumber);
-				console.log(JSON.stringify(issue, null, 2));
-
-				console.log("");
-				logger.info("Scratchpad:");
-
-				const scratchpadPath =
-					config.state?.scratchpad_path ?? ".agent/scratchpad.md";
-				console.log(readScratchpad(scratchpadPath));
-
-				const tasks = store
-					.getAll()
-					.filter((t) => t.issueNumber === issueNumber);
-				if (tasks.length > 0) {
-					console.log("");
-					logger.info("Related tasks:");
-					printTaskTable(tasks);
-				}
-				return;
-			}
-
-			const runningTasks = store.getByStatus("running");
-			if (runningTasks.length > 0) {
-				logger.info("Running tasks:");
-				printTaskTable(runningTasks);
-			} else {
-				logger.info("No running tasks");
-
-				const recentTasks = store
-					.getAll()
-					.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-					.slice(0, 5);
-
-				if (recentTasks.length > 0) {
-					console.log("");
-					logger.info("Recent tasks:");
-					printTaskTable(recentTasks);
-				}
-			}
+			await handleStatusCommand(options);
 		} catch (error) {
 			logger.error(error instanceof Error ? error.message : String(error));
 			process.exit(1);
 		}
 	});
+
+async function handleStatusCommand(options: {
+	all?: boolean;
+	task?: string;
+	issue?: string;
+	config?: string;
+}): Promise<void> {
+	const store = new TaskStore();
+
+	if (options.all) {
+		const tasks = store.getAll();
+		if (tasks.length === 0) {
+			logger.info("No tasks found");
+			return;
+		}
+		printTaskTable(tasks);
+		return;
+	}
+
+	if (options.task) {
+		const task = store.get(options.task);
+		if (!task) {
+			logger.error(`Task not found: ${options.task}`);
+			process.exit(1);
+		}
+		printTaskDetail(task);
+		return;
+	}
+
+	if (options.issue) {
+		await showIssueStatus(options.issue, options.config, store);
+		return;
+	}
+
+	showDefaultStatus(store);
+}
+
+async function showIssueStatus(
+	issueStr: string,
+	configPath: string | undefined,
+	store: TaskStore,
+): Promise<void> {
+	const config = loadConfig(configPath);
+	const issueNumber = Number.parseInt(issueStr, 10);
+
+	logger.info(`Status for issue #${issueNumber}:`);
+
+	const issue = await fetchIssue(issueNumber);
+	console.log(JSON.stringify(issue, null, 2));
+
+	console.log("");
+	logger.info("Scratchpad:");
+
+	const scratchpadPath = config.state?.scratchpad_path ?? ".agent/scratchpad.md";
+	console.log(readScratchpad(scratchpadPath));
+
+	const tasks = store.getAll().filter((t) => t.issueNumber === issueNumber);
+	if (tasks.length > 0) {
+		console.log("");
+		logger.info("Related tasks:");
+		printTaskTable(tasks);
+	}
+}
+
+function showDefaultStatus(store: TaskStore): void {
+	const runningTasks = store.getByStatus("running");
+	if (runningTasks.length > 0) {
+		logger.info("Running tasks:");
+		printTaskTable(runningTasks);
+		return;
+	}
+
+	logger.info("No running tasks");
+
+	const recentTasks = store
+		.getAll()
+		.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+		.slice(0, 5);
+
+	if (recentTasks.length > 0) {
+		console.log("");
+		logger.info("Recent tasks:");
+		printTaskTable(recentTasks);
+	}
+}
 
 program
 	.command("events")
@@ -354,9 +400,7 @@ program
 		const interval = options.interval ?? 1000;
 
 		if (!options.follow) {
-			const tasks = options.task
-				? [store.get(options.task)].filter(Boolean)
-				: store.getAll();
+			const tasks = options.task ? [store.get(options.task)].filter(Boolean) : store.getAll();
 
 			if (tasks.length === 0) {
 				logger.info("No tasks found");
@@ -373,62 +417,11 @@ program
 		let lastSnapshot = "";
 
 		const printUpdate = () => {
-			const tasks = options.task
-				? [store.get(options.task)].filter(Boolean)
-				: store.getAll();
-
-			const snapshot = JSON.stringify(
-				tasks.map((t) => ({
-					id: t?.id,
-					status: t?.status,
-					iteration: t?.iteration,
-					hat: t?.currentHat,
-					event: t?.lastEvent,
-				})),
-			);
-
-			if (snapshot === lastSnapshot) {
-				return;
+			const tasks = options.task ? [store.get(options.task)].filter(Boolean) : store.getAll();
+			const result = renderTaskMonitor(tasks, lastSnapshot);
+			if (result.changed) {
+				lastSnapshot = result.snapshot;
 			}
-			lastSnapshot = snapshot;
-
-			console.clear();
-			console.log(
-				chalk.bold(`Task Monitor - ${new Date().toLocaleTimeString()}`),
-			);
-			console.log("");
-
-			if (tasks.length === 0) {
-				console.log(chalk.gray("No tasks found"));
-				return;
-			}
-
-			for (const task of tasks) {
-				if (!task) continue;
-				const statusIcon = getStatusIcon(task.status);
-				const hat = task.currentHat ?? "-";
-				const iter = `${task.iteration}/${task.maxIterations}`;
-				const event = task.lastEvent ?? "-";
-
-				console.log(
-					`${statusIcon} ${chalk.bold(task.id)} ` +
-						`#${task.issueNumber} ` +
-						`[${iter}] ` +
-						chalk.cyan(hat) +
-						(event !== "-" ? ` → ${chalk.yellow(event)}` : ""),
-				);
-			}
-
-			const running = tasks.filter((t) => t?.status === "running").length;
-			const completed = tasks.filter((t) => t?.status === "completed").length;
-			const failed = tasks.filter((t) => t?.status === "failed").length;
-
-			console.log("");
-			console.log(
-				chalk.gray(
-					`Running: ${running} | Completed: ${completed} | Failed: ${failed}`,
-				),
-			);
 		};
 
 		printUpdate();
@@ -456,9 +449,7 @@ function loadPreset(name: string) {
 	const presetPath = getPresetPath(name);
 
 	if (!existsSync(presetPath)) {
-		throw new Error(
-			`Preset not found: ${name}. Use --list-presets to see available presets.`,
-		);
+		throw new Error(`Preset not found: ${name}. Use --list-presets to see available presets.`);
 	}
 
 	const content = readFileSync(presetPath, "utf-8");
@@ -547,6 +538,66 @@ function getStatusIcon(status: string): string {
 		default:
 			return "?";
 	}
+}
+
+function renderTaskMonitor(
+	tasks: Array<TaskState | undefined>,
+	lastSnapshot: string,
+): { changed: boolean; snapshot: string } {
+	const snapshot = JSON.stringify(
+		tasks.map((t) => ({
+			id: t?.id,
+			status: t?.status,
+			iteration: t?.iteration,
+			hat: t?.currentHat,
+			event: t?.lastEvent,
+		})),
+	);
+
+	if (snapshot === lastSnapshot) {
+		return { changed: false, snapshot: lastSnapshot };
+	}
+
+	console.clear();
+	console.log(chalk.bold(`Task Monitor - ${new Date().toLocaleTimeString()}`));
+	console.log("");
+
+	if (tasks.length === 0) {
+		console.log(chalk.gray("No tasks found"));
+		return { changed: true, snapshot };
+	}
+
+	for (const task of tasks) {
+		if (!task) continue;
+		printTaskMonitorLine(task);
+	}
+
+	printTaskMonitorSummary(tasks);
+	return { changed: true, snapshot };
+}
+
+function printTaskMonitorLine(task: TaskState): void {
+	const statusIcon = getStatusIcon(task.status);
+	const hat = task.currentHat ?? "-";
+	const iter = `${task.iteration}/${task.maxIterations}`;
+	const event = task.lastEvent ?? "-";
+
+	console.log(
+		`${statusIcon} ${chalk.bold(task.id)} ` +
+			`#${task.issueNumber} ` +
+			`[${iter}] ` +
+			chalk.cyan(hat) +
+			(event !== "-" ? ` → ${chalk.yellow(event)}` : ""),
+	);
+}
+
+function printTaskMonitorSummary(tasks: Array<TaskState | undefined>): void {
+	const running = tasks.filter((t) => t?.status === "running").length;
+	const completed = tasks.filter((t) => t?.status === "completed").length;
+	const failed = tasks.filter((t) => t?.status === "failed").length;
+
+	console.log("");
+	console.log(chalk.gray(`Running: ${running} | Completed: ${completed} | Failed: ${failed}`));
 }
 
 function printTaskTable(
@@ -653,8 +704,7 @@ function printTaskSummary(
 	console.log(`Total:     ${tasks.length}`);
 	console.log(`Completed: ${chalk.green(completed.toString())}`);
 	if (failed > 0) console.log(`Failed:    ${chalk.red(failed.toString())}`);
-	if (cancelled > 0)
-		console.log(`Cancelled: ${chalk.yellow(cancelled.toString())}`);
+	if (cancelled > 0) console.log(`Cancelled: ${chalk.yellow(cancelled.toString())}`);
 
 	const failedTasks = tasks.filter((t) => t.status === "failed");
 	if (failedTasks.length > 0) {

@@ -12,9 +12,7 @@ export interface ApprovalOptions {
 
 export type ApprovalResult = "continue" | "abort";
 
-export async function requestApproval(
-	options: ApprovalOptions,
-): Promise<ApprovalResult> {
+export async function requestApproval(options: ApprovalOptions): Promise<ApprovalResult> {
 	const { gateName, message, autoMode, scratchpadPath } = options;
 
 	if (autoMode) {
@@ -23,17 +21,9 @@ export async function requestApproval(
 	}
 
 	console.log("");
-	console.log(
-		chalk.yellow(
-			"════════════════════════════════════════════════════════════",
-		),
-	);
+	console.log(chalk.yellow("════════════════════════════════════════════════════════════"));
 	console.log(chalk.yellow(`  APPROVAL GATE: ${gateName}`));
-	console.log(
-		chalk.yellow(
-			"════════════════════════════════════════════════════════════",
-		),
-	);
+	console.log(chalk.yellow("════════════════════════════════════════════════════════════"));
 	console.log("");
 	console.log(message);
 	console.log("");

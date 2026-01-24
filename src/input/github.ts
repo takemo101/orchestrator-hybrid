@@ -24,39 +24,21 @@ export async function fetchIssue(issueNumber: number): Promise<Issue> {
 	};
 }
 
-export async function updateIssueLabel(
-	issueNumber: number,
-	label: string,
-): Promise<void> {
+export async function updateIssueLabel(issueNumber: number, label: string): Promise<void> {
 	logger.info(`Adding label '${label}' to issue #${issueNumber}...`);
 
 	try {
-		await exec("gh", [
-			"issue",
-			"edit",
-			String(issueNumber),
-			"--add-label",
-			label,
-		]);
+		await exec("gh", ["issue", "edit", String(issueNumber), "--add-label", label]);
 	} catch {
 		logger.warn(`Failed to add label '${label}' (may not exist)`);
 	}
 }
 
-export async function addIssueComment(
-	issueNumber: number,
-	comment: string,
-): Promise<void> {
+export async function addIssueComment(issueNumber: number, comment: string): Promise<void> {
 	logger.info(`Adding comment to issue #${issueNumber}...`);
 
 	try {
-		await exec("gh", [
-			"issue",
-			"comment",
-			String(issueNumber),
-			"--body",
-			comment,
-		]);
+		await exec("gh", ["issue", "comment", String(issueNumber), "--body", comment]);
 	} catch {
 		logger.warn("Failed to add comment");
 	}

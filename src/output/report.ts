@@ -51,13 +51,26 @@ export function generateReport(data: ReportData, outputPath: string): void {
 }
 
 function formatMarkdownReport(data: ReportData): string {
+	const parts = [
+		formatSummarySection(data),
+		formatTimelineSection(data.iterations),
+		formatEventHistorySection(data.events),
+		formatPRSection(data.prCreated),
+		formatConfigSection(data.config),
+		formatIssueSection(data.issue),
+		`---\n\n*Generated at ${data.endTime.toISOString()}*\n`,
+	];
+
+	return parts.filter(Boolean).join("");
+}
+
+function formatSummarySection(data: ReportData): string {
 	const duration = data.endTime.getTime() - data.startTime.getTime();
 	const durationStr = formatDuration(duration);
-
 	const statusEmoji = data.successful ? "✅" : "❌";
 	const statusText = data.successful ? "Completed" : "Failed";
 
-	let report = `# Orchestration Report
+	return `# Orchestration Report
 
 ## Summary
 
@@ -71,71 +84,83 @@ function formatMarkdownReport(data: ReportData): string {
 | Backend | ${data.config.backend} |
 | Container | ${data.config.useContainer ? "Yes" : "No"} |
 
-## Timeline
+`;
+}
+
+function formatTimelineSection(iterations: IterationRecord[]): string {
+	let section = `## Timeline
 
 | # | Hat | Duration | Exit | Event |
 |---|-----|----------|------|-------|
 `;
 
-	for (const iter of data.iterations) {
+	for (const iter of iterations) {
 		const hatDisplay = iter.hatName ?? iter.hatId ?? "-";
 		const durationDisplay = `${iter.durationMs}ms`;
 		const exitDisplay = iter.exitCode === 0 ? "✓" : `✗ (${iter.exitCode})`;
 		const eventDisplay = iter.publishedEvent ?? "-";
 
-		report += `| ${iter.iteration} | ${hatDisplay} | ${durationDisplay} | ${exitDisplay} | ${eventDisplay} |\n`;
+		section += `| ${iter.iteration} | ${hatDisplay} | ${durationDisplay} | ${exitDisplay} | ${eventDisplay} |\n`;
 	}
 
-	if (data.events.length > 0) {
-		report += `
+	return section;
+}
+
+function formatEventHistorySection(events: ReportData["events"]): string {
+	if (events.length === 0) return "";
+
+	let section = `
 ## Event History
 
 \`\`\`
 `;
-		for (const event of data.events) {
-			const time = event.timestamp.toISOString().slice(11, 19);
-			const hatInfo = event.hatId ? ` (${event.hatId})` : "";
-			report += `[${time}] ${event.type}${hatInfo}\n`;
-		}
-		report += `\`\`\`
-`;
+	for (const event of events) {
+		const time = event.timestamp.toISOString().slice(11, 19);
+		const hatInfo = event.hatId ? ` (${event.hatId})` : "";
+		section += `[${time}] ${event.type}${hatInfo}\n`;
 	}
+	section += `\`\`\`
+`;
+	return section;
+}
 
-	if (data.prCreated) {
-		report += `
+function formatPRSection(prCreated: ReportData["prCreated"]): string {
+	if (!prCreated) return "";
+
+	return `
 ## Pull Request
 
-- **URL**: ${data.prCreated.url}
-- **Number**: #${data.prCreated.number}
-- **Branch**: ${data.prCreated.branch}
+- **URL**: ${prCreated.url}
+- **Number**: #${prCreated.number}
+- **Branch**: ${prCreated.branch}
 `;
-	}
+}
 
-	report += `
+function formatConfigSection(config: ReportData["config"]): string {
+	return `
 ## Configuration
 
 \`\`\`yaml
-backend: ${data.config.backend}
-max_iterations: ${data.config.maxIterations}
-completion_promise: ${data.config.completionPromise}
-use_container: ${data.config.useContainer}
-${data.config.preset ? `preset: ${data.config.preset}` : ""}
+backend: ${config.backend}
+max_iterations: ${config.maxIterations}
+completion_promise: ${config.completionPromise}
+use_container: ${config.useContainer}
+${config.preset ? `preset: ${config.preset}` : ""}
 \`\`\`
 
-## Issue Details
-
-### ${data.issue.title}
-
-**Labels**: ${data.issue.labels.length > 0 ? data.issue.labels.join(", ") : "(none)"}
-
-${data.issue.body}
-
----
-
-*Generated at ${data.endTime.toISOString()}*
 `;
+}
 
-	return report;
+function formatIssueSection(issue: Issue): string {
+	return `## Issue Details
+
+### ${issue.title}
+
+**Labels**: ${issue.labels.length > 0 ? issue.labels.join(", ") : "(none)"}
+
+${issue.body}
+
+`;
 }
 
 function formatDuration(ms: number): string {
@@ -161,9 +186,7 @@ function formatDuration(ms: number): string {
 	return `${hours}h ${remainingMinutes}m`;
 }
 
-function formatCompletionReason(
-	reason: ReportData["completionReason"],
-): string {
+function formatCompletionReason(reason: ReportData["completionReason"]): string {
 	switch (reason) {
 		case "completed":
 			return "Task completed successfully";

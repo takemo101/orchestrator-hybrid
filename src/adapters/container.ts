@@ -92,14 +92,7 @@ export class ContainerBackend extends BaseBackend {
 		logger.info(`Cleaning up environment: ${this.envId}`);
 
 		try {
-			await exec("cu", [
-				"environment",
-				"delete",
-				"--id",
-				this.envId,
-				"--source",
-				this.workdir,
-			]);
+			await exec("cu", ["environment", "delete", "--id", this.envId, "--source", this.workdir]);
 			logger.info("Environment deleted");
 		} catch {
 			logger.warn("Failed to delete environment");
