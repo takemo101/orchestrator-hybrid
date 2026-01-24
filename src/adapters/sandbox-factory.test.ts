@@ -5,13 +5,13 @@
  */
 
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import type { Config } from "../core/types.js";
-import type { ProcessExecutor, ProcessResult, SpawnOptions } from "../core/process-executor.js";
-import { SandboxFactory } from "./sandbox-factory.js";
 import { EnvironmentUnavailableError } from "../core/errors.js";
+import type { ProcessExecutor, ProcessResult, SpawnOptions } from "../core/process-executor.js";
+import type { Config } from "../core/types.js";
+import { ContainerAdapter } from "./container-adapter.js";
 import { DockerAdapter } from "./docker-adapter.js";
 import { HostAdapter } from "./host-adapter.js";
-import { ContainerAdapter } from "./container-adapter.js";
+import { SandboxFactory } from "./sandbox-factory.js";
 
 /**
  * モックProcessExecutorを作成
@@ -24,7 +24,11 @@ function createMockExecutor(options: {
 	const cuAvailable = options.cuAvailable ?? false;
 
 	return {
-		spawn: async (command: string, args: string[], _opts?: SpawnOptions): Promise<ProcessResult> => {
+		spawn: async (
+			command: string,
+			args: string[],
+			_opts?: SpawnOptions,
+		): Promise<ProcessResult> => {
 			// docker --version
 			if (command === "docker" && args[0] === "--version") {
 				return dockerAvailable
@@ -250,7 +254,7 @@ describe("SandboxFactory", () => {
 			};
 			const executor = createMockExecutor({ cuAvailable: true });
 
-			const adapter = await SandboxFactory.create(config, executor) as ContainerAdapter;
+			const adapter = (await SandboxFactory.create(config, executor)) as ContainerAdapter;
 
 			expect(adapter).toBeInstanceOf(ContainerAdapter);
 			// envIdが設定されていることを確認

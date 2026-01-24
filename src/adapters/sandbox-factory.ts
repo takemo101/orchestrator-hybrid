@@ -80,7 +80,7 @@ export class SandboxFactory {
 		const fallbackType = configWithSandbox.sandbox?.fallback;
 
 		// プライマリ環境を試行
-		const primaryAdapter = this.createAdapter(sandboxType, configWithSandbox, executor);
+		const primaryAdapter = SandboxFactory.createAdapter(sandboxType, configWithSandbox, executor);
 		if (await primaryAdapter.isAvailable()) {
 			logger.info(`サンドボックス環境: ${sandboxType}`);
 			return primaryAdapter;
@@ -90,7 +90,11 @@ export class SandboxFactory {
 		if (fallbackType) {
 			logger.warn(`${sandboxType}が利用できません。${fallbackType}にフォールバックします。`);
 
-			const fallbackAdapter = this.createAdapter(fallbackType, configWithSandbox, executor);
+			const fallbackAdapter = SandboxFactory.createAdapter(
+				fallbackType,
+				configWithSandbox,
+				executor,
+			);
 			if (await fallbackAdapter.isAvailable()) {
 				logger.info(`サンドボックス環境: ${fallbackType} (フォールバック)`);
 				return fallbackAdapter;
