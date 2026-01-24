@@ -132,7 +132,8 @@ describe("SandboxAdapter インターフェース", () => {
 				async isAvailable() {
 					return true;
 				},
-				async execute(command: string, options?: ExecuteOptions) {
+				async execute(command: string, _options?: ExecuteOptions) {
+					void _options; // unused in mock
 					return {
 						stdout: `ran: ${command}`,
 						stderr: "",
