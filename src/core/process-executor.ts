@@ -11,66 +11,66 @@
  * プロセス実行オプション
  */
 export interface SpawnOptions {
-  /**
-   * 作業ディレクトリ
-   * @default process.cwd()
-   */
-  cwd?: string;
+	/**
+	 * 作業ディレクトリ
+	 * @default process.cwd()
+	 */
+	cwd?: string;
 
-  /**
-   * 環境変数
-   * @default process.env
-   */
-  env?: Record<string, string>;
+	/**
+	 * 環境変数
+	 * @default process.env
+	 */
+	env?: Record<string, string>;
 
-  /**
-   * 標準入力に書き込むデータ
-   */
-  stdin?: string;
+	/**
+	 * 標準入力に書き込むデータ
+	 */
+	stdin?: string;
 
-  /**
-   * タイムアウト（ミリ秒）
-   * @default undefined（無制限）
-   */
-  timeout?: number;
+	/**
+	 * タイムアウト（ミリ秒）
+	 * @default undefined（無制限）
+	 */
+	timeout?: number;
 
-  /**
-   * 標準出力の処理方法
-   * - "pipe": パイプで取得（デフォルト）
-   * - "inherit": 親プロセスの標準出力に出力
-   */
-  stdout?: "pipe" | "inherit";
+	/**
+	 * 標準出力の処理方法
+	 * - "pipe": パイプで取得（デフォルト）
+	 * - "inherit": 親プロセスの標準出力に出力
+	 */
+	stdout?: "pipe" | "inherit";
 
-  /**
-   * 標準エラー出力の処理方法
-   * - "pipe": パイプで取得（デフォルト）
-   * - "inherit": 親プロセスの標準エラー出力に出力
-   */
-  stderr?: "pipe" | "inherit";
+	/**
+	 * 標準エラー出力の処理方法
+	 * - "pipe": パイプで取得（デフォルト）
+	 * - "inherit": 親プロセスの標準エラー出力に出力
+	 */
+	stderr?: "pipe" | "inherit";
 }
 
 /**
  * プロセス実行結果
  */
 export interface ProcessResult {
-  /**
-   * 標準出力
-   * stdout="inherit"の場合は空文字列
-   */
-  stdout: string;
+	/**
+	 * 標準出力
+	 * stdout="inherit"の場合は空文字列
+	 */
+	stdout: string;
 
-  /**
-   * 標準エラー出力
-   * stderr="inherit"の場合は空文字列
-   */
-  stderr: string;
+	/**
+	 * 標準エラー出力
+	 * stderr="inherit"の場合は空文字列
+	 */
+	stderr: string;
 
-  /**
-   * 終了コード
-   * 0: 正常終了
-   * 非0: エラー終了
-   */
-  exitCode: number;
+	/**
+	 * 終了コード
+	 * 0: 正常終了
+	 * 非0: エラー終了
+	 */
+	exitCode: number;
 }
 
 /**
@@ -90,18 +90,14 @@ export interface ProcessResult {
  * ```
  */
 export interface ProcessExecutor {
-  /**
-   * コマンドを実行する
-   *
-   * @param command 実行するコマンド（例: "docker", "gh"）
-   * @param args コマンド引数の配列
-   * @param options 実行オプション
-   * @returns 実行結果のPromise
-   * @throws ProcessExecutionError タイムアウトまたは実行失敗時
-   */
-  spawn(
-    command: string,
-    args: string[],
-    options?: SpawnOptions,
-  ): Promise<ProcessResult>;
+	/**
+	 * コマンドを実行する
+	 *
+	 * @param command 実行するコマンド（例: "docker", "gh"）
+	 * @param args コマンド引数の配列
+	 * @param options 実行オプション
+	 * @returns 実行結果のPromise
+	 * @throws ProcessExecutionError タイムアウトまたは実行失敗時
+	 */
+	spawn(command: string, args: string[], options?: SpawnOptions): Promise<ProcessResult>;
 }
