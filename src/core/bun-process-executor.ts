@@ -1,0 +1,121 @@
+/**
+ * BunProcessExecutor - Bun.spawnを使用したProcessExecutor実装
+ *
+ * @module
+ */
+
+import type { Subprocess } from "bun";
+import type {
+	ProcessExecutor,
+	ProcessResult,
+	SpawnOptions,
+} from "./process-executor.js";
+
+/**
+ * Bun.spawnを使用したProcessExecutor実装
+ *
+ * @example
+ * ```typescript
+ * const executor = new BunProcessExecutor();
+ * const result = await executor.spawn("echo", ["hello"], {
+ *   timeout: 5000,
+ * });
+ * console.log(result.stdout); // "hello\n"
+ * ```
+ */
+export class BunProcessExecutor implements ProcessExecutor {
+	/**
+	 * コマンドを実行する
+	 *
+	 * @param command 実行するコマンド
+	 * @param args コマンド引数の配列
+	 * @param options 実行オプション
+	 * @returns 実行結果のPromise
+	 */
+	async spawn(
+		command: string,
+		args: string[],
+		options: SpawnOptions = {},
+	): Promise<ProcessResult> {
+		// 1. Bun.spawnを呼び出し
+		const proc = Bun.spawn([command, ...args], {
+			cwd: options.cwd,
+			env: options.env,
+			stdin: options.stdin ? "pipe" : undefined,
+			stdout: options.stdout ?? "pipe",
+			stderr: options.stderr ?? "pipe",
+		});
+
+		// 2. タイムアウト処理を設定
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+		if (options.timeout) {
+			timeoutId = this.setupTimeout(proc, options.timeout);
+		}
+
+		// 3. 標準入力にデータを書き込む
+		if (options.stdin && proc.stdin) {
+			await this.writeStdin(proc, options.stdin);
+		}
+
+		// 4. 実行完了を待機
+		try {
+			const [stdout, stderr, exitCode] = await Promise.all([
+				options.stdout === "inherit"
+					? Promise.resolve("")
+					: new Response(proc.stdout).text(),
+				options.stderr === "inherit"
+					? Promise.resolve("")
+					: new Response(proc.stderr).text(),
+				proc.exited,
+			]);
+
+			// 5. タイムアウトタイマーをクリア
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+			}
+
+			return { stdout, stderr, exitCode };
+		} finally {
+			// タイムアウトタイマーを確実にクリア
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+			}
+		}
+	}
+
+	/**
+	 * タイムアウト処理を設定
+	 * @private
+	 */
+	private setupTimeout(
+		proc: Subprocess,
+		timeout: number,
+	): ReturnType<typeof setTimeout> {
+		const timeoutId = setTimeout(() => {
+			proc.kill();
+		}, timeout);
+
+		// プロセス終了時にタイマーをクリア
+		proc.exited.then(() => clearTimeout(timeoutId));
+
+		return timeoutId;
+	}
+
+	/**
+	 * 標準入力にデータを書き込む
+	 * @private
+	 */
+	private async writeStdin(proc: Subprocess, data: string): Promise<void> {
+		if (!proc.stdin) {
+			throw new Error("stdin is not available");
+		}
+
+		const writer = proc.stdin.getWriter();
+		try {
+			await writer.write(new TextEncoder().encode(data));
+			await writer.close();
+		} catch (error) {
+			throw new Error("Failed to write to stdin", { cause: error });
+		}
+	}
+}
