@@ -36,6 +36,8 @@ export interface LoopOptions {
 	preset?: string;
 	taskId?: string;
 	prConfig?: PRConfig;
+	resolveDeps?: boolean;
+	ignoreDeps?: boolean;
 	onStateChange?: TaskStateCallback;
 	signal?: AbortSignal;
 }
@@ -51,6 +53,8 @@ export interface MultiLoopOptions {
 	generateReport?: boolean;
 	preset?: string;
 	prConfig?: PRConfig;
+	resolveDeps?: boolean;
+	ignoreDeps?: boolean;
 }
 
 export async function runLoop(options: LoopOptions): Promise<void> {

@@ -516,5 +516,37 @@ describe("types.ts 拡張", () => {
 			});
 			expect(result.state?.label_prefix).toBe("custom");
 		});
+
+		it("dependency.resolveが指定できる", () => {
+			const result = ConfigSchema.parse({
+				backend: { type: "claude" },
+				loop: {},
+				dependency: {
+					resolve: true,
+				},
+			});
+			expect(result.dependency?.resolve).toBe(true);
+			expect(result.dependency?.ignore).toBe(false);
+		});
+
+		it("dependency.ignoreが指定できる", () => {
+			const result = ConfigSchema.parse({
+				backend: { type: "claude" },
+				loop: {},
+				dependency: {
+					ignore: true,
+				},
+			});
+			expect(result.dependency?.ignore).toBe(true);
+			expect(result.dependency?.resolve).toBe(false);
+		});
+
+		it("dependency設定がオプショナル", () => {
+			const result = ConfigSchema.parse({
+				backend: { type: "claude" },
+				loop: {},
+			});
+			expect(result.dependency).toBeUndefined();
+		});
 	});
 });

@@ -94,6 +94,9 @@ bun run dev run --issue <Issue番号> [オプション]
 | `--auto` | `-a` | 承認ゲートを自動承認 | false |
 | `--create-pr` | - | 完了後にPRを自動作成 | false |
 | `--draft` | - | PRをドラフトとして作成 | false |
+| `--auto-merge` | - | CI成功後にPRを自動マージ（v1.3.0+） | false |
+| `--resolve-deps` | - | 依存Issueを先に実行（v1.3.0+） | false |
+| `--ignore-deps` | - | 依存関係を無視（v1.3.0+） | false |
 | `--container` | - | 隔離されたcontainer-use環境で実行 | false |
 | `--report [パス]` | - | 実行レポートを生成 | .agent/report.md |
 | `--preset <名前>` | `-p` | プリセット設定を使用 | - |
@@ -372,6 +375,11 @@ autoIssue:
     - improvement
   duplicateCheckEnabled: true     # 重複チェックを有効化
   repository: ""                  # 別リポジトリに作成（オプション）
+
+# Issue依存関係管理（v1.3.0+）
+dependency:
+  resolve: true                   # 依存Issueを自動的に先に実行（--resolve-deps相当）
+  ignore: false                   # 依存関係を無視（--ignore-deps相当）
 
 # カスタムHat定義
 hats:

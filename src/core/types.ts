@@ -158,6 +158,29 @@ export const PRConfigSchema = z.object({
 export type PRConfig = z.infer<typeof PRConfigSchema>;
 
 /**
+ * Issue依存関係設定のzodスキーマ（v1.3.0）
+ *
+ * Issue間の依存関係管理（F-011）の設定を定義します。
+ */
+export const DependencyConfigSchema = z.object({
+	/**
+	 * 依存Issueを自動的に先に実行するか
+	 * trueの場合、依存Issueが未完了なら先に実行する
+	 * @default false
+	 */
+	resolve: z.boolean().default(false),
+
+	/**
+	 * 依存関係を無視するか
+	 * trueの場合、依存Issueが未完了でも実行を続行する
+	 * @default false
+	 */
+	ignore: z.boolean().default(false),
+});
+
+export type DependencyConfig = z.infer<typeof DependencyConfigSchema>;
+
+/**
  * 状態管理設定のzodスキーマ（v1.3.0拡張版）
  *
  * v1.3.0でlabel_prefixを追加。
@@ -229,6 +252,9 @@ export const ConfigSchema = z.object({
 
 	// 新規: PR設定（v1.3.0）
 	pr: PRConfigSchema.optional(),
+
+	// 新規: 依存関係設定（v1.3.0）
+	dependency: DependencyConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

@@ -42,6 +42,8 @@ program
 	.option("--draft", "Create PR as draft")
 	.option("--container", "Run in isolated container-use environment")
 	.option("--auto-merge", "Auto-merge PR after CI passes")
+	.option("--resolve-deps", "Resolve and run dependency issues first")
+	.option("--ignore-deps", "Ignore issue dependencies")
 	.option("--report [path]", "Generate execution report (default: .agent/report.md)")
 	.option("-c, --config <path>", "Config file path")
 	.option("-v, --verbose", "Verbose output")
@@ -67,6 +69,8 @@ async function handleRunCommand(options: {
 	draft?: boolean;
 	container?: boolean;
 	autoMerge?: boolean;
+	resolveDeps?: boolean;
+	ignoreDeps?: boolean;
 	report?: string | boolean;
 }): Promise<void> {
 	if (options.verbose) {
@@ -98,10 +102,16 @@ async function handleRunCommand(options: {
 		ciTimeoutSecs: config.pr?.ciTimeoutSecs ?? 600,
 	};
 
+	// 依存関係設定を構築（CLIオプションが設定ファイルより優先）
+	const depConfig = {
+		resolveDeps: options.resolveDeps ?? config.dependency?.resolve ?? false,
+		ignoreDeps: options.ignoreDeps ?? config.dependency?.ignore ?? false,
+	};
+
 	if (options.issues) {
-		await handleMultipleIssues(options, config, prConfig);
+		await handleMultipleIssues(options, config, prConfig, depConfig);
 	} else {
-		await handleSingleIssue(options, config, prConfig);
+		await handleSingleIssue(options, config, prConfig, depConfig);
 	}
 }
 
@@ -118,6 +128,7 @@ async function handleMultipleIssues(
 	},
 	config: ReturnType<typeof loadConfig>,
 	prConfig: PRConfig,
+	depConfig: { resolveDeps: boolean; ignoreDeps: boolean },
 ): Promise<void> {
 	const issueNumbers = (options.issues ?? "")
 		.split(",")
@@ -145,6 +156,8 @@ async function handleMultipleIssues(
 			generateReport: options.report !== undefined,
 			preset: options.preset,
 			prConfig,
+			resolveDeps: depConfig.resolveDeps,
+			ignoreDeps: depConfig.ignoreDeps,
 		},
 		taskManager,
 	);
@@ -165,6 +178,7 @@ async function handleSingleIssue(
 	},
 	config: ReturnType<typeof loadConfig>,
 	prConfig: PRConfig,
+	depConfig: { resolveDeps: boolean; ignoreDeps: boolean },
 ): Promise<void> {
 	const issueNumber = Number.parseInt(options.issue ?? "0", 10);
 	const issue = await fetchIssue(issueNumber);
@@ -188,6 +202,8 @@ async function handleSingleIssue(
 			preset: options.preset,
 			taskId: taskState.id,
 			prConfig,
+			resolveDeps: depConfig.resolveDeps,
+			ignoreDeps: depConfig.ignoreDeps,
 			onStateChange,
 			signal,
 		});
