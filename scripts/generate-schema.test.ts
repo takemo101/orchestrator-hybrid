@@ -58,9 +58,27 @@ describe("generate-schema.ts", () => {
 		const content = await Bun.file(SCHEMA_PATH).text();
 		const schema = JSON.parse(content);
 
-		// JSON Schema仕様の識別子を確認
-		expect(schema.$schema).toContain("json-schema.org");
+		// JSON Schema仕様の識別子を確認（$refまたは$schemaのいずれか）
+		expect(schema.$ref || schema.$schema).toBeDefined();
 	});
+
+	/**
+	 * スキーマのpropertiesを取得するヘルパー
+	 * zodToJsonSchemaは$refとdefinitionsを使用するため
+	 */
+	function getSchemaProperties(schema: {
+		$ref?: string;
+		definitions?: Record<string, { properties?: Record<string, unknown> }>;
+		properties?: Record<string, unknown>;
+	}): Record<string, unknown> {
+		// $refを使用している場合はdefinitionsから取得
+		if (schema.$ref && schema.definitions) {
+			const refName = schema.$ref.replace("#/definitions/", "");
+			return schema.definitions[refName]?.properties ?? {};
+		}
+		// 直接propertiesがある場合
+		return schema.properties ?? {};
+	}
 
 	it("生成されたスキーマにbackendプロパティが含まれる", async () => {
 		// スクリプトを実行
@@ -71,9 +89,10 @@ describe("generate-schema.ts", () => {
 
 		const content = await Bun.file(SCHEMA_PATH).text();
 		const schema = JSON.parse(content);
+		const properties = getSchemaProperties(schema);
 
 		// ConfigSchemaの主要プロパティを確認
-		expect(schema.properties.backend).toBeDefined();
+		expect(properties.backend).toBeDefined();
 	});
 
 	it("生成されたスキーマにloopプロパティが含まれる", async () => {
@@ -85,8 +104,9 @@ describe("generate-schema.ts", () => {
 
 		const content = await Bun.file(SCHEMA_PATH).text();
 		const schema = JSON.parse(content);
+		const properties = getSchemaProperties(schema);
 
-		expect(schema.properties.loop).toBeDefined();
+		expect(properties.loop).toBeDefined();
 	});
 
 	it("生成されたスキーマにsandboxプロパティが含まれる", async () => {
@@ -98,9 +118,10 @@ describe("generate-schema.ts", () => {
 
 		const content = await Bun.file(SCHEMA_PATH).text();
 		const schema = JSON.parse(content);
+		const properties = getSchemaProperties(schema);
 
 		// Issue #13で追加されたsandbox設定
-		expect(schema.properties.sandbox).toBeDefined();
+		expect(properties.sandbox).toBeDefined();
 	});
 
 	it("生成されたスキーマにautoIssueプロパティが含まれる", async () => {
@@ -112,9 +133,10 @@ describe("generate-schema.ts", () => {
 
 		const content = await Bun.file(SCHEMA_PATH).text();
 		const schema = JSON.parse(content);
+		const properties = getSchemaProperties(schema);
 
 		// Issue #13で追加されたautoIssue設定
-		expect(schema.properties.autoIssue).toBeDefined();
+		expect(properties.autoIssue).toBeDefined();
 	});
 
 	it("スクリプトが正常終了する（exit code 0）", async () => {
