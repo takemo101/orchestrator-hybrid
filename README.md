@@ -306,6 +306,20 @@ container:
   image: node:20                  # ベースイメージ
   env_id: ""                      # 既存の環境IDを再利用（オプション）
 
+# サンドボックス環境設定（v1.2.0+）
+sandbox:
+  type: docker                    # docker | container-use | host
+  fallback: host                  # プライマリ環境が使えない場合のフォールバック
+  docker:
+    image: node:20-alpine         # Dockerイメージ
+    network: none                 # ネットワーク設定（none = 隔離）
+    timeout: 300                  # タイムアウト（秒）
+  containerUse:
+    image: node:20                # container-use用イメージ
+    envId: ""                     # 既存環境ID（オプション）
+  host:
+    warnOnStart: true             # ホスト環境使用時に警告
+
 # ループ設定
 loop:
   max_iterations: 100             # 最大反復回数
@@ -328,6 +342,16 @@ state:
   use_github_labels: true         # GitHub Issueラベルを使用
   use_scratchpad: true            # Scratchpadを使用
   scratchpad_path: ".agent/scratchpad.md"
+
+# 改善Issue自動作成（v1.2.0+）
+autoIssue:
+  enabled: true                   # 改善Issue自動作成を有効化
+  minPriority: medium             # 最低優先度（high | medium | low）
+  labels:                         # 自動付与するラベル
+    - auto-generated
+    - improvement
+  duplicateCheckEnabled: true     # 重複チェックを有効化
+  repository: ""                  # 別リポジトリに作成（オプション）
 
 # カスタムHat定義
 hats:
