@@ -169,9 +169,25 @@ bun run dev status --task <task-id>
 ### リアルタイム監視
 
 ```bash
-# タスク状態をリアルタイムで監視（1秒間隔で更新）
-bun run dev logs --follow
+# タスク状態テーブルをリアルタイムで監視（1秒間隔で更新）
+bun run dev logs --table
+
+# 特定タスクのログをリアルタイムで監視（v1.2.0+）
+bun run dev logs --task <task-id> --follow
+
+# 最後の50行を表示
+bun run dev logs --task <task-id> --lines 50
 ```
+
+#### logsコマンドオプション（v1.2.0+）
+
+| オプション | 短縮形 | 説明 | デフォルト |
+|-----------|--------|------|-----------|
+| `--task <id>` | `-t` | 特定タスクのログを表示 | - |
+| `--follow` | `-f` | リアルタイムでログをストリーミング | false |
+| `--lines <num>` | `-n` | 表示する行数 | 100 |
+| `--table` | - | タスク状態テーブルを表示（レガシーモード） | false |
+| `--interval <ms>` | - | テーブルモードの更新間隔 | 1000 |
 
 ### タスクのキャンセル
 
@@ -306,6 +322,20 @@ container:
   image: node:20                  # ベースイメージ
   env_id: ""                      # 既存の環境IDを再利用（オプション）
 
+# サンドボックス環境設定（v1.2.0+）
+sandbox:
+  type: docker                    # docker | container-use | host
+  fallback: host                  # プライマリ環境が使えない場合のフォールバック
+  docker:
+    image: node:20-alpine         # Dockerイメージ
+    network: none                 # ネットワーク設定（none = 隔離）
+    timeout: 300                  # タイムアウト（秒）
+  containerUse:
+    image: node:20                # container-use用イメージ
+    envId: ""                     # 既存環境ID（オプション）
+  host:
+    warnOnStart: true             # ホスト環境使用時に警告
+
 # ループ設定
 loop:
   max_iterations: 100             # 最大反復回数
@@ -328,6 +358,16 @@ state:
   use_github_labels: true         # GitHub Issueラベルを使用
   use_scratchpad: true            # Scratchpadを使用
   scratchpad_path: ".agent/scratchpad.md"
+
+# 改善Issue自動作成（v1.2.0+）
+autoIssue:
+  enabled: true                   # 改善Issue自動作成を有効化
+  minPriority: medium             # 最低優先度（high | medium | low）
+  labels:                         # 自動付与するラベル
+    - auto-generated
+    - improvement
+  duplicateCheckEnabled: true     # 重複チェックを有効化
+  repository: ""                  # 別リポジトリに作成（オプション）
 
 # カスタムHat定義
 hats:
@@ -542,6 +582,7 @@ orch run --issue 42
 ```
 src/
 ├── cli.ts              # CLIエントリーポイント
+├── cli-logs.ts         # logsコマンドヘルパー（v1.2.0+）
 ├── index.ts            # ライブラリエクスポート
 ├── core/
 │   ├── loop.ts         # メインループエンジン
@@ -552,20 +593,33 @@ src/
 │   ├── logger.ts       # ロガー
 │   ├── task-manager.ts # 並列タスク管理
 │   ├── exec.ts         # Bun.spawn ラッパー
+│   ├── errors.ts       # エラークラス階層（v1.2.0+）
+│   ├── log-writer.ts   # ログファイル書き込み（v1.2.0+）
+│   ├── log-streamer.ts # ログリアルタイム読み取り（v1.2.0+）
+│   ├── bun-process-executor.ts  # プロセス実行抽象化（v1.2.0+）
 │   └── types.ts        # 型定義
 ├── adapters/
 │   ├── base.ts         # バックエンド抽象基底
 │   ├── claude.ts       # Claude Code アダプター
 │   ├── opencode.ts     # OpenCode アダプター
-│   └── container.ts    # Container-use アダプター
+│   ├── container.ts    # Container-use アダプター（リファクタリング済み）
+│   ├── docker-adapter.ts     # Docker sandbox（v1.2.0+）
+│   ├── host-adapter.ts       # ホスト環境 sandbox（v1.2.0+）
+│   ├── sandbox-adapter.ts    # Sandbox抽象インターフェース（v1.2.0+）
+│   └── sandbox-factory.ts    # Sandboxファクトリ（v1.2.0+）
 ├── input/
 │   ├── github.ts       # GitHub Issue取得
 │   └── prompt.ts       # プロンプト生成
 ├── gates/
 │   └── approval.ts     # 承認ゲート
-└── output/
-    ├── pr.ts           # PR作成
-    └── report.ts       # 実行レポート生成
+├── output/
+│   ├── pr.ts           # PR作成
+│   ├── report.ts       # 実行レポート生成
+│   └── issue-generator.ts    # 改善Issue自動作成（v1.2.0+）
+├── utils/
+│   └── improvement-extractor.ts  # 改善点抽出（v1.2.0+）
+└── schemas/
+    └── orch.schema.json  # JSON Schema（自動生成、v1.2.0+）
 ```
 
 ---
