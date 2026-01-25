@@ -4,8 +4,11 @@ import {
 	AutoIssueConfigSchema,
 	ConfigSchema,
 	type LoopContext,
+	type PRConfig,
+	PRConfigSchema,
 	type SandboxConfig,
 	SandboxConfigSchema,
+	StateConfigSchema,
 } from "./types.js";
 
 describe("types.ts 拡張", () => {
