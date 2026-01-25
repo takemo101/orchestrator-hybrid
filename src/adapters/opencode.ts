@@ -7,7 +7,7 @@ export class OpenCodeBackend extends BaseBackend {
 
 	async execute(prompt: string): Promise<BackendResult> {
 		try {
-			const { stdout, exitCode } = await exec("opencode", ["-p", prompt], {
+			const { stdout, exitCode } = await exec("opencode", ["run", prompt], {
 				reject: false,
 			});
 
