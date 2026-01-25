@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+	CircularDependencyError,
 	ContainerUseError,
 	DockerNotFoundError,
 	DockerTimeoutError,
@@ -11,6 +12,9 @@ import {
 	ExecutionTimeoutError,
 	HostExecutionError,
 	ImagePullError,
+	IssueDependencyError,
+	LogMonitorError,
+	PRAutoMergeError,
 	ProcessExecutionError,
 	SandboxError,
 } from "./errors.js";
