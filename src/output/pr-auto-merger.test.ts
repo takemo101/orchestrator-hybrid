@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { PRAutoMergeError } from "../core/errors.js";
 import { logger } from "../core/logger.js";
 import type { ProcessExecutor } from "../core/process-executor.js";
