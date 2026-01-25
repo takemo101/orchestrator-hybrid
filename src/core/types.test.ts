@@ -213,6 +213,91 @@ describe("types.ts 拡張", () => {
 		});
 	});
 
+	describe("PRConfigSchema", () => {
+		it("デフォルト値が正しく設定される", () => {
+			const result = PRConfigSchema.parse({});
+			expect(result.autoMerge).toBe(false);
+			expect(result.mergeMethod).toBe("squash");
+			expect(result.deleteBranch).toBe(true);
+			expect(result.ciTimeoutSecs).toBe(600);
+		});
+
+		it("autoMerge=trueが指定できる", () => {
+			const result = PRConfigSchema.parse({ autoMerge: true });
+			expect(result.autoMerge).toBe(true);
+		});
+
+		it("mergeMethod=mergeが指定できる", () => {
+			const result = PRConfigSchema.parse({ mergeMethod: "merge" });
+			expect(result.mergeMethod).toBe("merge");
+		});
+
+		it("mergeMethod=rebaseが指定できる", () => {
+			const result = PRConfigSchema.parse({ mergeMethod: "rebase" });
+			expect(result.mergeMethod).toBe("rebase");
+		});
+
+		it("無効なmergeMethodでエラーになる", () => {
+			expect(() => PRConfigSchema.parse({ mergeMethod: "invalid" })).toThrow();
+		});
+
+		it("ciTimeoutSecsの最小値は60", () => {
+			expect(() => PRConfigSchema.parse({ ciTimeoutSecs: 30 })).toThrow();
+		});
+
+		it("ciTimeoutSecsの最大値は3600", () => {
+			expect(() => PRConfigSchema.parse({ ciTimeoutSecs: 5000 })).toThrow();
+		});
+
+		it("ciTimeoutSecsの有効範囲内の値が指定できる", () => {
+			const result = PRConfigSchema.parse({ ciTimeoutSecs: 300 });
+			expect(result.ciTimeoutSecs).toBe(300);
+		});
+
+		it("deleteBranch=falseが指定できる", () => {
+			const result = PRConfigSchema.parse({ deleteBranch: false });
+			expect(result.deleteBranch).toBe(false);
+		});
+
+		it("PRConfig型が正しく推論される", () => {
+			const config: PRConfig = {
+				autoMerge: true,
+				mergeMethod: "squash",
+				deleteBranch: true,
+				ciTimeoutSecs: 600,
+			};
+			expect(config.autoMerge).toBe(true);
+		});
+	});
+
+	describe("StateConfigSchema", () => {
+		it("デフォルト値が正しく設定される", () => {
+			const result = StateConfigSchema.parse({});
+			expect(result.use_github_labels).toBe(true);
+			expect(result.use_scratchpad).toBe(true);
+			expect(result.scratchpad_path).toBe(".agent/scratchpad.md");
+			expect(result.label_prefix).toBe("orch");
+		});
+
+		it("label_prefixが指定できる", () => {
+			const result = StateConfigSchema.parse({ label_prefix: "myapp" });
+			expect(result.label_prefix).toBe("myapp");
+		});
+
+		it("label_prefixの最小長は1文字", () => {
+			expect(() => StateConfigSchema.parse({ label_prefix: "" })).toThrow();
+		});
+
+		it("label_prefixの最大長は20文字", () => {
+			expect(() => StateConfigSchema.parse({ label_prefix: "a".repeat(21) })).toThrow();
+		});
+
+		it("label_prefix=20文字はOK", () => {
+			const result = StateConfigSchema.parse({ label_prefix: "a".repeat(20) });
+			expect(result.label_prefix.length).toBe(20);
+		});
+	});
+
 	describe("LoopContext 拡張", () => {
 		it("taskIdフィールドが追加されている", () => {
 			const context: LoopContext = {
