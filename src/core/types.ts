@@ -275,6 +275,23 @@ export interface LoopContext {
 	 * @example ".agent/task-1737705600000-42"
 	 */
 	logDir?: string;
+
+	// 新規: PR設定（v1.3.0）
+	/**
+	 * PR自動マージ設定
+	 */
+	prConfig?: PRConfig;
+
+	// 新規: 依存関係オプション（v1.3.0）
+	/**
+	 * 依存Issueを先に実行するか
+	 */
+	resolveDeps?: boolean;
+
+	/**
+	 * 依存関係を無視するか
+	 */
+	ignoreDeps?: boolean;
 }
 
 export interface BackendResult {
