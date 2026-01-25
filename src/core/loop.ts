@@ -142,6 +142,9 @@ async function initializeLoopEnvironment(
 }
 
 function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions): LoopContext {
+	const taskId = options.taskId;
+	const logDir = taskId ? join(".agent", taskId) : ".agent";
+
 	return {
 		issue,
 		iteration: 0,
@@ -156,6 +159,8 @@ function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions
 		generateReport: config.shouldGenerateReport,
 		reportPath: config.reportPath,
 		preset: options.preset,
+		taskId,
+		logDir,
 	};
 }
 
