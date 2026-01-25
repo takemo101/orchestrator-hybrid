@@ -222,16 +222,13 @@ export const ConfigSchema = z.object({
 			auto_approve_above: z.number().default(9),
 		})
 		.optional(),
-	state: z
-		.object({
-			use_github_labels: z.boolean().default(true),
-			use_scratchpad: z.boolean().default(true),
-			scratchpad_path: z.string().default(".agent/scratchpad.md"),
-		})
-		.optional(),
+	state: StateConfigSchema.optional(),
 
 	// 新規: 改善Issue自動作成設定
 	autoIssue: AutoIssueConfigSchema.optional(),
+
+	// 新規: PR設定（v1.3.0）
+	pr: PRConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
