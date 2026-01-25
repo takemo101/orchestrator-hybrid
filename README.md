@@ -169,9 +169,25 @@ bun run dev status --task <task-id>
 ### リアルタイム監視
 
 ```bash
-# タスク状態をリアルタイムで監視（1秒間隔で更新）
-bun run dev logs --follow
+# タスク状態テーブルをリアルタイムで監視（1秒間隔で更新）
+bun run dev logs --table
+
+# 特定タスクのログをリアルタイムで監視（v1.2.0+）
+bun run dev logs --task <task-id> --follow
+
+# 最後の50行を表示
+bun run dev logs --task <task-id> --lines 50
 ```
+
+#### logsコマンドオプション（v1.2.0+）
+
+| オプション | 短縮形 | 説明 | デフォルト |
+|-----------|--------|------|-----------|
+| `--task <id>` | `-t` | 特定タスクのログを表示 | - |
+| `--follow` | `-f` | リアルタイムでログをストリーミング | false |
+| `--lines <num>` | `-n` | 表示する行数 | 100 |
+| `--table` | - | タスク状態テーブルを表示（レガシーモード） | false |
+| `--interval <ms>` | - | テーブルモードの更新間隔 | 1000 |
 
 ### タスクのキャンセル
 
