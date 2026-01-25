@@ -127,9 +127,7 @@ describe("types.ts 拡張", () => {
 		});
 
 		it("無効なminPriorityでエラーになる", () => {
-			expect(() =>
-				AutoIssueConfigSchema.parse({ minPriority: "invalid" }),
-			).toThrow();
+			expect(() => AutoIssueConfigSchema.parse({ minPriority: "invalid" })).toThrow();
 		});
 
 		it("カスタムlabelsが指定できる", () => {
