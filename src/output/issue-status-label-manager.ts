@@ -1,6 +1,6 @@
 import { BunProcessExecutor } from "../core/bun-process-executor.js";
 import { logger } from "../core/logger.js";
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
+import type { ProcessExecutor } from "../core/process-executor.js";
 
 export type IssueStatus =
 	| "queued"

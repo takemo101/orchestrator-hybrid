@@ -174,7 +174,7 @@ describe("IssueStatusLabelManager", () => {
 		});
 
 		it("すべてのステータスに対応する", async () => {
-			spawnMock.mockImplementation((cmd: string, args: string[]) => {
+			spawnMock.mockImplementation((_cmd: string, args: string[]) => {
 				if (args.includes("view")) {
 					return Promise.resolve({
 						stdout: JSON.stringify({ labels: [] }),
