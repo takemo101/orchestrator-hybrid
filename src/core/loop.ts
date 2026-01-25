@@ -1,10 +1,11 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import chalk from "chalk";
 import { type Backend, createBackend } from "../adapters/index.js";
 import { requestApproval } from "../gates/approval.js";
 import { fetchIssue, updateIssueLabel } from "../input/github.js";
 import { generatePrompt } from "../input/prompt.js";
+import { IssueGenerator } from "../output/issue-generator.js";
 import { checkForUncommittedChanges, createPR } from "../output/pr.js";
 import {
 	createReportCollector,
@@ -12,8 +13,10 @@ import {
 	type ReportCollector,
 	type ReportData,
 } from "../output/report.js";
+import { extractImprovements } from "../utils/improvement-extractor.js";
 import { EventBus } from "./event.js";
 import { buildHatPrompt, extractPublishedEvent, type HatDefinition, HatRegistry } from "./hat.js";
+import { LogWriter } from "./log-writer.js";
 import { createTaskLogger, logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
 import type { TaskManager, TaskStateCallback } from "./task-manager.js";
