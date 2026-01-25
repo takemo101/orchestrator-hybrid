@@ -100,9 +100,7 @@ describe("LogWriter", () => {
 		test("initialize()前に呼ぶとエラー", async () => {
 			const writer = new LogWriter({ taskId: testTaskId, baseDir: testBaseDir });
 
-			await expect(writer.writeStderr("test")).rejects.toThrow(
-				"LogWriter not initialized",
-			);
+			await expect(writer.writeStderr("test")).rejects.toThrow("LogWriter not initialized");
 		});
 	});
 
