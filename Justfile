@@ -63,6 +63,17 @@ check: lint format typecheck
 build:
     bun run build:binary
 
+# ビルドして /usr/local/bin にインストール（sudo必要）
+install-global: build
+    sudo cp ./orch /usr/local/bin/
+    @echo "Installed: $(which orch)"
+    @orch --version || true
+
+# /usr/local/bin からアンインストール（sudo必要）
+uninstall-global:
+    sudo rm -f /usr/local/bin/orch
+    @echo "Uninstalled orch from /usr/local/bin"
+
 # JavaScriptにビルド
 build-js:
     bun run build
