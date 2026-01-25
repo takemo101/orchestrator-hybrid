@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { ZodError } from "zod";
 import { parse as parseYaml } from "yaml";
+import { ZodError } from "zod";
 import { type Config, ConfigSchema } from "./types.js";
 
 const DEFAULT_CONFIG_NAME = "orch.yml";
