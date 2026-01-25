@@ -6,7 +6,7 @@
  * @module
  */
 
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
+import type { ProcessExecutor } from "../core/process-executor.js";
 import { BunProcessExecutor } from "../core/bun-process-executor.js";
 import { PRAutoMergeError } from "../core/errors.js";
 import { logger } from "../core/logger.js";
