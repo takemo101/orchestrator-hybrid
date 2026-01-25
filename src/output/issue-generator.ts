@@ -7,7 +7,7 @@
 import { writeFileSync } from "node:fs";
 import { BunProcessExecutor } from "../core/bun-process-executor.js";
 import { logger } from "../core/logger.js";
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
+import type { ProcessExecutor } from "../core/process-executor.js";
 
 /**
  * 改善提案の優先度
