@@ -52,9 +52,9 @@ function extractFromScratchpad(scratchpadPath: string): ImprovementSuggestion[] 
 		return [];
 	}
 
-	// 改善提案マーカーのパターン
+	// 改善提案マーカーのパターン（メタデータはオプショナル）
 	const pattern =
-		/<!-- IMPROVEMENT_START (.*?) -->([\s\S]*?)<!-- IMPROVEMENT_END -->/g;
+		/<!-- IMPROVEMENT_START\s*(.*?)\s*-->([\s\S]*?)<!-- IMPROVEMENT_END -->/g;
 	let match: RegExpExecArray | null;
 
 	while ((match = pattern.exec(content)) !== null) {
