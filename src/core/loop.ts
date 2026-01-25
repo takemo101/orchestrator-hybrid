@@ -294,6 +294,7 @@ interface HatIterationParams {
 	hatRegistry: HatRegistry;
 	eventBus: EventBus;
 	collector: ReportCollector | null;
+	logWriter: LogWriter;
 	taskLogger: typeof logger;
 	taskId?: string;
 	onStateChange?: TaskStateCallback;
