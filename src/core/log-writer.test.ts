@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { rmSync, existsSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { LogWriter, type LogWriterConfig } from "./log-writer.js";
+import { LogWriter } from "./log-writer.js";
 
 describe("LogWriter", () => {
 	const testTaskId = "test-task-123";
