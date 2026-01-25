@@ -17,6 +17,7 @@ import type { TaskState } from "./core/task-manager.js";
 import { TaskManager, TaskStore } from "./core/task-manager.js";
 import type { PRConfig } from "./core/types.js";
 import { fetchIssue } from "./input/github.js";
+import { IssueStatusLabelManager } from "./output/issue-status-label-manager.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PRESETS_DIR = join(__dirname, "..", "presets");
@@ -329,9 +330,20 @@ program
 	.option("-p, --preset <name>", "Use preset configuration")
 	.option("--list-presets", "List available presets")
 	.option("-f, --force", "Overwrite existing config")
-	.action((options) => {
+	.option("--labels", "Create status labels in repository")
+	.action(async (options) => {
 		if (options.listPresets) {
 			listPresets();
+			return;
+		}
+
+		if (options.labels) {
+			const config = loadConfig();
+			const labelManager = new IssueStatusLabelManager({
+				enabled: true,
+				labelPrefix: config.state?.label_prefix ?? "orch",
+			});
+			await labelManager.initializeLabels();
 			return;
 		}
 
