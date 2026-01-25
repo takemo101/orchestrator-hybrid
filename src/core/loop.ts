@@ -600,9 +600,7 @@ async function handlePRAutoMerge(
 		return merged;
 	} catch (error) {
 		// CI失敗時はエラーログのみ、タスク自体は成功扱い
-		taskLogger.error(
-			`PR自動マージ失敗: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		taskLogger.error(`PR自動マージ失敗: ${error instanceof Error ? error.message : String(error)}`);
 		return false;
 	}
 }
