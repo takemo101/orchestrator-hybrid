@@ -5,10 +5,10 @@
 | 項目 | 内容 |
 |------|------|
 | ドキュメントID | REQ-ORCH-001 |
-| バージョン | 1.2.0 |
+| バージョン | 1.3.0 |
 | ステータス | ドラフト |
 | 作成日 | 2026-01-24 |
-| 最終更新日 | 2026-01-24 |
+| 最終更新日 | 2026-01-25 |
 | 作成者 | AI Assistant |
 | 承認者 | - |
 
@@ -96,6 +96,10 @@ orchestrator-hybridは、GitHub Issueを入力としてAIエージェントを�
 | F-006 | 改善Issue自動作成 | ralph-loop実行時の自動Issue作成 | 重要 | Phase 2 |
 | F-007 | Issue作成条件設定 | 自動作成の有効/無効切り替え | 重要 | Phase 2 |
 | F-008 | 実行ログリアルタイム確認 | タスク実行中のAIエージェント出力をリアルタイムで確認 | 重要 | Phase 1 |
+| F-009 | PR自動マージ機能 | CI成功後にPRを自動マージ | 重要 | Phase 3 |
+| F-010 | リアルタイムログ監視機能 | 別ターミナルから実行中タスクのログを監視 | 重要 | Phase 3 |
+| F-011 | Issue依存関係管理機能 | Issue間の依存関係を管理し、依存順に実行 | 重要 | Phase 3 |
+| F-012 | Issueステータスラベル機能 | GitHub Issueラベルでタスク状態を管理 | 重要 | Phase 3 |
 
 ### 3.2 ユーザーストーリー
 
@@ -158,6 +162,57 @@ orchestrator-hybridは、GitHub Issueを入力としてAIエージェントを�
   - [ ] ログはファイルにも保存され、後から確認できる
   - [ ] Ctrl+Cで監視を終了できる
 - **関連機能**: F-008
+
+#### US-005: PR自動マージ
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: PR作成後、CIが成功したら自動的にマージしたい
+- **理由**: 手動でCIを監視してマージする手間を省き、完全自動化を実現するため
+- **受け入れ基準**:
+  - [ ] `--auto-merge`フラグでPR自動マージを有効化できる
+  - [ ] CI完了を自動的に待機する
+  - [ ] CI成功時に自動マージされる
+  - [ ] CI失敗時はエラーログを出力して終了する
+  - [ ] マージ方式（squash/merge/rebase）を設定できる
+- **関連機能**: F-009
+
+#### US-006: 別ターミナルからのログ監視
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: 実行中のタスクのログを別ターミナルからリアルタイムで監視したい
+- **理由**: 実行ターミナルを占有せずに、複数のタスクを同時に監視するため
+- **受け入れ基準**:
+  - [ ] `orch logs --task <task-id> --follow`で別ターミナルから監視できる
+  - [ ] 実行中のタスク一覧から選択して監視できる
+  - [ ] 最新のタスクを自動的に監視できる（`--latest`）
+  - [ ] ログファイルの新しい行がリアルタイムで表示される
+- **関連機能**: F-010
+
+#### US-007: Issue依存関係の管理
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: Issue間の依存関係を管理し、依存Issueが完了してから実行したい
+- **理由**: 依存関係のあるタスクを正しい順序で実行し、エラーを防ぐため
+- **受け入れ基準**:
+  - [ ] 依存Issueが未完了の場合、実行を中断できる
+  - [ ] `--resolve-deps`で依存Issueを先に実行できる
+  - [ ] 複数Issueを依存順にソートして実行できる
+  - [ ] 循環依存を検出してエラーを出力する
+  - [ ] GitHub Issue Dependencies APIを使用する
+- **関連機能**: F-011
+
+#### US-008: Issueステータスラベルの管理
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: タスクの実行状況をGitHub Issueのラベルで一目で確認したい
+- **理由**: GitHub上でタスクの状態を視覚的に把握し、チーム全体で進捗を共有するため
+- **受け入れ基準**:
+  - [ ] タスク開始時に`orch:running`ラベルが自動付与される
+  - [ ] タスク完了時に`orch:completed`ラベルに変更される
+  - [ ] PR作成時に`orch:pr-created`ラベルが追加される
+  - [ ] マージ時に`orch:merged`ラベルに変更される
+  - [ ] 失敗時は`orch:failed`ラベルが付与される
+- **関連機能**: F-012
 
 ### 3.3 機能詳細
 
@@ -262,6 +317,17 @@ sandbox:
   host:
     timeout: 300
     warn_on_start: true  # セキュリティ警告を表示
+
+# v1.3.0 新設定
+pr:
+  auto_merge: true
+  merge_method: squash  # squash | merge | rebase
+  delete_branch: true
+  ci_timeout_secs: 600
+
+state:
+  use_github_labels: true
+  label_prefix: "orch"
 ```
 
 **ビジネスルール**:
@@ -310,6 +376,47 @@ sandbox:
           "type": "string",
           "enum": ["docker", "container-use", "host"],
           "description": "プライマリ環境が利用不可時のフォールバック先"
+        }
+      }
+    },
+    "pr": {
+      "type": "object",
+      "properties": {
+        "auto_merge": {
+          "type": "boolean",
+          "default": false,
+          "description": "PR作成後、CI成功時に自動マージ"
+        },
+        "merge_method": {
+          "type": "string",
+          "enum": ["squash", "merge", "rebase"],
+          "default": "squash",
+          "description": "マージ方式"
+        },
+        "delete_branch": {
+          "type": "boolean",
+          "default": true,
+          "description": "マージ後にブランチを削除"
+        },
+        "ci_timeout_secs": {
+          "type": "integer",
+          "default": 600,
+          "description": "CIタイムアウト（秒）"
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "properties": {
+        "use_github_labels": {
+          "type": "boolean",
+          "default": true,
+          "description": "GitHub Issueラベルを使用"
+        },
+        "label_prefix": {
+          "type": "string",
+          "default": "orch",
+          "description": "ラベルのプレフィックス"
         }
       }
     }
@@ -490,6 +597,227 @@ orch logs -t <task-id> -n 100
 
 ---
 
+#### F-009: PR自動マージ機能
+
+**概要**: `--create-pr`でPR作成後、CIが成功したら自動的にマージする機能
+
+**入力**:
+- `--auto-merge`フラグ（CLIオプション）
+- PR番号（PR作成後に取得）
+- CI実行結果（GitHub Actions等）
+
+**出力**:
+- マージ完了メッセージ
+- マージされたPR URL
+
+**処理概要**:
+1. PR作成後、PR番号を取得
+2. `gh pr checks <PR番号> --watch`でCI完了を待機
+3. CI成功時: `gh pr merge <PR番号> --squash --delete-branch`でマージ
+4. CI失敗時: エラーログを出力して終了
+
+**CLI使用例**:
+```bash
+# PR作成後、CI成功時に自動マージ
+orch run --issue 42 --auto --create-pr --auto-merge
+
+# マージ方式を指定（設定ファイル）
+pr:
+  auto_merge: true
+  merge_method: squash  # squash | merge | rebase
+  delete_branch: true   # マージ後にブランチを削除
+  ci_timeout_secs: 600  # CIタイムアウト（デフォルト10分）
+```
+
+**ビジネスルール**:
+- BR-025: `--auto-merge`は`--create-pr`と同時に指定する必要がある
+- BR-026: CIタイムアウト時はエラーを出力して終了（マージしない）
+- BR-027: マージ後はブランチを自動削除（`delete_branch: true`の場合）
+- BR-028: マージ方式はsquash/merge/rebaseから選択可能（デフォルト: squash）
+
+**制約事項**:
+- GitHub CLIがインストールされている必要がある
+- リポジトリへの書き込み権限が必要
+- CI設定が存在しない場合は即座にマージ
+
+---
+
+#### F-010: リアルタイムログ監視機能
+
+**概要**: 別ターミナルから実行中タスクのログをリアルタイムで監視できる機能
+
+**入力**:
+- タスクID（`--task <task-id>`）
+- フォローモードフラグ（`--follow`）
+
+**出力**:
+- ログファイルの新しい行（リアルタイムストリーム）
+
+**処理概要**:
+1. タスクIDに対応するログファイルパスを特定
+2. ログファイルを`fs.watch()`またはpollingで監視
+3. 新しい行が追加されたら即座にコンソールに出力
+4. Ctrl+Cで監視を終了
+
+**CLI使用例**:
+```bash
+# ターミナル1: タスク実行
+orch run --issue 42 --auto
+
+# ターミナル2: リアルタイム監視
+orch logs --task <task-id> --follow
+
+# 実行中のタスク一覧から選択
+orch logs --follow
+
+# 最新のタスクを監視
+orch logs --latest --follow
+```
+
+**実装方針**:
+- `LogWriter`が書き出すログファイルを`tail -f`的に読み取り
+- `fs.watch()`または polling で新しい行を検出
+- 既存の`LogWriter` / `LogStreamer`を拡張
+
+**ビジネスルール**:
+- BR-029: `--follow`指定時はCtrl+Cで監視を終了できる
+- BR-030: タスクが完了したら監視も自動終了する
+- BR-031: 複数ターミナルから同時に監視可能
+
+**制約事項**:
+- ログファイルが存在しない場合はエラーを出力
+- タスクIDが不正な場合はエラーを出力
+
+---
+
+#### F-011: Issue依存関係管理機能
+
+**概要**: Issue間に依存関係がある場合、依存Issueが完了してから実行する機能
+
+**入力**:
+- Issue番号（`--issue <番号>`）
+- 依存関係解決フラグ（`--resolve-deps`）
+- 依存関係無視フラグ（`--ignore-deps`）
+
+**出力**:
+- 依存関係グラフ
+- 実行順序（トポロジカルソート結果）
+
+**処理概要**:
+1. GitHub Issue Dependencies APIで依存関係を取得
+2. 依存Issueが未完了の場合:
+   - `--resolve-deps`あり: 依存Issueを先に実行
+   - `--resolve-deps`なし: エラーを出力して終了
+3. 複数Issue実行時は依存関係をトポロジカルソートして実行順を決定
+4. 循環依存を検出したらエラーを出力
+
+**CLI使用例**:
+```bash
+# 依存Issueが未完了ならエラー
+orch run --issue 45 --auto
+# → "Issue #44 is not completed. Aborting."
+
+# 依存Issueを先に実行
+orch run --issue 45 --auto --resolve-deps
+# → Issue #44 → Issue #45 の順に実行
+
+# 複数Issueを依存順に実行
+orch run --issues 44,45,46 --auto
+# → 依存関係をトポロジカルソートして実行
+
+# 依存関係を無視して実行
+orch run --issue 45 --auto --ignore-deps
+
+# 依存関係のみチェック（実行しない）
+orch run --issue 45 --check-deps
+```
+
+**依存関係の取得方法**:
+```bash
+# GitHub Issue Dependencies API（2025年8月GA）
+gh api "repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by"
+gh api "repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocking"
+```
+
+**ビジネスルール**:
+- BR-032: 依存Issueが未完了の場合、デフォルトでエラーを出力して終了
+- BR-033: `--resolve-deps`指定時は依存Issueを先に実行
+- BR-034: 循環依存を検出したらエラーを出力
+- BR-035: `--ignore-deps`指定時は依存関係を無視して実行
+
+**制約事項**:
+- GitHub Issue Dependencies APIが利用可能である必要がある
+- リポジトリへの読み取り権限が必要
+
+---
+
+#### F-012: Issueステータスラベル機能
+
+**概要**: タスクの実行状況をGitHub Issueのラベルで管理し、GitHub上で一目で状態を確認できるようにする
+
+**入力**:
+- Issue番号
+- タスク状態（queued/running/completed/failed/blocked/pr-created/merged）
+
+**出力**:
+- GitHub Issueに付与されたラベル
+
+**処理概要**:
+1. タスク開始時に`orch:running`ラベルを付与
+2. 前のステータスラベルを自動削除（排他制御）
+3. タスク完了時に`orch:completed`ラベルに変更
+4. PR作成時に`orch:pr-created`ラベルを追加
+5. マージ時に`orch:merged`ラベルに変更
+6. 失敗時は`orch:failed`ラベルを付与
+
+**ステータスラベル体系**:
+
+| ラベル | 説明 | 色 |
+|--------|------|-----|
+| `orch:queued` | 実行待ち | #c2e0c6 (薄緑) |
+| `orch:running` | 実行中 | #0e8a16 (緑) |
+| `orch:completed` | 正常完了 | #1d76db (青) |
+| `orch:failed` | 失敗 | #d93f0b (赤) |
+| `orch:blocked` | ブロック中 | #fbca04 (黄) |
+| `orch:pr-created` | PR作成済み | #6f42c1 (紫) |
+| `orch:merged` | マージ完了 | #0052cc (濃い青) |
+
+**状態遷移**:
+```
+queued → running → completed → pr-created → merged
+                ↘ failed
+                ↘ blocked
+```
+
+**設定ファイル例**:
+```yaml
+state:
+  use_github_labels: true
+  label_prefix: "orch"  # カスタマイズ可能
+```
+
+**CLI使用例**:
+```bash
+# ラベルのみ初期化（リポジトリにラベルを作成）
+orch init --labels
+
+# タスク実行時に自動的にラベルを更新
+orch run --issue 42 --auto
+# → orch:running → orch:completed → orch:pr-created → orch:merged
+```
+
+**ビジネスルール**:
+- BR-036: ステータスラベルは排他的（同時に複数のステータスラベルは付与しない）
+- BR-037: `use_github_labels: false`の場合はラベル管理を無効化
+- BR-038: ラベルが存在しない場合は自動作成
+- BR-039: `label_prefix`でラベルのプレフィックスをカスタマイズ可能
+
+**制約事項**:
+- GitHub APIへのアクセス権限が必要
+- リポジトリへの書き込み権限が必要
+
+---
+
 ## 4. 非機能要件
 
 ### 4.1 性能要件
@@ -499,6 +827,9 @@ orch logs -t <task-id> -n 100
 | NFR-P-001 | Docker起動時間 | 5秒以内 | 統合テスト |
 | NFR-P-002 | スキーマ検証時間 | 100ms以内 | ユニットテスト |
 | NFR-P-003 | Issue作成時間 | 3秒以内 | 統合テスト |
+| NFR-P-004 | CI監視レスポンス時間 | 1秒以内 | 統合テスト |
+| NFR-P-005 | ログ監視遅延 | 500ms以内 | 統合テスト |
+| NFR-P-006 | 依存関係解析時間 | 2秒以内（10Issue） | 統合テスト |
 
 ### 4.2 可用性要件
 
@@ -507,6 +838,8 @@ orch logs -t <task-id> -n 100
 | NFR-A-001 | コンテナ環境障害時のフォールバック | 設定されたfallback環境へ自動切り替え |
 | NFR-A-002 | GitHub API障害時の挙動 | エラーログ出力、処理は継続 |
 | NFR-A-003 | ホスト環境での継続実行 | コンテナ環境が全て利用不可でもhost環境で実行可能 |
+| NFR-A-004 | CIタイムアウト時の挙動 | エラーログ出力、マージせずに終了 |
+| NFR-A-005 | ログファイル破損時の挙動 | エラーログ出力、監視を継続 |
 
 ### 4.3 セキュリティ要件
 
@@ -525,6 +858,8 @@ orch logs -t <task-id> -n 100
 | NFR-U-002 | VSCode補完対応 | YAML Language Server対応 |
 | NFR-U-003 | ドキュメント整備 | README、設定例、トラブルシューティング |
 | NFR-U-004 | 実行ログの即時確認 | タスク実行中でもログをリアルタイムで確認可能 |
+| NFR-U-005 | CI監視の進捗表示 | CI実行状況をリアルタイムで表示 |
+| NFR-U-006 | 依存関係の可視化 | 依存関係グラフを視覚的に表示 |
 
 ### 4.5 保守性要件
 
@@ -611,6 +946,9 @@ orch logs -t <task-id> -n 100
 | R-003 | JSON Schemaとコードの不整合 | 中 | 中 | CI/CDでの自動検証 |
 | R-004 | Docker実行時のセキュリティリスク | 高 | 低 | ネットワーク制限、read-onlyマウント |
 | R-005 | ホスト環境実行時のセキュリティリスク | 高 | 中 | 警告表示必須、ドキュメントでリスク明記 |
+| R-006 | CI監視中のネットワーク障害 | 中 | 低 | タイムアウト設定、リトライ機能 |
+| R-007 | 依存関係APIの利用不可 | 中 | 低 | エラーメッセージ表示、手動実行を促す |
+| R-008 | ラベル付与時のAPI rate limit | 低 | 中 | リトライ機能、rate limit確認 |
 
 ### 8.2 未解決課題
 
@@ -619,6 +957,9 @@ orch logs -t <task-id> -n 100
 | I-001 | Dockerイメージのキャッシュ戦略 | 開発者 | Phase 1完了前 |
 | I-002 | Issue重複判定のアルゴリズム詳細 | 開発者 | Phase 2開始前 |
 | I-003 | VSCode以外のエディタでの補完対応 | 開発者 | Phase 1完了後 |
+| I-004 | CI監視のタイムアウト値の最適化 | 開発者 | Phase 3開始前 |
+| I-005 | 依存関係グラフの可視化方法 | 開発者 | Phase 3開始前 |
+| I-006 | ラベル体系のカスタマイズ範囲 | 開発者 | Phase 3開始前 |
 
 ---
 
@@ -636,6 +977,10 @@ orch logs -t <task-id> -n 100
 | zod | TypeScript用のスキーマ検証ライブラリ |
 | orch.yml | オーケストレーター設定ファイル |
 | config.yml | プロジェクト設定ファイル |
+| CI | Continuous Integration（継続的インテグレーション） |
+| トポロジカルソート | 依存関係を考慮した順序付けアルゴリズム |
+| 循環依存 | Issue A → B → A のように依存関係がループする状態 |
+| squash merge | 複数のコミットを1つにまとめてマージする方式 |
 
 ---
 
@@ -646,6 +991,7 @@ orch logs -t <task-id> -n 100
 | 1.0.0 | 2026-01-24 | 初版作成 | AI Assistant |
 | 1.1.0 | 2026-01-24 | ホスト環境実行対応（F-002）を追加、フォールバック機能を追加 | AI Assistant |
 | 1.2.0 | 2026-01-24 | 実行ログリアルタイム確認機能（F-008）を追加 | AI Assistant |
+| 1.3.0 | 2026-01-25 | Phase 3機能を追加（F-009: PR自動マージ、F-010: リアルタイムログ監視、F-011: Issue依存関係管理、F-012: Issueステータスラベル） | AI Assistant |
 
 ---
 
@@ -655,6 +1001,8 @@ orch logs -t <task-id> -n 100
 
 - [Docker Engine API](https://docs.docker.com/engine/api/)
 - [GitHub REST API - Issues](https://docs.github.com/en/rest/issues)
+- [GitHub Issue Dependencies API](https://docs.github.com/en/rest/issues/dependencies)
+- [GitHub CLI - PR Commands](https://cli.github.com/manual/gh_pr)
 - [JSON Schema Specification](https://json-schema.org/)
 - [Zod Documentation](https://zod.dev/)
 - [YAML Language Server](https://github.com/redhat-developer/yaml-language-server)
@@ -681,7 +1029,14 @@ orch logs -t <task-id> -n 100
 1. F-006: 改善Issue自動作成
 2. F-007: Issue作成条件設定
 
-### Phase 3（将来検討）
+### Phase 3（v1.3.0新機能）
+1. F-009: PR自動マージ機能
+2. F-010: リアルタイムログ監視機能
+3. F-011: Issue依存関係管理機能
+4. F-012: Issueステータスラベル機能
+
+### Phase 4（将来検討）
 - 他のコンテナランタイム対応（Podman等）
 - Issue作成時のテンプレートカスタマイズ
 - 改善点の優先度自動判定の精度向上
+- 依存関係グラフの可視化UI
