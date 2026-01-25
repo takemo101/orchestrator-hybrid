@@ -7,6 +7,7 @@ import { fetchIssue, updateIssueLabel } from "../input/github.js";
 import { generatePrompt } from "../input/prompt.js";
 import { IssueGenerator } from "../output/issue-generator.js";
 import { checkForUncommittedChanges, createPR } from "../output/pr.js";
+import { PRAutoMerger } from "../output/pr-auto-merger.js";
 import {
 	createReportCollector,
 	generateReport,
@@ -20,7 +21,7 @@ import { LogWriter } from "./log-writer.js";
 import { createTaskLogger, logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
 import type { TaskManager, TaskStateCallback } from "./task-manager.js";
-import type { Config, Issue, LoopContext } from "./types.js";
+import type { Config, Issue, LoopContext, PRConfig } from "./types.js";
 
 export interface LoopOptions {
 	issueNumber: number;
@@ -34,6 +35,7 @@ export interface LoopOptions {
 	reportPath?: string;
 	preset?: string;
 	taskId?: string;
+	prConfig?: PRConfig;
 	onStateChange?: TaskStateCallback;
 	signal?: AbortSignal;
 }
@@ -48,6 +50,7 @@ export interface MultiLoopOptions {
 	useContainer?: boolean;
 	generateReport?: boolean;
 	preset?: string;
+	prConfig?: PRConfig;
 }
 
 export async function runLoop(options: LoopOptions): Promise<void> {
@@ -170,6 +173,7 @@ function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions
 		preset: options.preset,
 		taskId,
 		logDir,
+		prConfig: options.prConfig,
 	};
 }
 
@@ -244,6 +248,7 @@ export async function runMultipleLoops(
 		useContainer = false,
 		generateReport: shouldGenerateReport = false,
 		preset,
+		prConfig,
 	} = options;
 
 	const issues: Issue[] = [];
@@ -273,6 +278,7 @@ export async function runMultipleLoops(
 				reportPath: taskId ? `.agent/${taskId}/report.md` : `.agent/report-${issue.number}.md`,
 				preset,
 				taskId,
+				prConfig,
 				onStateChange,
 				signal,
 			});
@@ -286,6 +292,7 @@ interface LoopState {
 	consecutiveFailures: number;
 	completionReason: ReportData["completionReason"];
 	prResult?: { url: string; number: number; branch: string };
+	merged?: boolean;
 }
 
 interface HatIterationParams {
@@ -534,6 +541,16 @@ async function handleLoopEnd(
 			if (eventBus) printEventSummary(eventBus, taskId);
 			if (context.createPR) {
 				state.prResult = await handlePRCreation(context, taskId);
+
+				// PR自動マージ（prConfigが有効な場合）
+				if (state.prResult && context.prConfig?.autoMerge) {
+					state.merged = await handlePRAutoMerge(
+						state.prResult.number,
+						context.prConfig,
+						issueNumber,
+						taskLogger,
+					);
+				}
 			}
 
 			// IssueGenerator で改善Issueを作成（設定有効時）
@@ -551,6 +568,43 @@ async function handleLoopEnd(
 		state.completionReason,
 		state.prResult,
 	);
+}
+
+/**
+ * PR自動マージを実行
+ *
+ * @param prNumber PR番号
+ * @param prConfig PR設定
+ * @param issueNumber Issue番号
+ * @param taskLogger タスクロガー
+ * @returns マージ成功時はtrue
+ */
+async function handlePRAutoMerge(
+	prNumber: number,
+	prConfig: PRConfig,
+	issueNumber: number,
+	taskLogger: typeof logger,
+): Promise<boolean> {
+	const merger = new PRAutoMerger({
+		enabled: true,
+		mergeMethod: prConfig.mergeMethod,
+		deleteBranch: prConfig.deleteBranch,
+		ciTimeoutSecs: prConfig.ciTimeoutSecs,
+	});
+
+	try {
+		const merged = await merger.autoMerge(prNumber);
+		if (merged) {
+			await updateIssueLabel(issueNumber, "env:merged");
+		}
+		return merged;
+	} catch (error) {
+		// CI失敗時はエラーログのみ、タスク自体は成功扱い
+		taskLogger.error(
+			`PR自動マージ失敗: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return false;
+	}
 }
 
 async function handleLoopDetection(
