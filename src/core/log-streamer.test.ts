@@ -93,9 +93,7 @@ describe("LogStreamer", () => {
 				follow: false,
 			});
 
-			await expect(
-				streamer.stream(() => {}),
-			).rejects.toThrow();
+			await expect(streamer.stream(() => {})).rejects.toThrow();
 		});
 	});
 
@@ -149,9 +147,11 @@ describe("LogStreamer", () => {
 			});
 
 			let streamEnded = false;
-			const streamPromise = streamer.stream(() => {}).then(() => {
-				streamEnded = true;
-			});
+			const streamPromise = streamer
+				.stream(() => {})
+				.then(() => {
+					streamEnded = true;
+				});
 
 			// 即座に停止
 			streamer.stop();
@@ -283,9 +283,7 @@ describe("LogStreamer", () => {
 				baseDir: TEST_BASE_DIR,
 			});
 
-			expect(streamer.getLogPath()).toBe(
-				join(TEST_BASE_DIR, TEST_TASK_ID, "output.log"),
-			);
+			expect(streamer.getLogPath()).toBe(join(TEST_BASE_DIR, TEST_TASK_ID, "output.log"));
 		});
 	});
 });

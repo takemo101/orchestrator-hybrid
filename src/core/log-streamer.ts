@@ -71,11 +71,7 @@ export class LogStreamer {
 
 	constructor(config: LogStreamerConfig) {
 		this.taskId = config.taskId;
-		this.logPath = join(
-			config.baseDir ?? ".agent",
-			config.taskId,
-			"output.log",
-		);
+		this.logPath = join(config.baseDir ?? ".agent", config.taskId, "output.log");
 		this.follow = config.follow ?? false;
 		this.pollInterval = config.pollInterval ?? 100;
 		this.lines = config.lines;
@@ -139,9 +135,7 @@ export class LogStreamer {
 		const content = await file.text();
 		const allLines = content.split("\n").filter((line) => line !== "");
 
-		const linesToReturn = this.lines
-			? allLines.slice(-this.lines)
-			: allLines;
+		const linesToReturn = this.lines ? allLines.slice(-this.lines) : allLines;
 
 		for (const line of linesToReturn) {
 			callback(line);
@@ -151,23 +145,16 @@ export class LogStreamer {
 	/**
 	 * 継続監視モード（ポーリング）
 	 */
-	private async streamFollow(
-		callback: (line: string) => void,
-		signal: AbortSignal,
-	): Promise<void> {
+	private async streamFollow(callback: (line: string) => void, signal: AbortSignal): Promise<void> {
 		let lastPosition = 0;
 
 		// 初回読み取り
 		const file = Bun.file(this.logPath);
 		const initialContent = await file.text();
-		const initialLines = initialContent
-			.split("\n")
-			.filter((line) => line !== "");
+		const initialLines = initialContent.split("\n").filter((line) => line !== "");
 
 		// lines オプションがある場合は最後のN行のみ
-		const linesToEmit = this.lines
-			? initialLines.slice(-this.lines)
-			: initialLines;
+		const linesToEmit = this.lines ? initialLines.slice(-this.lines) : initialLines;
 
 		for (const line of linesToEmit) {
 			callback(line);
@@ -189,9 +176,7 @@ export class LogStreamer {
 			if (currentContent.length > lastPosition) {
 				// 新しいコンテンツを抽出
 				const newContent = currentContent.slice(lastPosition);
-				const newLines = newContent
-					.split("\n")
-					.filter((line) => line !== "");
+				const newLines = newContent.split("\n").filter((line) => line !== "");
 
 				for (const line of newLines) {
 					callback(line);
