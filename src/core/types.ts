@@ -122,6 +122,74 @@ export const AutoIssueConfigSchema = z.object({
 export type AutoIssueConfig = z.infer<typeof AutoIssueConfigSchema>;
 
 /**
+ * PR設定のzodスキーマ
+ *
+ * PR自動マージ機能（F-009）の設定を定義します。
+ */
+export const PRConfigSchema = z.object({
+	/**
+	 * PR自動マージを有効にするか
+	 * @default false
+	 */
+	autoMerge: z.boolean().default(false),
+
+	/**
+	 * マージ方式
+	 * - squash: コミットをまとめてマージ（推奨）
+	 * - merge: マージコミットを作成
+	 * - rebase: リベースしてマージ
+	 * @default "squash"
+	 */
+	mergeMethod: z.enum(["squash", "merge", "rebase"]).default("squash"),
+
+	/**
+	 * マージ後にブランチを削除するか
+	 * @default true
+	 */
+	deleteBranch: z.boolean().default(true),
+
+	/**
+	 * CIタイムアウト（秒）
+	 * @default 600 (10分)
+	 */
+	ciTimeoutSecs: z.number().min(60).max(3600).default(600),
+});
+
+export type PRConfig = z.infer<typeof PRConfigSchema>;
+
+/**
+ * 状態管理設定のzodスキーマ（v1.3.0拡張版）
+ *
+ * v1.3.0でlabel_prefixを追加。
+ */
+export const StateConfigSchema = z.object({
+	/**
+	 * GitHub Issueラベルを使用するか
+	 * @default true
+	 */
+	use_github_labels: z.boolean().default(true),
+
+	/**
+	 * Scratchpadを使用するか
+	 * @default true
+	 */
+	use_scratchpad: z.boolean().default(true),
+
+	/**
+	 * Scratchpadのパス
+	 * @default ".agent/scratchpad.md"
+	 */
+	scratchpad_path: z.string().default(".agent/scratchpad.md"),
+
+	/**
+	 * ステータスラベルのプレフィックス
+	 * @default "orch"
+	 * @example "orch" -> ラベル名 "orch:running"
+	 */
+	label_prefix: z.string().min(1).max(20).default("orch"),
+});
+
+/**
  * 設定ファイル全体のzodスキーマ（拡張版）
  */
 export const ConfigSchema = z.object({
@@ -154,16 +222,13 @@ export const ConfigSchema = z.object({
 			auto_approve_above: z.number().default(9),
 		})
 		.optional(),
-	state: z
-		.object({
-			use_github_labels: z.boolean().default(true),
-			use_scratchpad: z.boolean().default(true),
-			scratchpad_path: z.string().default(".agent/scratchpad.md"),
-		})
-		.optional(),
+	state: StateConfigSchema.optional(),
 
 	// 新規: 改善Issue自動作成設定
 	autoIssue: AutoIssueConfigSchema.optional(),
+
+	// 新規: PR設定（v1.3.0）
+	pr: PRConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -210,6 +275,23 @@ export interface LoopContext {
 	 * @example ".agent/task-1737705600000-42"
 	 */
 	logDir?: string;
+
+	// 新規: PR設定（v1.3.0）
+	/**
+	 * PR自動マージ設定
+	 */
+	prConfig?: PRConfig;
+
+	// 新規: 依存関係オプション（v1.3.0）
+	/**
+	 * 依存Issueを先に実行するか
+	 */
+	resolveDeps?: boolean;
+
+	/**
+	 * 依存関係を無視するか
+	 */
+	ignoreDeps?: boolean;
 }
 
 export interface BackendResult {

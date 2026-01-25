@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+	CircularDependencyError,
 	ContainerUseError,
 	DockerNotFoundError,
 	DockerTimeoutError,
@@ -11,6 +12,9 @@ import {
 	ExecutionTimeoutError,
 	HostExecutionError,
 	ImagePullError,
+	IssueDependencyError,
+	LogMonitorError,
+	PRAutoMergeError,
 	ProcessExecutionError,
 	SandboxError,
 } from "./errors.js";
@@ -271,5 +275,113 @@ describe("ImagePullError", () => {
 
 		expect(error).toBeInstanceOf(SandboxError);
 		expect(error).toBeInstanceOf(ImagePullError);
+	});
+});
+
+// v1.3.0 新規エラークラス
+
+describe("PRAutoMergeError", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new PRAutoMergeError("PR #123 のCI失敗。マージを中断します。");
+
+		expect(error.message).toBe("PR #123 のCI失敗。マージを中断します。");
+		expect(error.code).toBe("PR_AUTO_MERGE_ERROR");
+		expect(error.name).toBe("PRAutoMergeError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new PRAutoMergeError("PR #123 のCIがタイムアウトしました", {
+			prNumber: 123,
+			timeout: 600,
+		});
+
+		expect(error.details).toEqual({ prNumber: 123, timeout: 600 });
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new PRAutoMergeError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(PRAutoMergeError);
+	});
+});
+
+describe("LogMonitorError", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new LogMonitorError("ログファイルが見つかりません");
+
+		expect(error.message).toBe("ログファイルが見つかりません");
+		expect(error.code).toBe("LOG_MONITOR_ERROR");
+		expect(error.name).toBe("LogMonitorError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new LogMonitorError("ログファイルが見つかりません", {
+			taskId: "task-123",
+			logPath: ".agent/task-123/output.log",
+		});
+
+		expect(error.details).toEqual({
+			taskId: "task-123",
+			logPath: ".agent/task-123/output.log",
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new LogMonitorError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(LogMonitorError);
+	});
+});
+
+describe("CircularDependencyError", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new CircularDependencyError("循環依存を検出: #42 -> #43 -> #44 -> #42");
+
+		expect(error.message).toBe("循環依存を検出: #42 -> #43 -> #44 -> #42");
+		expect(error.code).toBe("CIRCULAR_DEPENDENCY_ERROR");
+		expect(error.name).toBe("CircularDependencyError");
+	});
+
+	it("detailsに循環のパスを設定できる", () => {
+		const error = new CircularDependencyError("循環依存を検出", {
+			cycle: [42, 43, 44, 42],
+		});
+
+		expect(error.details).toEqual({ cycle: [42, 43, 44, 42] });
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new CircularDependencyError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(CircularDependencyError);
+	});
+});
+
+describe("IssueDependencyError", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new IssueDependencyError("Issue #42 の依存関係取得に失敗しました");
+
+		expect(error.message).toBe("Issue #42 の依存関係取得に失敗しました");
+		expect(error.code).toBe("ISSUE_DEPENDENCY_ERROR");
+		expect(error.name).toBe("IssueDependencyError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new IssueDependencyError("依存関係取得に失敗", {
+			issueNumber: 42,
+			cause: "API error",
+		});
+
+		expect(error.details).toEqual({ issueNumber: 42, cause: "API error" });
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new IssueDependencyError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(IssueDependencyError);
 	});
 });
