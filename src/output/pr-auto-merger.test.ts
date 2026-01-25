@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test";
 import { PRAutoMerger, type PRAutoMergerConfig } from "./pr-auto-merger.js";
 import { PRAutoMergeError } from "../core/errors.js";
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
+import type { ProcessExecutor } from "../core/process-executor.js";
 import { logger } from "../core/logger.js";
 
 /**
