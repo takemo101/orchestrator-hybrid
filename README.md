@@ -530,7 +530,48 @@ which opencode
 
 ## 開発
 
-### ビルド
+### Justfile（推奨）
+
+[just](https://github.com/casey/just) を使用すると、開発コマンドを簡潔に実行できます。
+
+```bash
+# justのインストール（macOS）
+brew install just
+
+# コマンド一覧を表示
+just
+
+# セットアップ（依存関係 + スキーマ生成）
+just setup
+
+# テスト実行
+just test
+
+# 品質チェック（lint + format + typecheck）
+just check
+
+# バイナリビルド
+just build
+
+# クロスプラットフォームビルド
+just build-all
+```
+
+#### 利用可能なコマンド
+
+| コマンド | 説明 |
+|---------|------|
+| `just setup` | 依存関係インストール + スキーマ生成 |
+| `just dev [args]` | 開発モードでCLI実行 |
+| `just test` | テスト実行 |
+| `just test-watch` | テストをwatchモードで実行 |
+| `just check` | lint + format + typecheck |
+| `just build` | 現在のプラットフォーム用バイナリ |
+| `just build-all` | 全プラットフォームビルド |
+| `just clean` | ビルド成果物削除 |
+| `just ci` | CI用チェック（test + check） |
+
+### npm scripts
 
 ```bash
 # JavaScriptにビルド
@@ -549,12 +590,16 @@ bun run build:binary:windows  # Windows x64
 
 ```bash
 bun test
+# または
+just test
 ```
 
 ### 型チェック
 
 ```bash
 bun run typecheck
+# または
+just typecheck
 ```
 
 ### Lint & Format
@@ -562,13 +607,15 @@ bun run typecheck
 ```bash
 bun run lint
 bun run format
+# または
+just check
 ```
 
 ### グローバルインストール
 
 ```bash
 # バイナリをビルドしてパスの通った場所に配置
-bun run build:binary
+just build
 sudo mv orch /usr/local/bin/
 
 # これで `orch` コマンドが使えるようになる
