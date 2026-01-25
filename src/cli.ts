@@ -393,57 +393,130 @@ program
 
 program
 	.command("logs")
-	.description("Watch task status in real-time")
-	.option("-f, --follow", "Follow mode (watch for changes)")
-	.option("-t, --task <id>", "Watch specific task")
-	.option("-n, --interval <ms>", "Refresh interval in ms", Number.parseInt)
-	.action((options) => {
-		const store = new TaskStore();
-		const interval = options.interval ?? 1000;
-
-		if (!options.follow) {
-			const tasks = options.task ? [store.get(options.task)].filter(Boolean) : store.getAll();
-
-			if (tasks.length === 0) {
-				logger.info("No tasks found");
-				return;
-			}
-
-			printTaskTable(tasks as TaskState[]);
+	.description("Show task logs or watch task status")
+	.option("-f, --follow", "Follow mode (stream logs in real-time or watch task status)")
+	.option("-t, --task <id>", "Task ID to show logs for")
+	.option("-n, --lines <num>", "Number of lines to display (default: 100)", Number.parseInt)
+	.option("--table", "Show task status table (legacy mode)")
+	.option("--interval <ms>", "Refresh interval in ms for table mode", Number.parseInt)
+	.action(async (options) => {
+		// タスクIDが指定された場合はログを表示
+		if (options.task) {
+			await handleTaskLogs(options);
 			return;
 		}
 
-		logger.info("Watching tasks... (Ctrl+C to stop)");
+		// --table または 旧来の動作（タスクテーブル表示）
+		handleTaskTable(options);
+	});
+
+async function handleTaskLogs(options: {
+	task: string;
+	follow?: boolean;
+	lines?: number;
+}): Promise<void> {
+	const logPath = await findTaskLogPath(options.task);
+
+	if (!logPath) {
+		logger.error(`Log file not found for task: ${options.task}`);
+		process.exit(1);
+	}
+
+	if (options.follow) {
+		// リアルタイムストリーミングモード
+		const streamer = new LogStreamer({
+			taskId: options.task,
+			follow: true,
+		});
+
+		logger.info(`Streaming logs for task: ${options.task} (Ctrl+C to stop)`);
 		console.log("");
 
-		let lastSnapshot = "";
-
-		const printUpdate = () => {
-			const tasks = options.task ? [store.get(options.task)].filter(Boolean) : store.getAll();
-			const result = renderTaskMonitor(tasks, lastSnapshot);
-			if (result.changed) {
-				lastSnapshot = result.snapshot;
-			}
-		};
-
-		printUpdate();
-
-		const taskStorePath = ".agent/tasks.json";
-		if (existsSync(taskStorePath)) {
-			watch(taskStorePath, () => {
-				setTimeout(() => printUpdate(), 100);
-			});
+		// 既存の行を表示
+		const existingLines = await readLastNLines(logPath, options.lines ?? 100);
+		for (const line of existingLines) {
+			console.log(line);
 		}
 
-		const intervalId = setInterval(printUpdate, interval);
+		// 新しい行をストリーミング
+		const streamPromise = streamer.stream((line) => {
+			console.log(line);
+		});
 
 		process.on("SIGINT", () => {
-			clearInterval(intervalId);
+			streamer.stop();
 			console.log("");
-			logger.info("Stopped watching");
+			logger.info("Stopped streaming");
 			process.exit(0);
 		});
+
+		await streamPromise;
+	} else {
+		// 一度だけ表示モード
+		const lines = await readLastNLines(logPath, options.lines ?? 100);
+
+		if (lines.length === 0) {
+			logger.info("No logs found");
+			return;
+		}
+
+		for (const line of lines) {
+			console.log(line);
+		}
+	}
+}
+
+function handleTaskTable(options: {
+	follow?: boolean;
+	table?: boolean;
+	interval?: number;
+}): void {
+	const store = new TaskStore();
+	const interval = options.interval ?? 1000;
+
+	if (!options.follow) {
+		const tasks = store.getAll();
+
+		if (tasks.length === 0) {
+			logger.info("No tasks found");
+			return;
+		}
+
+		printTaskTable(tasks as TaskState[]);
+		return;
+	}
+
+	logger.info("Watching tasks... (Ctrl+C to stop)");
+	console.log("");
+
+	let lastSnapshot = "";
+
+	const printUpdate = () => {
+		const tasks = store.getAll();
+		const result = renderTaskMonitor(tasks, lastSnapshot);
+		if (result.changed) {
+			lastSnapshot = result.snapshot;
+		}
+	};
+
+	printUpdate();
+
+	const taskStorePath = ".agent/tasks.json";
+	if (existsSync(taskStorePath)) {
+		watch(taskStorePath, () => {
+			setTimeout(() => printUpdate(), 100);
+		});
+	}
+
+	const intervalId = setInterval(printUpdate, interval);
+
+	process.on("SIGINT", () => {
+		clearInterval(intervalId);
+		console.log("");
+		logger.info("Stopped watching");
+		process.exit(0);
 	});
+}
 
 program.parse();
 
