@@ -273,3 +273,105 @@ export class ImagePullError extends SandboxError {
 		this.image = image;
 	}
 }
+
+// v1.3.0 新規エラークラス
+
+/**
+ * PR自動マージエラー
+ *
+ * PR自動マージ機能（F-009）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // CI失敗時
+ * throw new PRAutoMergeError(
+ *   "PR #123 のCI失敗。マージを中断します。",
+ *   { prNumber: 123 }
+ * );
+ *
+ * // タイムアウト時
+ * throw new PRAutoMergeError(
+ *   "PR #123 のCIがタイムアウトしました（600秒）",
+ *   { prNumber: 123, timeout: 600 }
+ * );
+ * ```
+ */
+export class PRAutoMergeError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "PR_AUTO_MERGE_ERROR",
+			details,
+		});
+		this.name = "PRAutoMergeError";
+	}
+}
+
+/**
+ * ログ監視エラー
+ *
+ * リアルタイムログ監視機能（F-010）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // ログファイル不存在
+ * throw new LogMonitorError(
+ *   "ログファイルが見つかりません: .agent/task-123/output.log",
+ *   { taskId: "task-123", logPath: ".agent/task-123/output.log" }
+ * );
+ * ```
+ */
+export class LogMonitorError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "LOG_MONITOR_ERROR",
+			details,
+		});
+		this.name = "LogMonitorError";
+	}
+}
+
+/**
+ * 循環依存エラー
+ *
+ * Issue依存関係管理機能（F-011）で循環依存を検出した場合にスローされます。
+ *
+ * @example
+ * ```typescript
+ * throw new CircularDependencyError(
+ *   "循環依存を検出: #42 -> #43 -> #44 -> #42",
+ *   { cycle: [42, 43, 44, 42] }
+ * );
+ * ```
+ */
+export class CircularDependencyError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "CIRCULAR_DEPENDENCY_ERROR",
+			details,
+		});
+		this.name = "CircularDependencyError";
+	}
+}
+
+/**
+ * Issue依存関係エラー
+ *
+ * Issue依存関係管理機能（F-011）で依存関係の取得や解決に失敗した場合にスローされます。
+ *
+ * @example
+ * ```typescript
+ * throw new IssueDependencyError(
+ *   "Issue #42 の依存関係取得に失敗しました",
+ *   { issueNumber: 42, cause: "API error" }
+ * );
+ * ```
+ */
+export class IssueDependencyError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "ISSUE_DEPENDENCY_ERROR",
+			details,
+		});
+		this.name = "IssueDependencyError";
+	}
+}
