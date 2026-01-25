@@ -168,7 +168,8 @@ async function handleSingleIssue(
 			draftPR: options.draft ?? false,
 			useContainer: options.container ?? false,
 			generateReport: options.report !== undefined,
-			reportPath: typeof options.report === "string" ? options.report : `.agent/${taskState.id}/report.md`,
+			reportPath:
+				typeof options.report === "string" ? options.report : `.agent/${taskState.id}/report.md`,
 			preset: options.preset,
 			taskId: taskState.id,
 			onStateChange,
