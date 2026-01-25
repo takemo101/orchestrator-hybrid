@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { LogWriter } from "./core/log-writer.js";
 import { findTaskLogPath, readLastNLines } from "./cli-logs.js";
+import { LogWriter } from "./core/log-writer.js";
 
 const TEST_BASE_DIR = ".test-cli-logs";
 const TEST_TASK_ID = "test-task-cli-123";

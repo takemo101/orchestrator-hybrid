@@ -6,16 +6,16 @@ import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import { Command } from "commander";
 import { parse as parseYaml } from "yaml";
+import { findTaskLogPath, readLastNLines } from "./cli-logs.js";
 import { loadConfig } from "./core/config.js";
 import { EventBus } from "./core/event.js";
+import { LogStreamer } from "./core/log-streamer.js";
 import { logger, setVerbose } from "./core/logger.js";
 import { runLoop, runMultipleLoops } from "./core/loop.js";
 import { readScratchpad } from "./core/scratchpad.js";
 import type { TaskState } from "./core/task-manager.js";
 import { TaskManager, TaskStore } from "./core/task-manager.js";
 import { fetchIssue } from "./input/github.js";
-import { findTaskLogPath, readLastNLines } from "./cli-logs.js";
-import { LogStreamer } from "./core/log-streamer.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PRESETS_DIR = join(__dirname, "..", "presets");
@@ -466,11 +466,7 @@ async function handleTaskLogs(options: {
 	}
 }
 
-function handleTaskTable(options: {
-	follow?: boolean;
-	table?: boolean;
-	interval?: number;
-}): void {
+function handleTaskTable(options: { follow?: boolean; table?: boolean; interval?: number }): void {
 	const store = new TaskStore();
 	const interval = options.interval ?? 1000;
 

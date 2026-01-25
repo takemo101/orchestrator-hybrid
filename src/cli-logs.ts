@@ -7,10 +7,7 @@ import { join } from "node:path";
  * @param baseDir ベースディレクトリ（デフォルト: ".agent"）
  * @returns ログファイルのパス、存在しない場合はnull
  */
-export async function findTaskLogPath(
-	taskId: string,
-	baseDir = ".agent",
-): Promise<string | null> {
+export async function findTaskLogPath(taskId: string, baseDir = ".agent"): Promise<string | null> {
 	const logPath = join(baseDir, taskId, "output.log");
 	const file = Bun.file(logPath);
 	const exists = await file.exists();
@@ -24,10 +21,7 @@ export async function findTaskLogPath(
  * @param lines 読み取る行数（デフォルト: 100）
  * @returns 行の配列
  */
-export async function readLastNLines(
-	logPath: string,
-	lines = 100,
-): Promise<string[]> {
+export async function readLastNLines(logPath: string, lines = 100): Promise<string[]> {
 	const file = Bun.file(logPath);
 	const content = await file.text();
 
