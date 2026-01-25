@@ -408,8 +408,17 @@ async function executeHatIteration(
 	currentEvent: ReturnType<EventBus["getLastEvent"]>,
 	state: LoopState,
 ): Promise<IterationResult> {
-	const { context, backend, hatRegistry, eventBus, collector, taskLogger, taskId, onStateChange } =
-		params;
+	const {
+		context,
+		backend,
+		hatRegistry,
+		eventBus,
+		collector,
+		logWriter,
+		taskLogger,
+		taskId,
+		onStateChange,
+	} = params;
 	const historyPath = taskId ? `.agent/${taskId}/output_history.txt` : ".agent/output_history.txt";
 
 	context.iteration++;
@@ -438,6 +447,11 @@ async function executeHatIteration(
 
 	const result = await backend.execute(prompt);
 	const iterEndTime = new Date();
+
+	// LogWriter にログを記録
+	const iterationHeader = `\n--- Iteration ${context.iteration} (${activeHat.name ?? activeHat.id}) ---\n`;
+	await logWriter.writeOutput(iterationHeader);
+	await logWriter.writeStdout(result.output);
 
 	taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
 
