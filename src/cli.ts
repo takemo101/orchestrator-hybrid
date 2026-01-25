@@ -151,18 +151,37 @@ async function handleSingleIssue(
 	},
 	config: ReturnType<typeof loadConfig>,
 ): Promise<void> {
-	await runLoop({
-		issueNumber: Number.parseInt(options.issue ?? "0", 10),
-		config,
-		autoMode: options.auto ?? false,
-		maxIterations: options.maxIterations,
-		createPR: options.createPr ?? false,
-		draftPR: options.draft ?? false,
-		useContainer: options.container ?? false,
-		generateReport: options.report !== undefined,
-		reportPath: typeof options.report === "string" ? options.report : ".agent/report.md",
-		preset: options.preset,
+	const issueNumber = Number.parseInt(options.issue ?? "0", 10);
+	const issue = await fetchIssue(issueNumber);
+	const maxIterations = options.maxIterations ?? config.loop.max_iterations;
+
+	const taskManager = new TaskManager();
+	const taskState = taskManager.createTask(issue, maxIterations);
+
+	await taskManager.startTask(taskState.id, async (onStateChange, signal) => {
+		await runLoop({
+			issueNumber,
+			config,
+			autoMode: options.auto ?? false,
+			maxIterations,
+			createPR: options.createPr ?? false,
+			draftPR: options.draft ?? false,
+			useContainer: options.container ?? false,
+			generateReport: options.report !== undefined,
+			reportPath: typeof options.report === "string" ? options.report : `.agent/${taskState.id}/report.md`,
+			preset: options.preset,
+			taskId: taskState.id,
+			onStateChange,
+			signal,
+		});
 	});
+
+	await taskManager.waitForTask(taskState.id);
+
+	const finalState = taskManager.getTask(taskState.id);
+	if (finalState) {
+		printTaskSummary([finalState]);
+	}
 }
 
 program
