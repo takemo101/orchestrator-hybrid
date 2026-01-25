@@ -376,5 +376,145 @@ describe("types.ts 拡張", () => {
 			expect(context.taskId).toBeUndefined();
 			expect(context.logDir).toBeUndefined();
 		});
+
+		it("prConfigフィールドが追加されている", () => {
+			const context: LoopContext = {
+				issue: {
+					number: 1,
+					title: "Test",
+					body: "Test body",
+					labels: [],
+					state: "open",
+				},
+				iteration: 0,
+				maxIterations: 10,
+				scratchpadPath: ".agent/scratchpad.md",
+				promptPath: ".agent/PROMPT.md",
+				completionPromise: "LOOP_COMPLETE",
+				autoMode: false,
+				createPR: false,
+				draftPR: false,
+				useContainer: false,
+				generateReport: false,
+				reportPath: ".agent/report.md",
+				prConfig: {
+					autoMerge: true,
+					mergeMethod: "squash",
+					deleteBranch: true,
+					ciTimeoutSecs: 600,
+				},
+			};
+			expect(context.prConfig?.autoMerge).toBe(true);
+		});
+
+		it("resolveDepsフィールドが追加されている", () => {
+			const context: LoopContext = {
+				issue: {
+					number: 1,
+					title: "Test",
+					body: "Test body",
+					labels: [],
+					state: "open",
+				},
+				iteration: 0,
+				maxIterations: 10,
+				scratchpadPath: ".agent/scratchpad.md",
+				promptPath: ".agent/PROMPT.md",
+				completionPromise: "LOOP_COMPLETE",
+				autoMode: false,
+				createPR: false,
+				draftPR: false,
+				useContainer: false,
+				generateReport: false,
+				reportPath: ".agent/report.md",
+				resolveDeps: true,
+			};
+			expect(context.resolveDeps).toBe(true);
+		});
+
+		it("ignoreDepsフィールドが追加されている", () => {
+			const context: LoopContext = {
+				issue: {
+					number: 1,
+					title: "Test",
+					body: "Test body",
+					labels: [],
+					state: "open",
+				},
+				iteration: 0,
+				maxIterations: 10,
+				scratchpadPath: ".agent/scratchpad.md",
+				promptPath: ".agent/PROMPT.md",
+				completionPromise: "LOOP_COMPLETE",
+				autoMode: false,
+				createPR: false,
+				draftPR: false,
+				useContainer: false,
+				generateReport: false,
+				reportPath: ".agent/report.md",
+				ignoreDeps: true,
+			};
+			expect(context.ignoreDeps).toBe(true);
+		});
+
+		it("v1.3.0新規フィールドがすべてオプショナルである", () => {
+			const context: LoopContext = {
+				issue: {
+					number: 1,
+					title: "Test",
+					body: "Test body",
+					labels: [],
+					state: "open",
+				},
+				iteration: 0,
+				maxIterations: 10,
+				scratchpadPath: ".agent/scratchpad.md",
+				promptPath: ".agent/PROMPT.md",
+				completionPromise: "LOOP_COMPLETE",
+				autoMode: false,
+				createPR: false,
+				draftPR: false,
+				useContainer: false,
+				generateReport: false,
+				reportPath: ".agent/report.md",
+			};
+			expect(context.prConfig).toBeUndefined();
+			expect(context.resolveDeps).toBeUndefined();
+			expect(context.ignoreDeps).toBeUndefined();
+		});
+	});
+
+	describe("ConfigSchema 拡張（v1.3.0）", () => {
+		it("pr設定が指定できる", () => {
+			const result = ConfigSchema.parse({
+				backend: { type: "claude" },
+				loop: {},
+				pr: {
+					autoMerge: true,
+					mergeMethod: "squash",
+				},
+			});
+			expect(result.pr?.autoMerge).toBe(true);
+			expect(result.pr?.mergeMethod).toBe("squash");
+		});
+
+		it("pr設定がオプショナル", () => {
+			const result = ConfigSchema.parse({
+				backend: { type: "claude" },
+				loop: {},
+			});
+			expect(result.pr).toBeUndefined();
+		});
+
+		it("state.label_prefixが指定できる", () => {
+			const result = ConfigSchema.parse({
+				backend: { type: "claude" },
+				loop: {},
+				state: {
+					label_prefix: "custom",
+				},
+			});
+			expect(result.state?.label_prefix).toBe("custom");
+		});
 	});
 });
