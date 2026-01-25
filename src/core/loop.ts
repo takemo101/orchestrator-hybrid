@@ -636,6 +636,7 @@ async function executeSimpleIteration(
 	context: LoopContext,
 	backend: Backend,
 	collector: ReportCollector | null,
+	logWriter: LogWriter,
 	historyPath: string,
 	state: LoopState,
 	taskLogger: typeof logger,
@@ -653,6 +654,11 @@ async function executeSimpleIteration(
 
 	const result = await backend.execute(prompt);
 	const iterEndTime = new Date();
+
+	// LogWriter にログを記録
+	const iterationHeader = `\n--- Iteration ${context.iteration} ---\n`;
+	await logWriter.writeOutput(iterationHeader);
+	await logWriter.writeStdout(result.output);
 
 	taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
 
