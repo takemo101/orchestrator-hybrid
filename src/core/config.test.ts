@@ -237,14 +237,16 @@ sandbox:
 				loop: { max_iterations: 100 },
 				autoIssue: {
 					enabled: true,
-					triggerPatterns: ["TODO:", "FIXME:"],
+					minPriority: "high",
+					labels: ["auto", "improvement"],
 				},
 			};
 
 			const result = validateConfig(validInput);
 
 			expect(result.autoIssue?.enabled).toBe(true);
-			expect(result.autoIssue?.triggerPatterns).toEqual(["TODO:", "FIXME:"]);
+			expect(result.autoIssue?.minPriority).toBe("high");
+			expect(result.autoIssue?.labels).toEqual(["auto", "improvement"]);
 		});
 
 		it("should format multiple errors in message", () => {
