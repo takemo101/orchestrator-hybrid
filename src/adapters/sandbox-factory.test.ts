@@ -61,29 +61,6 @@ const minimalConfig: Config = {
 	},
 };
 
-/**
- * sandbox設定を含むConfig型（Issue #13 完了まで暫定）
- */
-interface ConfigWithSandbox extends Config {
-	sandbox?: {
-		type?: "docker" | "container-use" | "host";
-		fallback?: "docker" | "container-use" | "host";
-		docker?: {
-			image?: string;
-			network?: "none" | "bridge" | "host";
-			timeout?: number;
-		};
-		containerUse?: {
-			image?: string;
-			envId?: string;
-		};
-		host?: {
-			timeout?: number;
-			warnOnStart?: boolean;
-		};
-	};
-}
-
 describe("SandboxFactory", () => {
 	describe("create()", () => {
 		test("sandbox設定がない場合、container-useをデフォルトで試行する", async () => {
@@ -103,7 +80,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("type=dockerが指定された場合、DockerAdapterを返す", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: { type: "docker" },
 			};
@@ -116,7 +93,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("type=hostが指定された場合、HostAdapterを返す", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: { type: "host" },
 			};
@@ -129,7 +106,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("type=container-useが指定された場合、ContainerAdapterを返す", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: { type: "container-use" },
 			};
@@ -144,7 +121,7 @@ describe("SandboxFactory", () => {
 
 	describe("フォールバック動作", () => {
 		test("プライマリ環境が利用不可でフォールバックが利用可能な場合、フォールバックを使用する", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "docker",
@@ -160,7 +137,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("プライマリもフォールバックも利用不可の場合、EnvironmentUnavailableErrorをスローする", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "docker",
@@ -175,7 +152,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("フォールバックが設定されていない場合、プライマリ不可でエラーをスローする", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "docker",
@@ -189,7 +166,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("docker -> container-use フォールバック", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "docker",
@@ -205,7 +182,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("container-use -> host フォールバック", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "container-use",
@@ -222,7 +199,7 @@ describe("SandboxFactory", () => {
 
 	describe("設定値の反映", () => {
 		test("DockerAdapterに設定値が渡される", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "docker",
@@ -242,7 +219,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("ContainerAdapterに設定値が渡される", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "container-use",
@@ -262,7 +239,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("HostAdapterに設定値が渡される", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "host",
@@ -282,7 +259,7 @@ describe("SandboxFactory", () => {
 
 	describe("未知のタイプ", () => {
 		test("未知のsandboxタイプでエラーをスローする", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "unknown" as "docker", // 型チェックを回避
@@ -298,7 +275,7 @@ describe("SandboxFactory", () => {
 
 	describe("エラーメッセージ", () => {
 		test("EnvironmentUnavailableErrorに試行した環境タイプが含まれる", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "docker",
@@ -318,7 +295,7 @@ describe("SandboxFactory", () => {
 		});
 
 		test("フォールバックがない場合、プライマリのみがエラーメッセージに含まれる", async () => {
-			const config: ConfigWithSandbox = {
+			const config: Config = {
 				...minimalConfig,
 				sandbox: {
 					type: "docker",

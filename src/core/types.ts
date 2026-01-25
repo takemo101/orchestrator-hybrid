@@ -15,6 +15,115 @@ export const ContainerConfigSchema = z
 	})
 	.optional();
 
+/**
+ * サンドボックス設定のzodスキーマ
+ */
+export const SandboxConfigSchema = z.object({
+	/**
+	 * サンドボックスタイプ
+	 * - docker: Dockerコンテナ
+	 * - container-use: container-use環境
+	 * - host: ホスト環境（隔離なし）
+	 */
+	type: z.enum(["docker", "container-use", "host"]).default("container-use"),
+
+	/**
+	 * フォールバック先のサンドボックスタイプ
+	 * プライマリが利用できない場合に使用
+	 */
+	fallback: z.enum(["docker", "container-use", "host"]).optional(),
+
+	/**
+	 * Docker設定
+	 */
+	docker: z
+		.object({
+			/**
+			 * Dockerイメージ名
+			 * @example "node:20-alpine"
+			 */
+			image: z.string().default("node:20-alpine"),
+
+			/**
+			 * ネットワークモード
+			 * - none: ネットワーク無効（最も安全）
+			 * - bridge: ブリッジネットワーク
+			 * - host: ホストネットワーク
+			 */
+			network: z.enum(["none", "bridge", "host"]).optional(),
+
+			/**
+			 * タイムアウト（秒）
+			 */
+			timeout: z.number().default(300),
+		})
+		.optional(),
+
+	/**
+	 * container-use設定
+	 */
+	containerUse: z
+		.object({
+			image: z.string().optional(),
+			envId: z.string().optional(),
+		})
+		.optional(),
+
+	/**
+	 * ホスト環境設定
+	 */
+	host: z
+		.object({
+			/**
+			 * タイムアウト（秒）
+			 */
+			timeout: z.number().default(300),
+
+			/**
+			 * 初回実行時に警告を表示するか
+			 */
+			warnOnStart: z.boolean().default(true),
+		})
+		.optional(),
+});
+
+export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
+
+/**
+ * 改善Issue自動作成設定のzodスキーマ
+ */
+export const AutoIssueConfigSchema = z.object({
+	/**
+	 * Issue自動作成を有効にするか
+	 */
+	enabled: z.boolean().default(false),
+
+	/**
+	 * Issue作成する最低優先度
+	 * - high: 高優先度のみ
+	 * - medium: 中優先度以上
+	 * - low: すべて
+	 */
+	minPriority: z.enum(["high", "medium", "low"]).default("medium"),
+
+	/**
+	 * 自動作成されたIssueに付与するラベル
+	 */
+	labels: z.array(z.string()).default(["auto-generated", "improvement"]),
+
+	/**
+	 * リポジトリ（オプション）
+	 * 指定しない場合は現在のリポジトリ
+	 * @example "owner/repo"
+	 */
+	repository: z.string().optional(),
+});
+
+export type AutoIssueConfig = z.infer<typeof AutoIssueConfigSchema>;
+
+/**
+ * 設定ファイル全体のzodスキーマ（拡張版）
+ */
 export const ConfigSchema = z.object({
 	version: z.string().default("1.0"),
 	backend: z.object({
@@ -22,6 +131,10 @@ export const ConfigSchema = z.object({
 		model: z.string().optional(),
 	}),
 	container: ContainerConfigSchema,
+
+	// 新規: sandbox設定
+	sandbox: SandboxConfigSchema.optional(),
+
 	loop: z.object({
 		max_iterations: z.number().default(100),
 		completion_promise: z.string().default("LOOP_COMPLETE"),
@@ -48,6 +161,9 @@ export const ConfigSchema = z.object({
 			scratchpad_path: z.string().default(".agent/scratchpad.md"),
 		})
 		.optional(),
+
+	// 新規: 改善Issue自動作成設定
+	autoIssue: AutoIssueConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -61,7 +177,11 @@ export interface Issue {
 	state: string;
 }
 
+/**
+ * ループ実行コンテキスト（拡張版）
+ */
 export interface LoopContext {
+	// 既存フィールド
 	issue: Issue;
 	iteration: number;
 	maxIterations: number;
@@ -75,6 +195,21 @@ export interface LoopContext {
 	generateReport: boolean;
 	reportPath: string;
 	preset?: string;
+
+	// 新規: タスクID（並列実行対応）
+	/**
+	 * タスクID
+	 * 並列実行時に各タスクを一意に識別するためのID
+	 * @example "task-1737705600000-42"
+	 */
+	taskId?: string;
+
+	// 新規: ログディレクトリ
+	/**
+	 * ログディレクトリパス
+	 * @example ".agent/task-1737705600000-42"
+	 */
+	logDir?: string;
 }
 
 export interface BackendResult {
