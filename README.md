@@ -73,6 +73,9 @@ bun run dev init --preset tdd
 
 # 利用可能なプリセット一覧
 bun run dev init --list-presets
+
+# ステータスラベルをリポジトリに作成（v1.3.0+）
+bun run dev init --labels
 ```
 
 これにより `orch.yml` が作成されます。設定ファイルがない場合はデフォルト値が使用されます。
@@ -355,7 +358,8 @@ quality:
 
 # 状態管理
 state:
-  use_github_labels: true         # GitHub Issueラベルを使用
+  use_github_labels: true         # GitHub Issueラベルを使用（v1.3.0+: ステータスラベル自動更新）
+  label_prefix: "orch"            # ラベル接頭辞（デフォルト: "orch"）→ orch:running 等
   use_scratchpad: true            # Scratchpadを使用
   scratchpad_path: ".agent/scratchpad.md"
 
@@ -448,6 +452,45 @@ bun run dev run --issue 42 --auto --report ./reports/issue-42.md
 | 3 | Tester | 30000ms | ✓ | tests.passing |
 | 4 | Refactorer | 60000ms | ✓ | LOOP_COMPLETE |
 ```
+
+---
+
+## Issueステータスラベル（v1.3.0+）
+
+GitHub IssueにステータスラベルをつけてIssueの進行状態を可視化できます。
+
+### ステータス一覧
+
+| ステータス | ラベル | 色 | 説明 |
+|-----------|--------|-----|------|
+| `queued` | `orch:queued` | 🟢 薄緑 | 実行待ち |
+| `running` | `orch:running` | 🟢 緑 | 実行中 |
+| `completed` | `orch:completed` | 🔵 青 | 正常完了 |
+| `failed` | `orch:failed` | 🔴 赤 | 失敗 |
+| `blocked` | `orch:blocked` | 🟡 黄 | ブロック中（依存待ち） |
+| `pr-created` | `orch:pr-created` | 🟣 紫 | PR作成済み |
+| `merged` | `orch:merged` | 🔵 濃青 | マージ完了 |
+
+### 使用方法
+
+```bash
+# リポジトリにステータスラベルを作成
+bun run dev init --labels
+# または
+./orch init --labels
+```
+
+### 設定
+
+`orch.yml` でラベル機能を有効化・カスタマイズできます：
+
+```yaml
+state:
+  use_github_labels: true    # ラベル機能を有効化（デフォルト: true）
+  label_prefix: "orch"       # ラベルの接頭辞（デフォルト: "orch"）
+```
+
+ラベル接頭辞を変更すると、例えば `myapp:running` のようなラベルになります。
 
 ---
 
@@ -662,7 +705,8 @@ src/
 ├── output/
 │   ├── pr.ts           # PR作成
 │   ├── report.ts       # 実行レポート生成
-│   └── issue-generator.ts    # 改善Issue自動作成（v1.2.0+）
+│   ├── issue-generator.ts    # 改善Issue自動作成（v1.2.0+）
+│   └── issue-status-label-manager.ts  # Issueステータスラベル管理（v1.3.0+）
 ├── utils/
 │   └── improvement-extractor.ts  # 改善点抽出（v1.2.0+）
 └── schemas/
