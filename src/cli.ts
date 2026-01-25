@@ -15,6 +15,7 @@ import { runLoop, runMultipleLoops } from "./core/loop.js";
 import { readScratchpad } from "./core/scratchpad.js";
 import type { TaskState } from "./core/task-manager.js";
 import { TaskManager, TaskStore } from "./core/task-manager.js";
+import type { PRConfig } from "./core/types.js";
 import { fetchIssue } from "./input/github.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -39,6 +40,7 @@ program
 	.option("--create-pr", "Create PR after completion")
 	.option("--draft", "Create PR as draft")
 	.option("--container", "Run in isolated container-use environment")
+	.option("--auto-merge", "Auto-merge PR after CI passes")
 	.option("--report [path]", "Generate execution report (default: .agent/report.md)")
 	.option("-c, --config <path>", "Config file path")
 	.option("-v, --verbose", "Verbose output")
@@ -63,6 +65,7 @@ async function handleRunCommand(options: {
 	createPr?: boolean;
 	draft?: boolean;
 	container?: boolean;
+	autoMerge?: boolean;
 	report?: string | boolean;
 }): Promise<void> {
 	if (options.verbose) {
@@ -86,10 +89,18 @@ async function handleRunCommand(options: {
 		config.backend.type = options.backend as "claude" | "opencode" | "gemini" | "container";
 	}
 
+	// PR設定を構築（CLIオプションが設定ファイルより優先）
+	const prConfig: PRConfig = {
+		autoMerge: options.autoMerge ?? config.pr?.autoMerge ?? false,
+		mergeMethod: config.pr?.mergeMethod ?? "squash",
+		deleteBranch: config.pr?.deleteBranch ?? true,
+		ciTimeoutSecs: config.pr?.ciTimeoutSecs ?? 600,
+	};
+
 	if (options.issues) {
-		await handleMultipleIssues(options, config);
+		await handleMultipleIssues(options, config, prConfig);
 	} else {
-		await handleSingleIssue(options, config);
+		await handleSingleIssue(options, config, prConfig);
 	}
 }
 
@@ -105,6 +116,7 @@ async function handleMultipleIssues(
 		preset?: string;
 	},
 	config: ReturnType<typeof loadConfig>,
+	prConfig: PRConfig,
 ): Promise<void> {
 	const issueNumbers = (options.issues ?? "")
 		.split(",")
@@ -131,6 +143,7 @@ async function handleMultipleIssues(
 			useContainer: options.container ?? false,
 			generateReport: options.report !== undefined,
 			preset: options.preset,
+			prConfig,
 		},
 		taskManager,
 	);
@@ -150,6 +163,7 @@ async function handleSingleIssue(
 		preset?: string;
 	},
 	config: ReturnType<typeof loadConfig>,
+	prConfig: PRConfig,
 ): Promise<void> {
 	const issueNumber = Number.parseInt(options.issue ?? "0", 10);
 	const issue = await fetchIssue(issueNumber);
@@ -172,6 +186,7 @@ async function handleSingleIssue(
 				typeof options.report === "string" ? options.report : `.agent/${taskState.id}/report.md`,
 			preset: options.preset,
 			taskId: taskState.id,
+			prConfig,
 			onStateChange,
 			signal,
 		});
