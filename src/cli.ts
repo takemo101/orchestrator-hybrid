@@ -14,6 +14,8 @@ import { readScratchpad } from "./core/scratchpad.js";
 import type { TaskState } from "./core/task-manager.js";
 import { TaskManager, TaskStore } from "./core/task-manager.js";
 import { fetchIssue } from "./input/github.js";
+import { findTaskLogPath, readLastNLines } from "./cli-logs.js";
+import { LogStreamer } from "./core/log-streamer.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PRESETS_DIR = join(__dirname, "..", "presets");
