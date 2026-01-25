@@ -1,10 +1,11 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import chalk from "chalk";
 import { type Backend, createBackend } from "../adapters/index.js";
 import { requestApproval } from "../gates/approval.js";
 import { fetchIssue, updateIssueLabel } from "../input/github.js";
 import { generatePrompt } from "../input/prompt.js";
+import { IssueGenerator } from "../output/issue-generator.js";
 import { checkForUncommittedChanges, createPR } from "../output/pr.js";
 import {
 	createReportCollector,
@@ -12,8 +13,10 @@ import {
 	type ReportCollector,
 	type ReportData,
 } from "../output/report.js";
+import { extractImprovements } from "../utils/improvement-extractor.js";
 import { EventBus } from "./event.js";
 import { buildHatPrompt, extractPublishedEvent, type HatDefinition, HatRegistry } from "./hat.js";
+import { LogWriter } from "./log-writer.js";
 import { createTaskLogger, logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
 import type { TaskManager, TaskStateCallback } from "./task-manager.js";
@@ -75,12 +78,21 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	const backend = createLoopBackend(config, loopConfig.containerEnabled);
 	const collector = loopConfig.shouldGenerateReport ? createReportCollector() : null;
 
+	// LogWriter の初期化
+	const logWriter = new LogWriter({
+		taskId: taskId ?? `issue-${issueNumber}`,
+		baseDir: ".agent",
+	});
+	await logWriter.initialize();
+	taskLogger.debug(`Log directory: ${logWriter.getLogDir()}`);
+
 	await executeLoop(
 		context,
 		backend,
 		issueNumber,
 		config,
 		collector,
+		logWriter,
 		taskId,
 		onStateChange,
 		signal,
@@ -139,6 +151,9 @@ async function initializeLoopEnvironment(
 }
 
 function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions): LoopContext {
+	const taskId = options.taskId;
+	const logDir = taskId ? join(".agent", taskId) : ".agent";
+
 	return {
 		issue,
 		iteration: 0,
@@ -153,6 +168,8 @@ function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions
 		generateReport: config.shouldGenerateReport,
 		reportPath: config.reportPath,
 		preset: options.preset,
+		taskId,
+		logDir,
 	};
 }
 
@@ -173,6 +190,7 @@ async function executeLoop(
 	issueNumber: number,
 	config: Config,
 	collector: ReportCollector | null,
+	logWriter: LogWriter,
 	taskId?: string,
 	onStateChange?: TaskStateCallback,
 	signal?: AbortSignal,
@@ -192,6 +210,7 @@ async function executeLoop(
 			eventBus,
 			config,
 			collector,
+			logWriter,
 			taskId,
 			onStateChange,
 			signal,
@@ -203,6 +222,7 @@ async function executeLoop(
 			issueNumber,
 			config,
 			collector,
+			logWriter,
 			taskId,
 			onStateChange,
 			signal,
@@ -274,6 +294,7 @@ interface HatIterationParams {
 	hatRegistry: HatRegistry;
 	eventBus: EventBus;
 	collector: ReportCollector | null;
+	logWriter: LogWriter;
 	taskLogger: typeof logger;
 	taskId?: string;
 	onStateChange?: TaskStateCallback;
@@ -287,6 +308,7 @@ async function executeHatLoop(
 	eventBus: EventBus,
 	config: Config,
 	collector: ReportCollector | null,
+	logWriter: LogWriter,
 	taskId?: string,
 	onStateChange?: TaskStateCallback,
 	signal?: AbortSignal,
@@ -304,6 +326,7 @@ async function executeHatLoop(
 		hatRegistry,
 		eventBus,
 		collector,
+		logWriter,
 		taskLogger,
 		taskId,
 		onStateChange,
@@ -385,8 +408,17 @@ async function executeHatIteration(
 	currentEvent: ReturnType<EventBus["getLastEvent"]>,
 	state: LoopState,
 ): Promise<IterationResult> {
-	const { context, backend, hatRegistry, eventBus, collector, taskLogger, taskId, onStateChange } =
-		params;
+	const {
+		context,
+		backend,
+		hatRegistry,
+		eventBus,
+		collector,
+		logWriter,
+		taskLogger,
+		taskId,
+		onStateChange,
+	} = params;
 	const historyPath = taskId ? `.agent/${taskId}/output_history.txt` : ".agent/output_history.txt";
 
 	context.iteration++;
@@ -415,6 +447,11 @@ async function executeHatIteration(
 
 	const result = await backend.execute(prompt);
 	const iterEndTime = new Date();
+
+	// LogWriter にログを記録
+	const iterationHeader = `\n--- Iteration ${context.iteration} (${activeHat.name ?? activeHat.id}) ---\n`;
+	await logWriter.writeOutput(iterationHeader);
+	await logWriter.writeStdout(result.output);
 
 	taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
 
@@ -498,6 +535,9 @@ async function handleLoopEnd(
 			if (context.createPR) {
 				state.prResult = await handlePRCreation(context, taskId);
 			}
+
+			// IssueGenerator で改善Issueを作成（設定有効時）
+			await handleIssueGeneration(context, config, taskLogger);
 		}
 	} else if (state.completionReason === "error") {
 		await updateIssueLabel(issueNumber, "env:blocked");
@@ -535,6 +575,7 @@ async function executeSimpleLoop(
 	issueNumber: number,
 	config: Config,
 	collector: ReportCollector | null,
+	logWriter: LogWriter,
 	taskId?: string,
 	onStateChange?: TaskStateCallback,
 	signal?: AbortSignal,
@@ -555,6 +596,7 @@ async function executeSimpleLoop(
 			context,
 			backend,
 			collector,
+			logWriter,
 			historyPath,
 			state,
 			taskLogger,
@@ -597,6 +639,7 @@ async function executeSimpleIteration(
 	context: LoopContext,
 	backend: Backend,
 	collector: ReportCollector | null,
+	logWriter: LogWriter,
 	historyPath: string,
 	state: LoopState,
 	taskLogger: typeof logger,
@@ -614,6 +657,11 @@ async function executeSimpleIteration(
 
 	const result = await backend.execute(prompt);
 	const iterEndTime = new Date();
+
+	// LogWriter にログを記録
+	const iterationHeader = `\n--- Iteration ${context.iteration} ---\n`;
+	await logWriter.writeOutput(iterationHeader);
+	await logWriter.writeStdout(result.output);
 
 	taskLogger.debug(`Output (truncated): ${result.output.slice(0, 500)}...`);
 
@@ -696,6 +744,62 @@ function checkLoopDetection(
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 改善提案からIssueを自動作成する
+ *
+ * @param context ループコンテキスト
+ * @param config 設定
+ * @param taskLogger タスクロガー
+ */
+async function handleIssueGeneration(
+	context: LoopContext,
+	config: Config,
+	taskLogger: typeof logger,
+): Promise<void> {
+	const autoIssueConfig = config.autoIssue;
+
+	// 設定が無効または未設定の場合はスキップ
+	if (!autoIssueConfig?.enabled) {
+		return;
+	}
+
+	taskLogger.info("改善提案の抽出を開始...");
+
+	try {
+		// Scratchpadから改善提案を抽出
+		const improvements = await extractImprovements(context);
+
+		if (improvements.length === 0) {
+			taskLogger.info("改善提案は見つかりませんでした");
+			return;
+		}
+
+		taskLogger.info(`${improvements.length}件の改善提案を検出しました`);
+
+		// IssueGeneratorで改善Issueを作成
+		const issueGenerator = new IssueGenerator({
+			enabled: autoIssueConfig.enabled,
+			minPriority: autoIssueConfig.minPriority,
+			labels: autoIssueConfig.labels,
+			repository: autoIssueConfig.repository,
+		});
+
+		const createdIssues = await issueGenerator.createIssues(improvements);
+
+		if (createdIssues.length > 0) {
+			taskLogger.success(`${createdIssues.length}件の改善Issueを作成しました`);
+			for (const url of createdIssues) {
+				taskLogger.info(`  - ${url}`);
+			}
+		}
+	} catch (error) {
+		taskLogger.warn(
+			`改善Issue作成中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		// エラーは警告のみ、処理は継続
+	}
 }
 
 async function handlePRCreation(
