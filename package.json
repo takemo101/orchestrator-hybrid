@@ -30,6 +30,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.11",
 		"@types/bun": "latest",
-		"typescript": "^5.6.0"
+		"typescript": "^5.6.0",
+		"zod-to-json-schema": "^3.25.1"
 	}
 }
