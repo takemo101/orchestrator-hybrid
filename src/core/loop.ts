@@ -78,12 +78,21 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	const backend = createLoopBackend(config, loopConfig.containerEnabled);
 	const collector = loopConfig.shouldGenerateReport ? createReportCollector() : null;
 
+	// LogWriter の初期化
+	const logWriter = new LogWriter({
+		taskId: taskId ?? `issue-${issueNumber}`,
+		baseDir: ".agent",
+	});
+	await logWriter.initialize();
+	taskLogger.debug(`Log directory: ${logWriter.getLogDir()}`);
+
 	await executeLoop(
 		context,
 		backend,
 		issueNumber,
 		config,
 		collector,
+		logWriter,
 		taskId,
 		onStateChange,
 		signal,
