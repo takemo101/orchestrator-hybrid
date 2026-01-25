@@ -15,35 +15,6 @@ import { HostAdapter } from "./host-adapter.js";
 import type { SandboxAdapter } from "./sandbox-adapter.js";
 
 /**
- * サンドボックス設定型
- * Issue #13 完了後は Config に統合予定
- */
-export interface SandboxConfig {
-	type?: "docker" | "container-use" | "host";
-	fallback?: "docker" | "container-use" | "host";
-	docker?: {
-		image?: string;
-		network?: "none" | "bridge" | "host";
-		timeout?: number; // 秒単位
-	};
-	containerUse?: {
-		image?: string;
-		envId?: string;
-	};
-	host?: {
-		timeout?: number; // 秒単位
-		warnOnStart?: boolean;
-	};
-}
-
-/**
- * sandbox設定を含むConfig型（暫定）
- */
-interface ConfigWithSandbox extends Config {
-	sandbox?: SandboxConfig;
-}
-
-/**
  * サンドボックスアダプターを生成するファクトリー
  *
  * @example
@@ -75,12 +46,11 @@ export class SandboxFactory {
 	 * @throws Error 未知のサンドボックスタイプの場合
 	 */
 	static async create(config: Config, executor?: ProcessExecutor): Promise<SandboxAdapter> {
-		const configWithSandbox = config as ConfigWithSandbox;
-		const sandboxType = configWithSandbox.sandbox?.type ?? "container-use";
-		const fallbackType = configWithSandbox.sandbox?.fallback;
+		const sandboxType = config.sandbox?.type ?? "container-use";
+		const fallbackType = config.sandbox?.fallback;
 
 		// プライマリ環境を試行
-		const primaryAdapter = SandboxFactory.createAdapter(sandboxType, configWithSandbox, executor);
+		const primaryAdapter = SandboxFactory.createAdapter(sandboxType, config, executor);
 		if (await primaryAdapter.isAvailable()) {
 			logger.info(`サンドボックス環境: ${sandboxType}`);
 			return primaryAdapter;
@@ -90,11 +60,7 @@ export class SandboxFactory {
 		if (fallbackType) {
 			logger.warn(`${sandboxType}が利用できません。${fallbackType}にフォールバックします。`);
 
-			const fallbackAdapter = SandboxFactory.createAdapter(
-				fallbackType,
-				configWithSandbox,
-				executor,
-			);
+			const fallbackAdapter = SandboxFactory.createAdapter(fallbackType, config, executor);
 			if (await fallbackAdapter.isAvailable()) {
 				logger.info(`サンドボックス環境: ${fallbackType} (フォールバック)`);
 				return fallbackAdapter;
@@ -118,7 +84,7 @@ export class SandboxFactory {
 	 */
 	private static createAdapter(
 		type: string,
-		config: ConfigWithSandbox,
+		config: Config,
 		executor?: ProcessExecutor,
 	): SandboxAdapter {
 		const resolvedExecutor = executor ?? new BunProcessExecutor();
