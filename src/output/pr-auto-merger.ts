@@ -6,10 +6,10 @@
  * @module
  */
 
-import type { ProcessExecutor } from "../core/process-executor.js";
 import { BunProcessExecutor } from "../core/bun-process-executor.js";
 import { PRAutoMergeError } from "../core/errors.js";
 import { logger } from "../core/logger.js";
+import type { ProcessExecutor } from "../core/process-executor.js";
 
 /**
  * PR自動マージ設定
