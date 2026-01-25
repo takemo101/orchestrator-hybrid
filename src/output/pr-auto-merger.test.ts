@@ -128,8 +128,10 @@ describe("PRAutoMerger", () => {
 			spawnMock.mockImplementation(() => {
 				callCount++;
 				if (callCount === 1) {
+					// CI checks成功
 					return Promise.resolve({ stdout: "", stderr: "", exitCode: 0 });
 				}
+				// merge失敗
 				return Promise.resolve({
 					stdout: "",
 					stderr: "merge conflict",
@@ -139,8 +141,13 @@ describe("PRAutoMerger", () => {
 
 			const merger = new PRAutoMerger(defaultConfig, mockExecutor);
 
-			await expect(merger.autoMerge(123)).rejects.toThrow(PRAutoMergeError);
-			await expect(merger.autoMerge(456)).rejects.toThrow("マージに失敗");
+			try {
+				await merger.autoMerge(123);
+				expect(true).toBe(false); // Should not reach here
+			} catch (error) {
+				expect(error).toBeInstanceOf(PRAutoMergeError);
+				expect((error as PRAutoMergeError).message).toContain("マージに失敗");
+			}
 		});
 
 		it("UT-F009-008: タイムアウト時にエラーをスローする", async () => {
