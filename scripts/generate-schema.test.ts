@@ -135,8 +135,8 @@ describe("generate-schema.ts", () => {
 		const schema = JSON.parse(content);
 		const properties = getSchemaProperties(schema);
 
-		// Issue #13で追加されたautoIssue設定
-		expect(properties.autoIssue).toBeDefined();
+		// Issue #13で追加されたauto_issue設定
+		expect(properties.auto_issue).toBeDefined();
 	});
 
 	it("スクリプトが正常終了する（exit code 0）", async () => {

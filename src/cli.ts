@@ -96,10 +96,10 @@ async function handleRunCommand(options: {
 
 	// PR設定を構築（CLIオプションが設定ファイルより優先）
 	const prConfig: PRConfig = {
-		autoMerge: options.autoMerge ?? config.pr?.autoMerge ?? false,
-		mergeMethod: config.pr?.mergeMethod ?? "squash",
-		deleteBranch: config.pr?.deleteBranch ?? true,
-		ciTimeoutSecs: config.pr?.ciTimeoutSecs ?? 600,
+		auto_merge: options.autoMerge ?? config.pr?.auto_merge ?? false,
+		merge_method: config.pr?.merge_method ?? "squash",
+		delete_branch: config.pr?.delete_branch ?? true,
+		ci_timeout_secs: config.pr?.ci_timeout_secs ?? 600,
 	};
 
 	// 依存関係設定を構築（CLIオプションが設定ファイルより優先）

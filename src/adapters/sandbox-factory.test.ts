@@ -223,9 +223,9 @@ describe("SandboxFactory", () => {
 				...minimalConfig,
 				sandbox: {
 					type: "container-use",
-					containerUse: {
+					container_use: {
 						image: "node:20",
-						envId: "existing-env",
+						env_id: "existing-env",
 					},
 				},
 			};
@@ -234,7 +234,7 @@ describe("SandboxFactory", () => {
 			const adapter = (await SandboxFactory.create(config, executor)) as ContainerAdapter;
 
 			expect(adapter).toBeInstanceOf(ContainerAdapter);
-			// envIdが設定されていることを確認
+			// env_idが設定されていることを確認
 			expect(adapter.getEnvironmentId()).toBe("existing-env");
 		});
 
@@ -245,7 +245,7 @@ describe("SandboxFactory", () => {
 					type: "host",
 					host: {
 						timeout: 600000,
-						warnOnStart: false,
+						warn_on_start: false,
 					},
 				},
 			};

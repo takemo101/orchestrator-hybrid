@@ -28,19 +28,19 @@ export interface PRAutoMergerConfig {
 	 * - rebase: リベースしてマージ
 	 * @default "squash"
 	 */
-	mergeMethod: "squash" | "merge" | "rebase";
+	merge_method: "squash" | "merge" | "rebase";
 
 	/**
 	 * マージ後にブランチを削除するか
 	 * @default true
 	 */
-	deleteBranch: boolean;
+	delete_branch: boolean;
 
 	/**
 	 * CIタイムアウト（秒）
 	 * @default 600 (10分)
 	 */
-	ciTimeoutSecs: number;
+	ci_timeout_secs: number;
 }
 
 /**
@@ -50,9 +50,9 @@ export interface PRAutoMergerConfig {
  * ```typescript
  * const merger = new PRAutoMerger({
  *   enabled: true,
- *   mergeMethod: "squash",
- *   deleteBranch: true,
- *   ciTimeoutSecs: 600,
+ *   merge_method: "squash",
+ *   delete_branch: true,
+ *   ci_timeout_secs: 600,
  * });
  *
  * try {
@@ -112,7 +112,7 @@ export class PRAutoMerger {
 	 */
 	private async waitForCI(prNumber: number): Promise<boolean> {
 		const result = await this.executor.spawn("gh", ["pr", "checks", String(prNumber), "--watch"], {
-			timeout: this.config.ciTimeoutSecs * 1000,
+			timeout: this.config.ci_timeout_secs * 1000,
 		});
 
 		if (result.exitCode === 0) {
@@ -129,8 +129,8 @@ export class PRAutoMerger {
 
 		if (isTimeout) {
 			throw new PRAutoMergeError(
-				`PR #${prNumber} のCIがタイムアウトしました（${this.config.ciTimeoutSecs}秒）`,
-				{ prNumber, timeout: this.config.ciTimeoutSecs },
+				`PR #${prNumber} のCIがタイムアウトしました（${this.config.ci_timeout_secs}秒）`,
+				{ prNumber, timeout: this.config.ci_timeout_secs },
 			);
 		}
 
@@ -144,9 +144,9 @@ export class PRAutoMerger {
 	 * @throws PRAutoMergeError - マージ失敗時
 	 */
 	private async merge(prNumber: number): Promise<void> {
-		const args = ["pr", "merge", String(prNumber), `--${this.config.mergeMethod}`];
+		const args = ["pr", "merge", String(prNumber), `--${this.config.merge_method}`];
 
-		if (this.config.deleteBranch) {
+		if (this.config.delete_branch) {
 			args.push("--delete-branch");
 		}
 

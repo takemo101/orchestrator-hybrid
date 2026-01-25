@@ -40,9 +40,9 @@ describe("IssueGenerator", () => {
 		mockExecutor = new MockProcessExecutor();
 		config = {
 			enabled: true,
-			minPriority: "medium",
+			min_priority: "medium",
 			labels: ["auto-generated", "improvement"],
-			duplicateCheckEnabled: true,
+			duplicate_check_enabled: true,
 		};
 	});
 
@@ -85,7 +85,7 @@ describe("IssueGenerator", () => {
 			expect(result[0]).toBe("https://github.com/owner/repo/issues/123");
 		});
 
-		it("minPriorityがmediumの時、lowは優先度スキップされる", async () => {
+		it("min_priorityがmediumの時、lowは優先度スキップされる", async () => {
 			const suggestions: ImprovementSuggestion[] = [
 				{
 					title: "Minor typo fix",
@@ -108,10 +108,10 @@ describe("IssueGenerator", () => {
 			expect(result).toEqual([]);
 		});
 
-		it("minPriorityがlowの時、全ての優先度が作成される", async () => {
+		it("min_priorityがlowの時、全ての優先度が作成される", async () => {
 			const lowPriorityConfig: IssueGeneratorConfig = {
 				...config,
-				minPriority: "low",
+				min_priority: "low",
 			};
 
 			const suggestions: ImprovementSuggestion[] = [
@@ -180,10 +180,10 @@ describe("IssueGenerator", () => {
 			expect(result).toEqual([]);
 		});
 
-		it("duplicateCheckEnabled=falseの時、重複チェックはスキップされる", async () => {
+		it("duplicate_check_enabled=falseの時、重複チェックはスキップされる", async () => {
 			const noDuplicateConfig: IssueGeneratorConfig = {
 				...config,
-				duplicateCheckEnabled: false,
+				duplicate_check_enabled: false,
 			};
 
 			const suggestions: ImprovementSuggestion[] = [

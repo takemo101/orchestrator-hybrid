@@ -30,9 +30,9 @@ describe("PRAutoMerger", () => {
 
 		defaultConfig = {
 			enabled: true,
-			mergeMethod: "squash",
-			deleteBranch: true,
-			ciTimeoutSecs: 600,
+			merge_method: "squash",
+			delete_branch: true,
+			ci_timeout_secs: 600,
 		};
 
 		// loggerをモック化してテスト出力を抑制
@@ -83,8 +83,8 @@ describe("PRAutoMerger", () => {
 			expect(spawnMock).not.toHaveBeenCalled();
 		});
 
-		it("UT-F009-004: deleteBranch=falseの場合、--delete-branchなしでマージ", async () => {
-			const noBranchDeleteConfig = { ...defaultConfig, deleteBranch: false };
+		it("UT-F009-004: delete_branch=falseの場合、--delete-branchなしでマージ", async () => {
+			const noBranchDeleteConfig = { ...defaultConfig, delete_branch: false };
 			const merger = new PRAutoMerger(noBranchDeleteConfig, mockExecutor);
 
 			await merger.autoMerge(123);
@@ -93,8 +93,8 @@ describe("PRAutoMerger", () => {
 			expect(spawnMock).toHaveBeenNthCalledWith(2, "gh", ["pr", "merge", "123", "--squash"]);
 		});
 
-		it("UT-F009-005: mergeMethodがrebaseの場合、--rebaseでマージ", async () => {
-			const rebaseConfig = { ...defaultConfig, mergeMethod: "rebase" as const };
+		it("UT-F009-005: merge_methodがrebaseの場合、--rebaseでマージ", async () => {
+			const rebaseConfig = { ...defaultConfig, merge_method: "rebase" as const };
 			const merger = new PRAutoMerger(rebaseConfig, mockExecutor);
 
 			await merger.autoMerge(123);
@@ -108,8 +108,8 @@ describe("PRAutoMerger", () => {
 			]);
 		});
 
-		it("UT-F009-006: mergeMethodがmergeの場合、--mergeでマージ", async () => {
-			const mergeConfig = { ...defaultConfig, mergeMethod: "merge" as const };
+		it("UT-F009-006: merge_methodがmergeの場合、--mergeでマージ", async () => {
+			const mergeConfig = { ...defaultConfig, merge_method: "merge" as const };
 			const merger = new PRAutoMerger(mergeConfig, mockExecutor);
 
 			await merger.autoMerge(123);
@@ -164,7 +164,7 @@ describe("PRAutoMerger", () => {
 
 	describe("config validation", () => {
 		it("異なるCIタイムアウト値でspawnに正しいtimeoutが渡される", async () => {
-			const customTimeoutConfig = { ...defaultConfig, ciTimeoutSecs: 300 };
+			const customTimeoutConfig = { ...defaultConfig, ci_timeout_secs: 300 };
 			const merger = new PRAutoMerger(customTimeoutConfig, mockExecutor);
 
 			await merger.autoMerge(123);

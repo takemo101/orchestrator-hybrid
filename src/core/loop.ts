@@ -547,7 +547,7 @@ async function handleLoopEnd(
 				state.prResult = await handlePRCreation(context, taskId);
 
 				// PR自動マージ（prConfigが有効な場合）
-				if (state.prResult && context.prConfig?.autoMerge) {
+				if (state.prResult && context.prConfig?.auto_merge) {
 					state.merged = await handlePRAutoMerge(
 						state.prResult.number,
 						context.prConfig,
@@ -591,9 +591,9 @@ async function handlePRAutoMerge(
 ): Promise<boolean> {
 	const merger = new PRAutoMerger({
 		enabled: true,
-		mergeMethod: prConfig.mergeMethod,
-		deleteBranch: prConfig.deleteBranch,
-		ciTimeoutSecs: prConfig.ciTimeoutSecs,
+		merge_method: prConfig.merge_method,
+		delete_branch: prConfig.delete_branch,
+		ci_timeout_secs: prConfig.ci_timeout_secs,
 	});
 
 	try {
@@ -814,7 +814,7 @@ async function handleIssueGeneration(
 	config: Config,
 	taskLogger: typeof logger,
 ): Promise<void> {
-	const autoIssueConfig = config.autoIssue;
+	const autoIssueConfig = config.auto_issue;
 
 	// 設定が無効または未設定の場合はスキップ
 	if (!autoIssueConfig?.enabled) {
@@ -837,7 +837,7 @@ async function handleIssueGeneration(
 		// IssueGeneratorで改善Issueを作成
 		const issueGenerator = new IssueGenerator({
 			enabled: autoIssueConfig.enabled,
-			minPriority: autoIssueConfig.minPriority,
+			min_priority: autoIssueConfig.min_priority,
 			labels: autoIssueConfig.labels,
 			repository: autoIssueConfig.repository,
 		});

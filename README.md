@@ -336,11 +336,11 @@ sandbox:
     image: node:20-alpine         # Dockerイメージ
     network: none                 # ネットワーク設定（none = 隔離）
     timeout: 300                  # タイムアウト（秒）
-  containerUse:
+  container_use:
     image: node:20                # container-use用イメージ
-    envId: ""                     # 既存環境ID（オプション）
+    env_id: ""                    # 既存環境ID（オプション）
   host:
-    warnOnStart: true             # ホスト環境使用時に警告
+    warn_on_start: true           # ホスト環境使用時に警告
 
 # ループ設定
 loop:
@@ -367,13 +367,13 @@ state:
   scratchpad_path: ".agent/scratchpad.md"
 
 # 改善Issue自動作成（v1.2.0+）
-autoIssue:
+auto_issue:
   enabled: true                   # 改善Issue自動作成を有効化
-  minPriority: medium             # 最低優先度（high | medium | low）
+  min_priority: medium            # 最低優先度（high | medium | low）
   labels:                         # 自動付与するラベル
     - auto-generated
     - improvement
-  duplicateCheckEnabled: true     # 重複チェックを有効化
+  duplicate_check_enabled: true   # 重複チェックを有効化
   repository: ""                  # 別リポジトリに作成（オプション）
 
 # Issue依存関係管理（v1.3.0+）

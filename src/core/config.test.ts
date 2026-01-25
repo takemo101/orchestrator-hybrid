@@ -226,23 +226,23 @@ sandbox:
 			expect(() => validateConfig(invalidInput)).toThrow(ConfigValidationError);
 		});
 
-		it("should validate autoIssue configuration", () => {
+		it("should validate auto_issue configuration", () => {
 			const validInput = {
 				version: "1.0",
 				backend: { type: "claude" },
 				loop: { max_iterations: 100 },
-				autoIssue: {
+				auto_issue: {
 					enabled: true,
-					minPriority: "high",
+					min_priority: "high",
 					labels: ["auto", "improvement"],
 				},
 			};
 
 			const result = validateConfig(validInput);
 
-			expect(result.autoIssue?.enabled).toBe(true);
-			expect(result.autoIssue?.minPriority).toBe("high");
-			expect(result.autoIssue?.labels).toEqual(["auto", "improvement"]);
+			expect(result.auto_issue?.enabled).toBe(true);
+			expect(result.auto_issue?.min_priority).toBe("high");
+			expect(result.auto_issue?.labels).toEqual(["auto", "improvement"]);
 		});
 
 		it("should format multiple errors in message", () => {

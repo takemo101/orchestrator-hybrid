@@ -62,10 +62,10 @@ export const SandboxConfigSchema = z.object({
 	/**
 	 * container-use設定
 	 */
-	containerUse: z
+	container_use: z
 		.object({
 			image: z.string().optional(),
-			envId: z.string().optional(),
+			env_id: z.string().optional(),
 		})
 		.optional(),
 
@@ -82,7 +82,7 @@ export const SandboxConfigSchema = z.object({
 			/**
 			 * 初回実行時に警告を表示するか
 			 */
-			warnOnStart: z.boolean().default(true),
+			warn_on_start: z.boolean().default(true),
 		})
 		.optional(),
 });
@@ -104,7 +104,7 @@ export const AutoIssueConfigSchema = z.object({
 	 * - medium: 中優先度以上
 	 * - low: すべて
 	 */
-	minPriority: z.enum(["high", "medium", "low"]).default("medium"),
+	min_priority: z.enum(["high", "medium", "low"]).default("medium"),
 
 	/**
 	 * 自動作成されたIssueに付与するラベル
@@ -131,7 +131,7 @@ export const PRConfigSchema = z.object({
 	 * PR自動マージを有効にするか
 	 * @default false
 	 */
-	autoMerge: z.boolean().default(false),
+	auto_merge: z.boolean().default(false),
 
 	/**
 	 * マージ方式
@@ -140,19 +140,19 @@ export const PRConfigSchema = z.object({
 	 * - rebase: リベースしてマージ
 	 * @default "squash"
 	 */
-	mergeMethod: z.enum(["squash", "merge", "rebase"]).default("squash"),
+	merge_method: z.enum(["squash", "merge", "rebase"]).default("squash"),
 
 	/**
 	 * マージ後にブランチを削除するか
 	 * @default true
 	 */
-	deleteBranch: z.boolean().default(true),
+	delete_branch: z.boolean().default(true),
 
 	/**
 	 * CIタイムアウト（秒）
 	 * @default 600 (10分)
 	 */
-	ciTimeoutSecs: z.number().min(60).max(3600).default(600),
+	ci_timeout_secs: z.number().min(60).max(3600).default(600),
 });
 
 export type PRConfig = z.infer<typeof PRConfigSchema>;
@@ -248,7 +248,7 @@ export const ConfigSchema = z.object({
 	state: StateConfigSchema.optional(),
 
 	// 新規: 改善Issue自動作成設定
-	autoIssue: AutoIssueConfigSchema.optional(),
+	auto_issue: AutoIssueConfigSchema.optional(),
 
 	// 新規: PR設定（v1.3.0）
 	pr: PRConfigSchema.optional(),

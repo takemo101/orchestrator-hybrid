@@ -105,8 +105,8 @@ export class SandboxFactory {
 			case "container-use":
 				return new ContainerAdapter(
 					{
-						image: config.sandbox?.containerUse?.image,
-						envId: config.sandbox?.containerUse?.envId,
+						image: config.sandbox?.container_use?.image,
+						envId: config.sandbox?.container_use?.env_id,
 					},
 					resolvedExecutor,
 				);
@@ -117,7 +117,7 @@ export class SandboxFactory {
 						timeout: config.sandbox?.host?.timeout
 							? config.sandbox.host.timeout * 1000 // 秒→ミリ秒
 							: undefined,
-						warnOnStart: config.sandbox?.host?.warnOnStart,
+						warnOnStart: config.sandbox?.host?.warn_on_start,
 					},
 					resolvedExecutor,
 				);

@@ -66,26 +66,26 @@ describe("types.ts 拡張", () => {
 			expect(result.docker?.timeout).toBe(300);
 		});
 
-		it("containerUse設定が指定できる", () => {
+		it("container_use設定が指定できる", () => {
 			const result = SandboxConfigSchema.parse({
-				containerUse: {
+				container_use: {
 					image: "custom-image",
-					envId: "my-env-123",
+					env_id: "my-env-123",
 				},
 			});
-			expect(result.containerUse?.image).toBe("custom-image");
-			expect(result.containerUse?.envId).toBe("my-env-123");
+			expect(result.container_use?.image).toBe("custom-image");
+			expect(result.container_use?.env_id).toBe("my-env-123");
 		});
 
 		it("host設定が指定できる", () => {
 			const result = SandboxConfigSchema.parse({
 				host: {
 					timeout: 600,
-					warnOnStart: false,
+					warn_on_start: false,
 				},
 			});
 			expect(result.host?.timeout).toBe(600);
-			expect(result.host?.warnOnStart).toBe(false);
+			expect(result.host?.warn_on_start).toBe(false);
 		});
 
 		it("host設定のデフォルト値が正しい", () => {
@@ -93,7 +93,7 @@ describe("types.ts 拡張", () => {
 				host: {},
 			});
 			expect(result.host?.timeout).toBe(300);
-			expect(result.host?.warnOnStart).toBe(true);
+			expect(result.host?.warn_on_start).toBe(true);
 		});
 
 		it("SandboxConfig型が正しく推論される", () => {
@@ -110,7 +110,7 @@ describe("types.ts 拡張", () => {
 		it("デフォルト値が正しく設定される", () => {
 			const result = AutoIssueConfigSchema.parse({});
 			expect(result.enabled).toBe(false);
-			expect(result.minPriority).toBe("medium");
+			expect(result.min_priority).toBe("medium");
 			expect(result.labels).toEqual(["auto-generated", "improvement"]);
 		});
 
@@ -119,18 +119,18 @@ describe("types.ts 拡張", () => {
 			expect(result.enabled).toBe(true);
 		});
 
-		it("minPriority=highが指定できる", () => {
-			const result = AutoIssueConfigSchema.parse({ minPriority: "high" });
-			expect(result.minPriority).toBe("high");
+		it("min_priority=highが指定できる", () => {
+			const result = AutoIssueConfigSchema.parse({ min_priority: "high" });
+			expect(result.min_priority).toBe("high");
 		});
 
-		it("minPriority=lowが指定できる", () => {
-			const result = AutoIssueConfigSchema.parse({ minPriority: "low" });
-			expect(result.minPriority).toBe("low");
+		it("min_priority=lowが指定できる", () => {
+			const result = AutoIssueConfigSchema.parse({ min_priority: "low" });
+			expect(result.min_priority).toBe("low");
 		});
 
-		it("無効なminPriorityでエラーになる", () => {
-			expect(() => AutoIssueConfigSchema.parse({ minPriority: "invalid" })).toThrow();
+		it("無効なmin_priorityでエラーになる", () => {
+			expect(() => AutoIssueConfigSchema.parse({ min_priority: "invalid" })).toThrow();
 		});
 
 		it("カスタムlabelsが指定できる", () => {
@@ -150,7 +150,7 @@ describe("types.ts 拡張", () => {
 		it("AutoIssueConfig型が正しく推論される", () => {
 			const config: AutoIssueConfig = {
 				enabled: true,
-				minPriority: "high",
+				min_priority: "high",
 				labels: ["auto"],
 				repository: "owner/repo",
 			};
@@ -180,93 +180,93 @@ describe("types.ts 拡張", () => {
 			expect(result.sandbox).toBeUndefined();
 		});
 
-		it("autoIssue設定が指定できる", () => {
+		it("auto_issue設定が指定できる", () => {
 			const result = ConfigSchema.parse({
 				backend: { type: "claude" },
 				loop: {},
-				autoIssue: {
+				auto_issue: {
 					enabled: true,
-					minPriority: "high",
+					min_priority: "high",
 				},
 			});
-			expect(result.autoIssue?.enabled).toBe(true);
-			expect(result.autoIssue?.minPriority).toBe("high");
+			expect(result.auto_issue?.enabled).toBe(true);
+			expect(result.auto_issue?.min_priority).toBe("high");
 		});
 
-		it("autoIssue設定がオプショナル", () => {
+		it("auto_issue設定がオプショナル", () => {
 			const result = ConfigSchema.parse({
 				backend: { type: "claude" },
 				loop: {},
 			});
-			expect(result.autoIssue).toBeUndefined();
+			expect(result.auto_issue).toBeUndefined();
 		});
 
-		it("sandbox と autoIssue 両方指定できる", () => {
+		it("sandbox と auto_issue 両方指定できる", () => {
 			const result = ConfigSchema.parse({
 				backend: { type: "claude" },
 				loop: {},
 				sandbox: { type: "container-use" },
-				autoIssue: { enabled: false },
+				auto_issue: { enabled: false },
 			});
 			expect(result.sandbox?.type).toBe("container-use");
-			expect(result.autoIssue?.enabled).toBe(false);
+			expect(result.auto_issue?.enabled).toBe(false);
 		});
 	});
 
 	describe("PRConfigSchema", () => {
 		it("デフォルト値が正しく設定される", () => {
 			const result = PRConfigSchema.parse({});
-			expect(result.autoMerge).toBe(false);
-			expect(result.mergeMethod).toBe("squash");
-			expect(result.deleteBranch).toBe(true);
-			expect(result.ciTimeoutSecs).toBe(600);
+			expect(result.auto_merge).toBe(false);
+			expect(result.merge_method).toBe("squash");
+			expect(result.delete_branch).toBe(true);
+			expect(result.ci_timeout_secs).toBe(600);
 		});
 
-		it("autoMerge=trueが指定できる", () => {
-			const result = PRConfigSchema.parse({ autoMerge: true });
-			expect(result.autoMerge).toBe(true);
+		it("auto_merge=trueが指定できる", () => {
+			const result = PRConfigSchema.parse({ auto_merge: true });
+			expect(result.auto_merge).toBe(true);
 		});
 
-		it("mergeMethod=mergeが指定できる", () => {
-			const result = PRConfigSchema.parse({ mergeMethod: "merge" });
-			expect(result.mergeMethod).toBe("merge");
+		it("merge_method=mergeが指定できる", () => {
+			const result = PRConfigSchema.parse({ merge_method: "merge" });
+			expect(result.merge_method).toBe("merge");
 		});
 
-		it("mergeMethod=rebaseが指定できる", () => {
-			const result = PRConfigSchema.parse({ mergeMethod: "rebase" });
-			expect(result.mergeMethod).toBe("rebase");
+		it("merge_method=rebaseが指定できる", () => {
+			const result = PRConfigSchema.parse({ merge_method: "rebase" });
+			expect(result.merge_method).toBe("rebase");
 		});
 
-		it("無効なmergeMethodでエラーになる", () => {
-			expect(() => PRConfigSchema.parse({ mergeMethod: "invalid" })).toThrow();
+		it("無効なmerge_methodでエラーになる", () => {
+			expect(() => PRConfigSchema.parse({ merge_method: "invalid" })).toThrow();
 		});
 
-		it("ciTimeoutSecsの最小値は60", () => {
-			expect(() => PRConfigSchema.parse({ ciTimeoutSecs: 30 })).toThrow();
+		it("ci_timeout_secsの最小値は60", () => {
+			expect(() => PRConfigSchema.parse({ ci_timeout_secs: 30 })).toThrow();
 		});
 
-		it("ciTimeoutSecsの最大値は3600", () => {
-			expect(() => PRConfigSchema.parse({ ciTimeoutSecs: 5000 })).toThrow();
+		it("ci_timeout_secsの最大値は3600", () => {
+			expect(() => PRConfigSchema.parse({ ci_timeout_secs: 5000 })).toThrow();
 		});
 
-		it("ciTimeoutSecsの有効範囲内の値が指定できる", () => {
-			const result = PRConfigSchema.parse({ ciTimeoutSecs: 300 });
-			expect(result.ciTimeoutSecs).toBe(300);
+		it("ci_timeout_secsの有効範囲内の値が指定できる", () => {
+			const result = PRConfigSchema.parse({ ci_timeout_secs: 300 });
+			expect(result.ci_timeout_secs).toBe(300);
 		});
 
-		it("deleteBranch=falseが指定できる", () => {
-			const result = PRConfigSchema.parse({ deleteBranch: false });
-			expect(result.deleteBranch).toBe(false);
+		it("delete_branch=falseが指定できる", () => {
+			const result = PRConfigSchema.parse({ delete_branch: false });
+			expect(result.delete_branch).toBe(false);
 		});
 
 		it("PRConfig型が正しく推論される", () => {
 			const config: PRConfig = {
-				autoMerge: true,
-				mergeMethod: "squash",
-				deleteBranch: true,
-				ciTimeoutSecs: 600,
+				auto_merge: true,
+				merge_method: "squash",
+				delete_branch: true,
+				ci_timeout_secs: 600,
 			};
-			expect(config.autoMerge).toBe(true);
+			expect(config.auto_merge).toBe(true);
 		});
 	});
 
@@ -398,13 +398,13 @@ describe("types.ts 拡張", () => {
 				generateReport: false,
 				reportPath: ".agent/report.md",
 				prConfig: {
-					autoMerge: true,
-					mergeMethod: "squash",
-					deleteBranch: true,
-					ciTimeoutSecs: 600,
+					auto_merge: true,
+					merge_method: "squash",
+					delete_branch: true,
+					ci_timeout_secs: 600,
 				},
 			};
-			expect(context.prConfig?.autoMerge).toBe(true);
+			expect(context.prConfig?.auto_merge).toBe(true);
 		});
 
 		it("resolveDepsフィールドが追加されている", () => {
@@ -490,12 +490,12 @@ describe("types.ts 拡張", () => {
 				backend: { type: "claude" },
 				loop: {},
 				pr: {
-					autoMerge: true,
-					mergeMethod: "squash",
+					auto_merge: true,
+					merge_method: "squash",
 				},
 			});
-			expect(result.pr?.autoMerge).toBe(true);
-			expect(result.pr?.mergeMethod).toBe("squash");
+			expect(result.pr?.auto_merge).toBe(true);
+			expect(result.pr?.merge_method).toBe("squash");
 		});
 
 		it("pr設定がオプショナル", () => {

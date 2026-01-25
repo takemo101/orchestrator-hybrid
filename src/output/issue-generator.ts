@@ -62,7 +62,7 @@ export interface IssueGeneratorConfig {
 	enabled: boolean;
 
 	/** 最低優先度閾値（必須） */
-	minPriority: ImprovementPriority;
+	min_priority: ImprovementPriority;
 
 	/** 自動付与ラベル（必須、空配列可） */
 	labels: string[];
@@ -71,10 +71,10 @@ export interface IssueGeneratorConfig {
 	repository?: string;
 
 	/** 重複チェックの有効/無効（オプション、デフォルト: true） */
-	duplicateCheckEnabled?: boolean;
+	duplicate_check_enabled?: boolean;
 
 	/** カスタムテンプレートパス（オプション） */
-	templatePath?: string;
+	template_path?: string;
 }
 
 /**
@@ -168,7 +168,7 @@ export class IssueGenerator {
 			low: 1,
 		};
 
-		const minPriorityValue = priorityOrder[this.config.minPriority];
+		const minPriorityValue = priorityOrder[this.config.min_priority];
 		const suggestionPriorityValue = priorityOrder[priority];
 
 		return suggestionPriorityValue >= minPriorityValue;
@@ -180,7 +180,7 @@ export class IssueGenerator {
 	 * @returns 重複ありならtrue
 	 */
 	private async isDuplicate(suggestion: ImprovementSuggestion): Promise<boolean> {
-		if (this.config.duplicateCheckEnabled === false) {
+		if (this.config.duplicate_check_enabled === false) {
 			return false;
 		}
 
