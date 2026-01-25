@@ -1,10 +1,10 @@
 /**
  * 改善点抽出ユーティリティ単体テスト
  */
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { extractImprovements } from "./improvement-extractor.js";
-import { writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import type { LoopContext } from "../core/types.js";
+import { extractImprovements } from "./improvement-extractor.js";
 
 describe("extractImprovements", () => {
 	const testDir = ".test-improvement-extractor";

@@ -4,10 +4,10 @@
  * @module
  */
 
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
+import { writeFileSync } from "node:fs";
 import { BunProcessExecutor } from "../core/bun-process-executor.js";
 import { logger } from "../core/logger.js";
-import { writeFileSync } from "node:fs";
+import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 
 /**
  * 改善提案の優先度
@@ -117,9 +117,7 @@ export class IssueGenerator {
 			try {
 				// 優先度フィルタ
 				if (!this.shouldCreateIssue(suggestion.priority)) {
-					logger.debug(
-						`優先度が低いためスキップ: ${suggestion.title} (${suggestion.priority})`
-					);
+					logger.debug(`優先度が低いためスキップ: ${suggestion.title} (${suggestion.priority})`);
 					continue;
 				}
 
@@ -136,7 +134,7 @@ export class IssueGenerator {
 			} catch (error) {
 				logger.error(
 					`Issue作成に失敗: ${suggestion.title}`,
-					error instanceof Error ? error.message : String(error)
+					error instanceof Error ? error.message : String(error),
 				);
 				// 次の提案へ続行
 			}
@@ -212,13 +210,12 @@ export class IssueGenerator {
 
 			// 完全一致チェック（大文字小文字を無視）
 			return issues.some(
-				(issue: { title: string }) =>
-					issue.title.toLowerCase() === suggestion.title.toLowerCase()
+				(issue: { title: string }) => issue.title.toLowerCase() === suggestion.title.toLowerCase(),
 			);
 		} catch (error) {
 			logger.warn(
 				"重複チェック中にエラーが発生しました。Issue作成を続行します。",
-				error instanceof Error ? error.message : String(error)
+				error instanceof Error ? error.message : String(error),
 			);
 			return false;
 		}
@@ -276,9 +273,7 @@ export class IssueGenerator {
 				? suggestion.relatedFiles.map((file) => `- \`${file}\``).join("\n")
 				: "なし";
 
-		const categorySection = suggestion.category
-			? `### カテゴリ\n${suggestion.category}\n\n`
-			: "";
+		const categorySection = suggestion.category ? `### カテゴリ\n${suggestion.category}\n\n` : "";
 
 		const metadataSection = suggestion.metadata
 			? `### メタデータ\n<!-- \nMETADATA: ${JSON.stringify(suggestion.metadata)}\n-->\n\n`

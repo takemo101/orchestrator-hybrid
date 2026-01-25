@@ -1,10 +1,10 @@
 /**
  * IssueGenerator単体テスト
  */
-import { describe, it, expect, beforeEach } from "bun:test";
-import { IssueGenerator } from "./issue-generator.js";
-import type { ImprovementSuggestion, IssueGeneratorConfig } from "./issue-generator.js";
+import { beforeEach, describe, expect, it } from "bun:test";
 import type { ProcessExecutor, ProcessResult, SpawnOptions } from "../core/process-executor.js";
+import type { ImprovementSuggestion, IssueGeneratorConfig } from "./issue-generator.js";
+import { IssueGenerator } from "./issue-generator.js";
 
 /**
  * モックProcessExecutor
@@ -295,7 +295,7 @@ describe("IssueGenerator", () => {
 
 			// --repoオプションが含まれているか確認
 			const createCall = mockExecutor.spawnCalls.find(
-				(call) => call.args.includes("create") && call.args.includes("--repo")
+				(call) => call.args.includes("create") && call.args.includes("--repo"),
 			);
 			expect(createCall).toBeDefined();
 			expect(createCall?.args).toContain("owner/other-repo");

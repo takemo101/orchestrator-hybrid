@@ -6,20 +6,22 @@
  * @module
  */
 
+import crypto from "node:crypto";
+import { logger } from "../core/logger.js";
 import { readScratchpad } from "../core/scratchpad.js";
 import type { LoopContext } from "../core/types.js";
-import { logger } from "../core/logger.js";
-import crypto from "node:crypto";
-import type { ImprovementSuggestion, ImprovementCategory, ImprovementPriority } from "../output/issue-generator.js";
+import type {
+	ImprovementCategory,
+	ImprovementPriority,
+	ImprovementSuggestion,
+} from "../output/issue-generator.js";
 
 /**
  * ループコンテキストから改善提案を抽出
  * @param context ループコンテキスト
  * @returns 改善提案配列
  */
-export async function extractImprovements(
-	context: LoopContext
-): Promise<ImprovementSuggestion[]> {
+export async function extractImprovements(context: LoopContext): Promise<ImprovementSuggestion[]> {
 	const suggestions: ImprovementSuggestion[] = [];
 
 	try {
@@ -31,7 +33,7 @@ export async function extractImprovements(
 	} catch (error) {
 		logger.warn(
 			"改善提案の抽出に失敗しました",
-			error instanceof Error ? error.message : String(error)
+			error instanceof Error ? error.message : String(error),
 		);
 	}
 
@@ -53,8 +55,7 @@ function extractFromScratchpad(scratchpadPath: string): ImprovementSuggestion[] 
 	}
 
 	// 改善提案マーカーのパターン（メタデータはオプショナル）
-	const pattern =
-		/<!-- IMPROVEMENT_START\s*(.*?)\s*-->([\s\S]*?)<!-- IMPROVEMENT_END -->/g;
+	const pattern = /<!-- IMPROVEMENT_START\s*(.*?)\s*-->([\s\S]*?)<!-- IMPROVEMENT_END -->/g;
 	let match: RegExpExecArray | null;
 
 	while ((match = pattern.exec(content)) !== null) {
@@ -88,7 +89,7 @@ function extractFromScratchpad(scratchpadPath: string): ImprovementSuggestion[] 
 		} catch (error) {
 			logger.warn(
 				"改善提案のパース中にエラーが発生しました",
-				error instanceof Error ? error.message : String(error)
+				error instanceof Error ? error.message : String(error),
 			);
 			// 次のマッチへ続行
 		}
@@ -117,7 +118,7 @@ function parseMetadata(metadataStr: string): {
 	}
 
 	const categoryMatch = metadataStr.match(
-		/category:(refactoring|performance|security|documentation|testing)/
+		/category:(refactoring|performance|security|documentation|testing)/,
 	);
 	if (categoryMatch) {
 		metadata.category = categoryMatch[1] as ImprovementCategory;
