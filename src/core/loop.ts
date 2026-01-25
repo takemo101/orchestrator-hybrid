@@ -535,6 +535,9 @@ async function handleLoopEnd(
 			if (context.createPR) {
 				state.prResult = await handlePRCreation(context, taskId);
 			}
+
+			// IssueGenerator で改善Issueを作成（設定有効時）
+			await handleIssueGeneration(context, config, taskLogger);
 		}
 	} else if (state.completionReason === "error") {
 		await updateIssueLabel(issueNumber, "env:blocked");
