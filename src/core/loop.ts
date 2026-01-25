@@ -746,6 +746,62 @@ function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * 改善提案からIssueを自動作成する
+ *
+ * @param context ループコンテキスト
+ * @param config 設定
+ * @param taskLogger タスクロガー
+ */
+async function handleIssueGeneration(
+	context: LoopContext,
+	config: Config,
+	taskLogger: typeof logger,
+): Promise<void> {
+	const autoIssueConfig = config.autoIssue;
+
+	// 設定が無効または未設定の場合はスキップ
+	if (!autoIssueConfig?.enabled) {
+		return;
+	}
+
+	taskLogger.info("改善提案の抽出を開始...");
+
+	try {
+		// Scratchpadから改善提案を抽出
+		const improvements = await extractImprovements(context);
+
+		if (improvements.length === 0) {
+			taskLogger.info("改善提案は見つかりませんでした");
+			return;
+		}
+
+		taskLogger.info(`${improvements.length}件の改善提案を検出しました`);
+
+		// IssueGeneratorで改善Issueを作成
+		const issueGenerator = new IssueGenerator({
+			enabled: autoIssueConfig.enabled,
+			minPriority: autoIssueConfig.minPriority,
+			labels: autoIssueConfig.labels,
+			repository: autoIssueConfig.repository,
+		});
+
+		const createdIssues = await issueGenerator.createIssues(improvements);
+
+		if (createdIssues.length > 0) {
+			taskLogger.success(`${createdIssues.length}件の改善Issueを作成しました`);
+			for (const url of createdIssues) {
+				taskLogger.info(`  - ${url}`);
+			}
+		}
+	} catch (error) {
+		taskLogger.warn(
+			`改善Issue作成中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		// エラーは警告のみ、処理は継続
+	}
+}
+
 async function handlePRCreation(
 	context: LoopContext,
 	taskId?: string,
