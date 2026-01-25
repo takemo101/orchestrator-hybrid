@@ -1,5 +1,5 @@
+import { type FSWatcher, watch } from "node:fs";
 import { join } from "node:path";
-import { watch, type FSWatcher } from "node:fs";
 import { LogMonitorError } from "./errors.js";
 import { logger } from "./logger.js";
 
@@ -24,6 +24,13 @@ export interface LogMonitorConfig {
 	 * @default 500
 	 */
 	pollInterval?: number;
+
+	/**
+	 * fs.watch()を使用せず、pollingモードのみを使用する
+	 * テスト環境など、fs.watch()が不安定な場合に使用
+	 * @default false
+	 */
+	usePolling?: boolean;
 }
 
 /**
@@ -54,10 +61,13 @@ export class LogMonitor {
 	private abortController: AbortController | null = null;
 	private lastSize = 0;
 
+	private readonly usePolling: boolean;
+
 	constructor(config: LogMonitorConfig) {
 		this.taskId = config.taskId;
 		this.logPath = join(config.baseDir ?? ".agent", config.taskId, "output.log");
 		this.pollInterval = config.pollInterval ?? 500;
+		this.usePolling = config.usePolling ?? false;
 	}
 
 	/**
@@ -89,10 +99,16 @@ export class LogMonitor {
 		this.abortController = new AbortController();
 		const signal = this.abortController.signal;
 
+		// usePollingが有効な場合は直接pollingモードを使用
+		if (this.usePolling) {
+			await this.monitorWithPolling(callback, signal);
+			return;
+		}
+
 		// fs.watch() を試行
 		try {
 			await this.monitorWithWatch(callback, signal);
-		} catch (error) {
+		} catch (_error) {
 			// fs.watch() が使えない場合はpollingにフォールバック
 			if (!signal.aborted) {
 				logger.warn("fs.watch() が使えません。pollingモードで監視します。");
@@ -114,7 +130,10 @@ export class LogMonitor {
 	/**
 	 * fs.watch() を使用した監視
 	 */
-	private async monitorWithWatch(callback: (line: string) => void, signal: AbortSignal): Promise<void> {
+	private async monitorWithWatch(
+		callback: (line: string) => void,
+		signal: AbortSignal,
+	): Promise<void> {
 		return new Promise((resolve, reject) => {
 			let watcher: FSWatcher;
 
@@ -130,7 +149,7 @@ export class LogMonitor {
 						try {
 							await this.readNewLines(callback);
 						} catch (error) {
-							logger.debug("Failed to read new lines", { error });
+							logger.debug(`Failed to read new lines: ${error}`);
 						}
 					}
 				});
@@ -157,14 +176,34 @@ export class LogMonitor {
 	/**
 	 * polling を使用した監視
 	 */
-	private async monitorWithPolling(callback: (line: string) => void, signal: AbortSignal): Promise<void> {
+	private async monitorWithPolling(
+		callback: (line: string) => void,
+		signal: AbortSignal,
+	): Promise<void> {
+		// 即座にアボートをチェック
+		if (signal.aborted) {
+			return;
+		}
+
 		while (!signal.aborted) {
 			try {
 				await this.readNewLines(callback);
 			} catch (error) {
-				logger.debug("Failed to read new lines", { error });
+				logger.debug(`Failed to read new lines: ${error}`);
 			}
-			await new Promise((resolve) => setTimeout(resolve, this.pollInterval));
+
+			// アボートをチェックしながらスリープ
+			await new Promise<void>((resolve) => {
+				const timeoutId = setTimeout(() => resolve(), this.pollInterval);
+				signal.addEventListener(
+					"abort",
+					() => {
+						clearTimeout(timeoutId);
+						resolve();
+					},
+					{ once: true },
+				);
+			});
 		}
 	}
 

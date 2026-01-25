@@ -1,23 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdir, writeFile, appendFile, rm } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { appendFile, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { LogMonitor, type LogMonitorConfig } from "./log-monitor.js";
 import { LogMonitorError } from "./errors.js";
+import { LogMonitor } from "./log-monitor.js";
 
 describe("LogMonitor", () => {
-	const testDir = ".test-agent";
+	const testDir = ".test-agent-logmonitor";
 	const taskId = "test-task-123";
 	const logDir = join(testDir, taskId);
 	const logPath = join(logDir, "output.log");
 
 	beforeEach(async () => {
-		// テスト用ディレクトリとファイルを作成
 		await mkdir(logDir, { recursive: true });
 		await writeFile(logPath, "initial line\n");
 	});
 
 	afterEach(async () => {
-		// クリーンアップ
 		await rm(testDir, { recursive: true, force: true });
 	});
 
@@ -34,7 +32,11 @@ describe("LogMonitor", () => {
 
 		it("カスタムpollIntervalで初期化できる", () => {
 			const monitor = new LogMonitor({ taskId, pollInterval: 1000 });
-			// pollIntervalはprivateなので直接テストできないが、初期化は成功する
+			expect(monitor.getLogPath()).toBe(join(".agent", taskId, "output.log"));
+		});
+
+		it("usePollingオプションを指定できる", () => {
+			const monitor = new LogMonitor({ taskId, usePolling: true });
 			expect(monitor.getLogPath()).toBe(join(".agent", taskId, "output.log"));
 		});
 	});
@@ -44,48 +46,47 @@ describe("LogMonitor", () => {
 			const monitor = new LogMonitor({
 				taskId: "nonexistent",
 				baseDir: testDir,
+				usePolling: true,
 			});
 
 			await expect(monitor.monitor(() => {})).rejects.toThrow(LogMonitorError);
 		});
 
-		it("ファイル存在時に監視を開始できる", async () => {
+		it("ファイル存在時に監視を開始できる（pollingモード）", async () => {
 			const monitor = new LogMonitor({
 				taskId,
 				baseDir: testDir,
-				pollInterval: 100,
+				pollInterval: 30,
+				usePolling: true,
 			});
 			const lines: string[] = [];
 
-			// 非同期で監視開始
 			const monitorPromise = monitor.monitor((line) => {
 				lines.push(line);
 			});
 
-			// 少し待ってから新しい行を追加
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise((resolve) => setTimeout(resolve, 50));
 			await appendFile(logPath, "new line 1\n");
-			await new Promise((resolve) => setTimeout(resolve, 200)); // polling間隔待ち
+			await new Promise((resolve) => setTimeout(resolve, 100));
 
-			// 監視停止
 			monitor.stop();
 			await monitorPromise;
 
 			expect(lines).toContain("new line 1");
 		});
 
-		it("stop()で監視を停止できる", async () => {
+		it("stop()で監視を即座に停止できる", async () => {
 			const monitor = new LogMonitor({
 				taskId,
 				baseDir: testDir,
+				pollInterval: 30,
+				usePolling: true,
 			});
 
 			const monitorPromise = monitor.monitor(() => {});
-
-			// すぐに停止
+			await new Promise((resolve) => setTimeout(resolve, 10));
 			monitor.stop();
 
-			// エラーなく終了することを確認
 			await expect(monitorPromise).resolves.toBeUndefined();
 		});
 
@@ -93,7 +94,8 @@ describe("LogMonitor", () => {
 			const monitor = new LogMonitor({
 				taskId,
 				baseDir: testDir,
-				pollInterval: 50,
+				pollInterval: 30,
+				usePolling: true,
 			});
 			const lines: string[] = [];
 
@@ -101,9 +103,9 @@ describe("LogMonitor", () => {
 				lines.push(line);
 			});
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise((resolve) => setTimeout(resolve, 50));
 			await appendFile(logPath, "line 1\nline 2\nline 3\n");
-			await new Promise((resolve) => setTimeout(resolve, 150));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 
 			monitor.stop();
 			await monitorPromise;
@@ -117,7 +119,8 @@ describe("LogMonitor", () => {
 			const monitor = new LogMonitor({
 				taskId,
 				baseDir: testDir,
-				pollInterval: 50,
+				pollInterval: 30,
+				usePolling: true,
 			});
 			const lines: string[] = [];
 
@@ -125,14 +128,13 @@ describe("LogMonitor", () => {
 				lines.push(line);
 			});
 
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise((resolve) => setTimeout(resolve, 50));
 			await appendFile(logPath, "line 1\n\n\nline 2\n");
-			await new Promise((resolve) => setTimeout(resolve, 150));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 
 			monitor.stop();
 			await monitorPromise;
 
-			// 空行はフィルタされている
 			expect(lines.filter((l) => l === "")).toHaveLength(0);
 			expect(lines).toContain("line 1");
 			expect(lines).toContain("line 2");
@@ -149,7 +151,6 @@ describe("LogMonitor", () => {
 	describe("stop", () => {
 		it("stop()を複数回呼んでも安全", () => {
 			const monitor = new LogMonitor({ taskId, baseDir: testDir });
-			// エラーが発生しないことを確認
 			expect(() => {
 				monitor.stop();
 				monitor.stop();
