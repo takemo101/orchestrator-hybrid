@@ -21,10 +21,7 @@ export class ConfigValidationError extends Error {
 	 */
 	readonly configPath?: string;
 
-	constructor(
-		zodError: ZodError,
-		configPath?: string,
-	) {
+	constructor(zodError: ZodError, configPath?: string) {
 		const errors = zodError.errors.map((err) => ({
 			path: err.path.join("."),
 			message: err.message,
@@ -62,10 +59,7 @@ export class ConfigValidationError extends Error {
  * }
  * ```
  */
-export function validateConfig(
-	rawConfig: unknown,
-	configPath?: string,
-): Config {
+export function validateConfig(rawConfig: unknown, configPath?: string): Config {
 	try {
 		return ConfigSchema.parse(rawConfig);
 	} catch (error) {

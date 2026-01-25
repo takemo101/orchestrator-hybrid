@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import {
-	ConfigValidationError,
-	loadConfig,
-	validateConfig,
-} from "./config.js";
+import { ConfigValidationError, loadConfig, validateConfig } from "./config.js";
 
 describe("config", () => {
 	const testDir = ".test-config";
