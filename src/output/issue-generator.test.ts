@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from "bun:test";
 import { IssueGenerator } from "./issue-generator.js";
-import type { ImprovementSuggestion, IssueGeneratorConfig } from "../core/types.js";
+import type { ImprovementSuggestion, IssueGeneratorConfig } from "./issue-generator.js";
 import type { ProcessExecutor, ProcessResult, SpawnOptions } from "../core/process-executor.js";
 
 /**
