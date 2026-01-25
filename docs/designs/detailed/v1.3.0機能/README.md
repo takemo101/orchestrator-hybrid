@@ -113,8 +113,17 @@
 
 ## GitHub Issues
 
-- **Epic Issue**: 未作成
-- **子Issue**: 未作成
+- **Epic Issue**: [#48 [Epic] v1.3.0 Phase 3機能実装](https://github.com/takemo101/orchestrator-hybrid/issues/48)
+
+### 子Issue
+
+| Issue | タイトル | 依存 |
+|-------|---------|------|
+| [#49](https://github.com/takemo101/orchestrator-hybrid/issues/49) | 共通基盤: 型定義・エラークラス追加 | なし |
+| [#50](https://github.com/takemo101/orchestrator-hybrid/issues/50) | F-009: PR自動マージ機能実装 | #49 |
+| [#51](https://github.com/takemo101/orchestrator-hybrid/issues/51) | F-010: リアルタイムログ監視機能実装 | #49 |
+| [#52](https://github.com/takemo101/orchestrator-hybrid/issues/52) | F-011: Issue依存関係管理機能実装 | #49 |
+| [#53](https://github.com/takemo101/orchestrator-hybrid/issues/53) | F-012: Issueステータスラベル機能実装 | #49 |
 
 ---
 
