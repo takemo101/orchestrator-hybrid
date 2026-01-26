@@ -9,6 +9,7 @@ import { parse as parseYaml } from "yaml";
 import { findTaskLogPath, readLastNLines } from "./cli-logs.js";
 import { loadConfig } from "./core/config.js";
 import { EventBus } from "./core/event.js";
+import { EventEmitter } from "./core/event-emitter.js";
 import { LogStreamer } from "./core/log-streamer.js";
 import { logger, setVerbose } from "./core/logger.js";
 import { runLoop, runMultipleLoops } from "./core/loop.js";
