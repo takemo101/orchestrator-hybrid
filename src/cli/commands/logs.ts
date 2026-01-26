@@ -5,8 +5,8 @@
  */
 
 import { existsSync, watch } from "node:fs";
-import type { Command } from "commander";
 import chalk from "chalk";
+import type { Command } from "commander";
 import { findTaskLogPath, readLastNLines } from "../../cli-logs.js";
 import { logger } from "../../core/logger.js";
 import { LogStreamer } from "../../core/log-streamer.js";
