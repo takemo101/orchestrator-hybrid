@@ -4,19 +4,25 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+	BackendSelectionError,
 	CircularDependencyError,
 	ContainerUseError,
 	DockerNotFoundError,
 	DockerTimeoutError,
 	EnvironmentUnavailableError,
 	ExecutionTimeoutError,
+	GlobPatternError,
 	HostExecutionError,
 	ImagePullError,
 	IssueDependencyError,
 	LogMonitorError,
+	MemoryError,
 	PRAutoMergeError,
 	ProcessExecutionError,
 	SandboxError,
+	SessionRecordError,
+	TaskError,
+	WorktreeError,
 } from "./errors.js";
 
 describe("SandboxError", () => {
