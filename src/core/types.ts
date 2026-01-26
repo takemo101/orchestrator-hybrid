@@ -219,6 +219,30 @@ export const StateConfigSchema = z.object({
 });
 
 /**
+ * Memories設定のzodスキーマ（v1.4.0）
+ *
+ * セッション間で学習内容を永続化する機能（F-014）の設定を定義します。
+ */
+export const MemoriesConfigSchema = z.object({
+	/**
+	 * Memoriesを有効にするか
+	 * @default true
+	 */
+	enabled: z.boolean().default(true),
+
+	/**
+	 * プロンプトへの注入モード
+	 * - auto: 自動注入
+	 * - manual: エージェントが明示的に読み込む
+	 * - none: 注入しない
+	 * @default "auto"
+	 */
+	inject: z.enum(["auto", "manual", "none"]).default("auto"),
+});
+
+export type MemoriesConfig = z.infer<typeof MemoriesConfigSchema>;
+
+/**
  * 設定ファイル全体のzodスキーマ（拡張版）
  */
 export const ConfigSchema = z.object({
@@ -261,6 +285,9 @@ export const ConfigSchema = z.object({
 
 	// 新規: 依存関係設定（v1.3.0）
 	dependency: DependencyConfigSchema.optional(),
+
+	// 新規: Memories設定（v1.4.0）
+	memories: MemoriesConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
