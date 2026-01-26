@@ -9,15 +9,15 @@
 
 import { Command } from "commander";
 import {
-	runCommand,
-	statusCommand,
-	initCommand,
-	logsCommand,
-	eventsCommand,
-	emitCommand,
 	cancelCommand,
 	clearCommand,
+	emitCommand,
+	eventsCommand,
+	initCommand,
+	logsCommand,
 	replayCommand,
+	runCommand,
+	statusCommand,
 	toolsCommand,
 } from "./cli/commands/index.js";
 
