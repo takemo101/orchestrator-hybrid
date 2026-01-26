@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { LoopStateSchema, LoopSchema } from "./types.js";
 import {
 	type AutoIssueConfig,
 	AutoIssueConfigSchema,
