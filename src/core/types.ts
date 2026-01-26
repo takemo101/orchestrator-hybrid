@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+export const BackendConfigSchema = z.union([
+	z.string(),
+	z.object({
+		type: z.literal("kiro"),
+		agent: z.string(),
+	}),
+	z.object({
+		command: z.string(),
+		args: z.array(z.string()).optional(),
+		prompt_mode: z.enum(["arg", "stdin"]).optional(),
+		prompt_flag: z.string().optional(),
+	}),
+]);
+
+export type BackendConfig = z.infer<typeof BackendConfigSchema>;
+
 export const HatSchema = z.object({
 	name: z.string().optional(),
 	triggers: z.array(z.string()),
@@ -11,6 +27,10 @@ export const HatSchema = z.object({
 	 * @example "opus", "sonnet", "haiku", "claude-sonnet-4-5-20250929"
 	 */
 	model: z.string().optional(),
+	/**
+	 * Hat専用のバックエンド設定（v1.4.0追加）
+	 */
+	backend: BackendConfigSchema.optional(),
 });
 
 export const ContainerConfigSchema = z
