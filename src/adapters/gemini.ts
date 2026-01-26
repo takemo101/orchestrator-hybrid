@@ -1,5 +1,7 @@
-import { BunProcessExecutor, type ProcessExecutor } from "../core/bun-process-executor.js";
-import type { Backend, BackendResult } from "./base.js";
+import { BunProcessExecutor } from "../core/bun-process-executor.js";
+import type { ProcessExecutor } from "../core/process-executor.js";
+import type { BackendResult } from "../core/types.js";
+import type { Backend } from "./base.js";
 
 export class GeminiAdapter implements Backend {
 	readonly name = "gemini";

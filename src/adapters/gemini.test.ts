@@ -1,26 +1,41 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import type { ProcessExecutor } from "../core/process-executor.js";
 import { GeminiAdapter } from "./gemini.js";
 
 describe("GeminiAdapter", () => {
-	let executor: ProcessExecutor;
-	let adapter: GeminiAdapter;
-
-	beforeEach(() => {
-		executor = {
-			spawn: mock().mockResolvedValue({ stdout: "response", stderr: "", exitCode: 0 }),
-		} as any;
-		adapter = new GeminiAdapter(executor);
-	});
-
 	it("geminiコマンドを実行", async () => {
+		let calledCmd: string | null = null;
+		let calledArgs: string[] | null = null;
+		const executor: ProcessExecutor = {
+			spawn: async (cmd: string, args: string[]) => {
+				calledCmd = cmd;
+				calledArgs = args;
+				return { stdout: "response", stderr: "", exitCode: 0 };
+			},
+		};
+		const adapter = new GeminiAdapter(executor);
+
 		const response = await adapter.execute("prompt");
-		expect(executor.spawn).toHaveBeenCalledWith("gemini", ["prompt"]);
+
+		expect(calledCmd).toBe("gemini");
+		expect(calledArgs).toEqual(["prompt"]);
 		expect(response.output).toBe("response");
 	});
 
 	it("エラー時は例外をスロー", async () => {
-		executor.spawn = mock().mockResolvedValue({ stdout: "", stderr: "error", exitCode: 1 });
-		expect(adapter.execute("prompt")).rejects.toThrow();
+		const executor: ProcessExecutor = {
+			spawn: async () => ({ stdout: "", stderr: "error", exitCode: 1 }),
+		};
+		const adapter = new GeminiAdapter(executor);
+
+		let error: Error | null = null;
+		try {
+			await adapter.execute("prompt");
+		} catch (e) {
+			error = e as Error;
+		}
+
+		expect(error).not.toBeNull();
+		expect(error?.message).toContain("Gemini実行失敗");
 	});
 });

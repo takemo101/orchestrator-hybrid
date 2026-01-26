@@ -1,11 +1,30 @@
 import type { Backend } from "../adapters/base.js";
 import { ClaudeBackend } from "../adapters/claude.js";
 import { GeminiAdapter } from "../adapters/gemini.js";
-import { KiroAdapter } from "../adapters/kiro.js";
+import { KiroAdapter, type KiroAdapterConfig } from "../adapters/kiro.js";
 import type { BackendConfig, Config } from "./types.js";
 
+export interface BackendFactories {
+	createGemini: () => Backend;
+	createClaude: () => Backend;
+	createKiro: (config: KiroAdapterConfig) => Backend;
+}
+
+const defaultFactories: BackendFactories = {
+	createGemini: () => new GeminiAdapter(),
+	createClaude: () => new ClaudeBackend(),
+	createKiro: (config: KiroAdapterConfig) => new KiroAdapter(config),
+};
+
 export class BackendSelector {
-	constructor(private config: Config) {}
+	private readonly factories: BackendFactories;
+
+	constructor(
+		private config: Config,
+		factories: BackendFactories = defaultFactories,
+	) {
+		this.factories = factories;
+	}
 
 	selectBackend(hatName: string): Backend {
 		const hat = this.config.hats?.[hatName];
@@ -25,21 +44,21 @@ export class BackendSelector {
 		if (typeof config === "string") {
 			switch (config) {
 				case "gemini":
-					return new GeminiAdapter();
+					return this.factories.createGemini();
 				case "claude":
-					return new ClaudeBackend();
+					return this.factories.createClaude();
 				case "kiro":
 					throw new Error("Kiro backend requires agent configuration");
 				default:
 					// 不明な場合はClaudeへフォールバック
-					return new ClaudeBackend();
+					return this.factories.createClaude();
 			}
 		}
 
 		// objectの場合
 		if (typeof config === "object") {
 			if ("type" in config && config.type === "kiro") {
-				return new KiroAdapter({ agent: config.agent });
+				return this.factories.createKiro({ agent: config.agent });
 			}
 			if ("command" in config) {
 				throw new Error("Custom backend not implemented yet");
@@ -47,6 +66,6 @@ export class BackendSelector {
 		}
 
 		// フォールバック
-		return new ClaudeBackend();
+		return this.factories.createClaude();
 	}
 }

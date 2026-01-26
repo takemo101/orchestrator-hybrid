@@ -1,30 +1,22 @@
-import { describe, expect, it, mock } from "bun:test";
-import { BackendSelector } from "./backend-selector.js";
+import { describe, expect, it } from "bun:test";
+import type { Backend } from "../adapters/base.js";
+import { type BackendFactories, BackendSelector } from "./backend-selector.js";
 import type { Config } from "./types.js";
 
-// モック定義
-mock.module("../adapters/gemini.js", () => ({
-	GeminiAdapter: class MockGemini {
-		name = "gemini";
-		execute = mock();
-	},
-}));
+const createMockBackend = (name: string): Backend => ({
+	name,
+	execute: async () => ({ output: "", exitCode: 0 }),
+});
 
-mock.module("../adapters/kiro.js", () => ({
-	KiroAdapter: class MockKiro {
-		name = "kiro";
-		execute = mock();
-		constructor(public config: any) {}
+const mockFactories: BackendFactories = {
+	createGemini: () => createMockBackend("gemini"),
+	createClaude: () => createMockBackend("claude"),
+	createKiro: (config) => {
+		const backend = createMockBackend("kiro") as Backend & { config: typeof config };
+		backend.config = config;
+		return backend;
 	},
-}));
-
-mock.module("../adapters/claude.js", () => ({
-	ClaudeAdapter: class MockClaude {
-		name = "claude";
-		execute = mock();
-		constructor(public config: any) {}
-	},
-}));
+};
 
 describe("BackendSelector", () => {
 	const baseConfig: Config = {
@@ -35,7 +27,7 @@ describe("BackendSelector", () => {
 	} as any;
 
 	it("selectBackend: Hat未定義時はグローバルバックエンドを使用", () => {
-		const selector = new BackendSelector(baseConfig);
+		const selector = new BackendSelector(baseConfig, mockFactories);
 		const backend = selector.selectBackend("unknown-hat");
 		expect(backend.name).toBe("claude");
 	});
@@ -51,7 +43,7 @@ describe("BackendSelector", () => {
 				},
 			},
 		} as any;
-		const selector = new BackendSelector(config);
+		const selector = new BackendSelector(config, mockFactories);
 		const backend = selector.selectBackend("test-hat");
 		expect(backend.name).toBe("gemini");
 	});
@@ -67,7 +59,7 @@ describe("BackendSelector", () => {
 				},
 			},
 		} as any;
-		const selector = new BackendSelector(config);
+		const selector = new BackendSelector(config, mockFactories);
 		const backend = selector.selectBackend("kiro-hat");
 		expect(backend.name).toBe("kiro");
 		expect((backend as any).config.agent).toBe("test-agent");
