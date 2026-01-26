@@ -12,8 +12,8 @@ import { TaskManager } from "../../core/task-manager.js";
 import type { PRConfig } from "../../core/types.js";
 import { fetchIssue } from "../../input/github.js";
 import { loadPreset } from "../utils/preset-loader.js";
-import type { CommandHandler, RunCommandOptions } from "./types.js";
 import { printTaskSummary } from "./status.js";
+import type { CommandHandler, RunCommandOptions } from "./types.js";
 
 /**
  * runコマンドハンドラー
