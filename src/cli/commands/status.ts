@@ -4,8 +4,8 @@
  * v2.0.0 F-102: CLIリファクタリング
  */
 
-import type { Command } from "commander";
 import chalk from "chalk";
+import type { Command } from "commander";
 import { loadConfig } from "../../core/config.js";
 import { logger } from "../../core/logger.js";
 import { readScratchpad } from "../../core/scratchpad.js";
