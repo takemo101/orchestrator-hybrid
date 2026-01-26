@@ -1,7 +1,7 @@
-import { describe, expect, test, spyOn, beforeEach, afterEach } from "bun:test";
-import { ModelSelector, MODEL_ALIASES } from "./model-selector.js";
-import type { Config } from "./types.js";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { logger } from "./logger.js";
+import { MODEL_ALIASES, ModelSelector } from "./model-selector.js";
+import type { Config } from "./types.js";
 
 describe("ModelSelector", () => {
 	const baseConfig: Config = {
