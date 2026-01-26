@@ -485,6 +485,61 @@ describe("types.ts 拡張", () => {
 		});
 	});
 
+	describe("LoopStateSchema (v1.4.0)", () => {
+		it("有効なLoopStateを受け入れる", () => {
+			expect(LoopStateSchema.parse("running")).toBe("running");
+			expect(LoopStateSchema.parse("queued")).toBe("queued");
+			expect(LoopStateSchema.parse("merging")).toBe("merging");
+			expect(LoopStateSchema.parse("merged")).toBe("merged");
+			expect(LoopStateSchema.parse("needs-review")).toBe("needs-review");
+			expect(LoopStateSchema.parse("crashed")).toBe("crashed");
+			expect(LoopStateSchema.parse("orphan")).toBe("orphan");
+			expect(LoopStateSchema.parse("discarded")).toBe("discarded");
+		});
+
+		it("無効なLoopStateを拒否する", () => {
+			expect(() => LoopStateSchema.parse("invalid")).toThrow();
+		});
+	});
+
+	describe("LoopSchema (v1.4.0)", () => {
+		it("有効なLoopオブジェクトを受け入れる", () => {
+			const loop = {
+				id: "orch-20260126-a3f2",
+				state: "running",
+				worktree_path: "/tmp/worktree",
+				created_at: new Date().toISOString(),
+				updated_at: new Date().toISOString(),
+			};
+			const result = LoopSchema.parse(loop);
+			expect(result.id).toBe(loop.id);
+			expect(result.state).toBe(loop.state);
+		});
+
+		it("worktree_pathはnullを許容する", () => {
+			const loop = {
+				id: "orch-20260126-a3f2",
+				state: "queued",
+				worktree_path: null,
+				created_at: new Date().toISOString(),
+				updated_at: new Date().toISOString(),
+			};
+			const result = LoopSchema.parse(loop);
+			expect(result.worktree_path).toBeNull();
+		});
+
+		it("必須フィールドが欠けている場合は拒否する", () => {
+			const loop = {
+				id: "orch-20260126-a3f2",
+				state: "running",
+				// worktree_path missing
+				created_at: new Date().toISOString(),
+				updated_at: new Date().toISOString(),
+			};
+			expect(() => LoopSchema.parse(loop)).toThrow();
+		});
+	});
+
 	describe("ConfigSchema 拡張（v1.3.0）", () => {
 		it("pr設定が指定できる", () => {
 			const result = ConfigSchema.parse({
