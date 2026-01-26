@@ -11,7 +11,7 @@ export class BackendSelector {
 		const hat = this.config.hats?.[hatName];
 
 		// 1. Hat固有の設定を確認
-		if (hat && hat.backend) {
+		if (hat?.backend) {
 			return this.createBackend(hat.backend);
 		}
 
