@@ -7,9 +7,7 @@ describe("CustomBackend", () => {
 	let mockSpawn: ReturnType<typeof mock>;
 
 	beforeEach(() => {
-		mockSpawn = mock(() =>
-			Promise.resolve({ stdout: "result output", stderr: "", exitCode: 0 }),
-		);
+		mockSpawn = mock(() => Promise.resolve({ stdout: "result output", stderr: "", exitCode: 0 }));
 		mockExecutor = {
 			spawn: mockSpawn,
 		};
@@ -46,11 +44,7 @@ describe("CustomBackend", () => {
 
 			await backend.execute("test prompt");
 
-			expect(mockSpawn).toHaveBeenCalledWith(
-				"my-agent",
-				["test prompt"],
-				expect.any(Object),
-			);
+			expect(mockSpawn).toHaveBeenCalledWith("my-agent", ["test prompt"], expect.any(Object));
 		});
 
 		it("should pass prompt with flag when promptFlag specified", async () => {
@@ -133,11 +127,7 @@ describe("CustomBackend", () => {
 
 			await backend.execute("test prompt");
 
-			expect(mockSpawn).toHaveBeenCalledWith(
-				"my-agent",
-				["test prompt"],
-				expect.any(Object),
-			);
+			expect(mockSpawn).toHaveBeenCalledWith("my-agent", ["test prompt"], expect.any(Object));
 		});
 
 		it("should default to empty args when args not specified", async () => {
@@ -149,11 +139,7 @@ describe("CustomBackend", () => {
 
 			await backend.execute("test prompt");
 
-			expect(mockSpawn).toHaveBeenCalledWith(
-				"my-agent",
-				["-p", "test prompt"],
-				expect.any(Object),
-			);
+			expect(mockSpawn).toHaveBeenCalledWith("my-agent", ["-p", "test prompt"], expect.any(Object));
 		});
 	});
 
@@ -206,9 +192,7 @@ describe("CustomBackend", () => {
 		});
 
 		it("should handle empty output", async () => {
-			mockSpawn.mockImplementation(() =>
-				Promise.resolve({ stdout: "", stderr: "", exitCode: 0 }),
-			);
+			mockSpawn.mockImplementation(() => Promise.resolve({ stdout: "", stderr: "", exitCode: 0 }));
 			const config: CustomBackendConfig = {
 				command: "my-agent",
 			};
