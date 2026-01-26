@@ -1,6 +1,8 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { GlobMatcher } from "./glob-matcher.js";
 import { logger } from "./logger.js";
+import type { Hat } from "./types.js";
 
 export interface OrchEvent {
 	type: string;
@@ -110,3 +112,24 @@ export class EventBus {
 }
 
 export const globalEventBus = new EventBus();
+
+/**
+ * イベントトピックにマッチするHatを検索
+ *
+ * GlobMatcherを使用して、優先度ルールに従ってマッチングを行います:
+ * 1. 具体的パターン（完全一致）が最優先
+ * 2. ワイルドカードパターン（`build.*`, `*.done`）が次
+ * 3. グローバルワイルドカード（`*`）がフォールバック
+ *
+ * @param eventType - イベントトピック
+ * @param hats - Hat定義
+ * @returns マッチしたHat名の配列
+ * @throws GlobPatternError - 複数の具体的パターンがマッチした場合（曖昧なルーティング）
+ */
+export function findMatchingHatsForEvent(
+	eventType: string,
+	hats: Record<string, Hat>,
+): string[] {
+	const matcher = new GlobMatcher(hats);
+	return matcher.match(eventType);
+}
