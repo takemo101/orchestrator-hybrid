@@ -1,7 +1,8 @@
 import { join, resolve } from "path";
 import { existsSync } from "fs";
 import { mkdir, symlink } from "fs/promises";
-import { type ProcessExecutor, BunProcessExecutor } from "./process-executor.js";
+import { type ProcessExecutor } from "./process-executor.js";
+import { BunProcessExecutor } from "./bun-process-executor.js";
 import { type Worktree } from "./types.js";
 
 export class WorktreeManager {
