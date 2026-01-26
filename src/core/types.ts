@@ -1,5 +1,327 @@
 import { z } from "zod";
 
+// ================================
+// v1.4.0 新規型定義
+// ================================
+
+/**
+ * Per-Hat Model Selectionのモデル指定 (v1.4.0)
+ *
+ * Claude Code CLIのエイリアス（opus/sonnet/haiku）または
+ * フルモデル名をサポートします。
+ */
+export const ModelAliasSchema = z.union([
+	z.enum(["opus", "sonnet", "haiku"]),
+	z.string().regex(/^claude-[a-z0-9-]+$/),
+]);
+
+export type ModelAlias = z.infer<typeof ModelAliasSchema>;
+
+/**
+ * Per-Hat Backend Configurationのバックエンド指定 (v1.4.0)
+ *
+ * - 文字列: 標準バックエンド名（claude/opencode/gemini）
+ * - オブジェクト: Kiro agentまたはカスタムバックエンド
+ */
+export const HatBackendSchema = z.union([
+	z.enum(["claude", "opencode", "gemini"]),
+	z.object({
+		type: z.literal("kiro"),
+		agent: z.string().min(1),
+	}),
+	z.object({
+		command: z.string().min(1),
+		args: z.array(z.string()).optional(),
+		prompt_mode: z.enum(["arg", "stdin"]).default("arg"),
+		prompt_flag: z.string().optional(),
+	}),
+]);
+
+export type HatBackend = z.infer<typeof HatBackendSchema>;
+
+/**
+ * 単一Memoryエントリ (v1.4.0)
+ */
+export interface MemoryEntry {
+	/**
+	 * 一意のID（自動生成）
+	 * @example "mem-001"
+	 */
+	id: string;
+
+	/**
+	 * Memory種別
+	 * - pattern: 発見したパターン
+	 * - architecture: アーキテクチャ決定
+	 * - solution: 問題の解決策
+	 * - lesson: 学んだ教訓
+	 */
+	type: "pattern" | "architecture" | "solution" | "lesson";
+
+	/**
+	 * Memory内容
+	 */
+	content: string;
+
+	/**
+	 * タグ（検索用）
+	 * @example ["error-handling", "async"]
+	 */
+	tags: string[];
+
+	/**
+	 * 作成日時
+	 */
+	createdAt: string;
+}
+
+/**
+ * Task状態 (v1.4.0)
+ */
+export const TaskStatusSchema = z.enum(["open", "in-progress", "closed"]);
+
+export type TaskStatus = z.infer<typeof TaskStatusSchema>;
+
+/**
+ * 単一Taskエントリ (v1.4.0)
+ */
+export interface TaskEntry {
+	/**
+	 * 一意のID（自動生成）
+	 * @example "task-001"
+	 */
+	id: string;
+
+	/**
+	 * タスクタイトル
+	 * @example "Add authentication"
+	 */
+	title: string;
+
+	/**
+	 * 優先度（1が最高、5が最低）
+	 * @default 3
+	 */
+	priority: 1 | 2 | 3 | 4 | 5;
+
+	/**
+	 * タスク状態
+	 */
+	status: TaskStatus;
+
+	/**
+	 * 依存タスクIDリスト
+	 * @example ["task-001", "task-002"]
+	 */
+	blocked_by: string[];
+
+	/**
+	 * 作成日時
+	 */
+	createdAt: string;
+
+	/**
+	 * 完了日時（closed時のみ）
+	 */
+	closedAt?: string;
+}
+
+/**
+ * セッション記録エントリ (v1.4.0)
+ */
+export interface SessionRecordEntry {
+	/**
+	 * イテレーション番号
+	 */
+	iteration: number;
+
+	/**
+	 * 実行したHat名
+	 * @example "planner"
+	 */
+	hat: string;
+
+	/**
+	 * 入力プロンプト
+	 */
+	prompt: string;
+
+	/**
+	 * AIエージェントの出力
+	 */
+	output: string;
+
+	/**
+	 * 発行されたイベント
+	 * @example ["plan.ready"]
+	 */
+	events: string[];
+
+	/**
+	 * 使用したモデル
+	 * @example "opus"
+	 */
+	model?: string;
+
+	/**
+	 * 使用したバックエンド
+	 * @example "claude"
+	 */
+	backend?: string;
+
+	/**
+	 * 実行時間（ミリ秒）
+	 */
+	durationMs: number;
+
+	/**
+	 * 記録日時
+	 */
+	timestamp: string;
+}
+
+/**
+ * ループレジストリエントリ (v1.4.0)
+ */
+export interface LoopEntry {
+	/**
+	 * ループID（自動生成）
+	 * @example "orch-20260126-a3f2"
+	 */
+	id: string;
+
+	/**
+	 * Issue番号
+	 */
+	issueNumber: number;
+
+	/**
+	 * worktreeパス（セカンダリループのみ）
+	 * @example ".worktrees/orch-20260126-a3f2"
+	 */
+	worktreePath?: string;
+
+	/**
+	 * ブランチ名
+	 * @example "feature/issue-42"
+	 */
+	branch: string;
+
+	/**
+	 * ループ状態
+	 */
+	state: LoopState;
+
+	/**
+	 * プライマリループかどうか
+	 */
+	isPrimary: boolean;
+
+	/**
+	 * 開始日時
+	 */
+	startedAt: string;
+
+	/**
+	 * 完了日時
+	 */
+	completedAt?: string;
+
+	/**
+	 * PID（プロセスID）
+	 */
+	pid?: number;
+}
+
+/**
+ * カスタムバックエンド設定のzodスキーマ (v1.4.0)
+ */
+export const CustomBackendConfigSchema = z.object({
+	/**
+	 * バックエンドタイプ
+	 */
+	type: z.literal("custom"),
+
+	/**
+	 * 実行するCLIコマンド
+	 * @example "my-agent"
+	 */
+	command: z.string().min(1),
+
+	/**
+	 * プロンプト前に挿入される引数
+	 * @example ["--headless", "--auto-approve"]
+	 */
+	args: z.array(z.string()).default([]),
+
+	/**
+	 * プロンプトの渡し方
+	 * - arg: コマンドライン引数として渡す
+	 * - stdin: 標準入力として渡す
+	 * @default "arg"
+	 */
+	prompt_mode: z.enum(["arg", "stdin"]).default("arg"),
+
+	/**
+	 * プロンプト前のフラグ
+	 * @example "-p", "--prompt"
+	 */
+	prompt_flag: z.string().optional(),
+});
+
+export type CustomBackendConfig = z.infer<typeof CustomBackendConfigSchema>;
+
+/**
+ * イベント発行リクエスト (v1.4.0)
+ */
+export interface EventEmission {
+	/**
+	 * イベントトピック
+	 * @example "build.done"
+	 */
+	topic: string;
+
+	/**
+	 * メッセージまたはJSONペイロード
+	 */
+	message: string | Record<string, unknown>;
+
+	/**
+	 * ターゲットHat（明示的なハンドオフ）
+	 * @example "reviewer"
+	 */
+	target?: string;
+
+	/**
+	 * 発行日時
+	 */
+	timestamp: string;
+}
+
+/**
+ * Globパターンマッチ結果 (v1.4.0)
+ */
+export interface GlobMatchResult {
+	/**
+	 * マッチしたHat名
+	 */
+	hatName: string;
+
+	/**
+	 * マッチしたパターン
+	 */
+	matchedPattern: string;
+
+	/**
+	 * パターンの具体性スコア（高いほど具体的）
+	 */
+	specificityScore: number;
+}
+
+// ================================
+// 既存型定義
+// ================================
+
 export const BackendConfigSchema = z.union([
 	z.string(),
 	z.object({
