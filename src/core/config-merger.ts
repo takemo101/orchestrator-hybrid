@@ -61,12 +61,9 @@ export class ConfigMerger {
 		// 2. 設定ファイル
 		// 3. デフォルト値
 		return {
-			auto_mode:
-				cliOptions.auto_mode ?? fileConfig?.auto_mode ?? DEFAULT_RUN_CONFIG.auto_mode,
-			create_pr:
-				cliOptions.create_pr ?? fileConfig?.create_pr ?? DEFAULT_RUN_CONFIG.create_pr,
-			draft_pr:
-				cliOptions.draft_pr ?? fileConfig?.draft_pr ?? DEFAULT_RUN_CONFIG.draft_pr,
+			auto_mode: cliOptions.auto_mode ?? fileConfig?.auto_mode ?? DEFAULT_RUN_CONFIG.auto_mode,
+			create_pr: cliOptions.create_pr ?? fileConfig?.create_pr ?? DEFAULT_RUN_CONFIG.create_pr,
+			draft_pr: cliOptions.draft_pr ?? fileConfig?.draft_pr ?? DEFAULT_RUN_CONFIG.draft_pr,
 		};
 	}
 
