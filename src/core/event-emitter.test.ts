@@ -43,11 +43,9 @@ describe("EventEmitter", () => {
 		it("should parse JSON payload when json option is true", async () => {
 			const emitter = new EventEmitter(mockEventBus);
 
-			const event = await emitter.emit(
-				"review.done",
-				'{"status": "approved", "score": 9}',
-				{ json: true },
-			);
+			const event = await emitter.emit("review.done", '{"status": "approved", "score": 9}', {
+				json: true,
+			});
 
 			expect(event.type).toBe("review.done");
 			expect(event.data?.message).toEqual({ status: "approved", score: 9 });
@@ -67,11 +65,10 @@ describe("EventEmitter", () => {
 		it("should combine json and target options", async () => {
 			const emitter = new EventEmitter(mockEventBus);
 
-			const event = await emitter.emit(
-				"handoff",
-				'{"task": "review", "priority": "high"}',
-				{ json: true, target: "reviewer" },
-			);
+			const event = await emitter.emit("handoff", '{"task": "review", "priority": "high"}', {
+				json: true,
+				target: "reviewer",
+			});
 
 			expect(event.type).toBe("handoff");
 			expect(event.data?.message).toEqual({ task: "review", priority: "high" });
@@ -115,17 +112,17 @@ describe("EventEmitter", () => {
 		it("should throw error when JSON parsing fails", async () => {
 			const emitter = new EventEmitter(mockEventBus);
 
-			await expect(
-				emitter.emit("topic", "invalid json", { json: true }),
-			).rejects.toThrow("JSONペイロードの解析に失敗");
+			await expect(emitter.emit("topic", "invalid json", { json: true })).rejects.toThrow(
+				"JSONペイロードの解析に失敗",
+			);
 		});
 
 		it("should throw error when JSON is incomplete", async () => {
 			const emitter = new EventEmitter(mockEventBus);
 
-			await expect(
-				emitter.emit("topic", '{"status": ', { json: true }),
-			).rejects.toThrow("JSONペイロードの解析に失敗");
+			await expect(emitter.emit("topic", '{"status": ', { json: true })).rejects.toThrow(
+				"JSONペイロードの解析に失敗",
+			);
 		});
 	});
 
