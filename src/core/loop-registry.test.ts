@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdir, rm } from "fs/promises";
-import { join } from "path";
+import { mkdir, rm } from "node:fs/promises";
 import { LoopRegistry } from "./loop-registry";
 import type { Loop } from "./types";
 

@@ -1,6 +1,6 @@
-import { existsSync } from "fs";
-import { mkdir, readFile, writeFile } from "fs/promises";
-import { join } from "path";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { z } from "zod";
 import { type Loop, LoopSchema, type LoopState } from "./types.js";
 
@@ -26,7 +26,7 @@ export class LoopRegistry {
 			const json = JSON.parse(content);
 			const result = LoopsFileSchema.parse(json);
 			return result.loops;
-		} catch (error) {
+		} catch (_error) {
 			return [];
 		}
 	}

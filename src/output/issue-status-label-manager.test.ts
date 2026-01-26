@@ -77,7 +77,7 @@ describe("IssueStatusLabelManager", () => {
 
 	describe("initializeLabels", () => {
 		it("各ラベルを作成する", async () => {
-			spawnMock.mockImplementation((cmd: string, args: string[]) => {
+			spawnMock.mockImplementation((_cmd: string, args: string[]) => {
 				if (args.includes("list")) {
 					return Promise.resolve({ stdout: "[]", stderr: "", exitCode: 0 });
 				}
@@ -106,7 +106,7 @@ describe("IssueStatusLabelManager", () => {
 		});
 
 		it("既存のラベルがある場合は作成をスキップする", async () => {
-			spawnMock.mockImplementation((cmd: string, args: string[]) => {
+			spawnMock.mockImplementation((_cmd: string, args: string[]) => {
 				if (args.includes("list")) {
 					return Promise.resolve({
 						stdout: JSON.stringify([{ name: "orch:running" }]),

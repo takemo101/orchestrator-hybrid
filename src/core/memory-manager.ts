@@ -111,7 +111,7 @@ export class MemoryManager {
 		for (const line of lines) {
 			// ## で始まる行が見出し（タイトル）
 			if (line.startsWith("## ")) {
-				if (currentMemory && currentMemory.title) {
+				if (currentMemory?.title) {
 					memories.push(this.finalizeMemory(currentMemory, id++));
 				}
 				currentMemory = {
@@ -143,7 +143,7 @@ export class MemoryManager {
 		}
 
 		// 最後のメモリを追加
-		if (currentMemory && currentMemory.title) {
+		if (currentMemory?.title) {
 			memories.push(this.finalizeMemory(currentMemory, id));
 		}
 

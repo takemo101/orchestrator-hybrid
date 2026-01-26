@@ -6,115 +6,107 @@ import type { ProcessExecutor } from "./process-executor.js";
 import type { Worktree } from "./types.js";
 
 export class WorktreeManager {
-  private baseDir: string;
-  private worktreesDir: string;
-  private executor: ProcessExecutor;
+	private baseDir: string;
+	private worktreesDir: string;
+	private executor: ProcessExecutor;
 
-  constructor(baseDir: string = process.cwd(), executor?: ProcessExecutor) {
-    this.baseDir = resolve(baseDir);
-    this.worktreesDir = join(this.baseDir, ".worktrees");
-    this.executor = executor || new BunProcessExecutor();
-  }
+	constructor(baseDir: string = process.cwd(), executor?: ProcessExecutor) {
+		this.baseDir = resolve(baseDir);
+		this.worktreesDir = join(this.baseDir, ".worktrees");
+		this.executor = executor || new BunProcessExecutor();
+	}
 
-  async listWorktrees(): Promise<Worktree[]> {
-    try {
-      const { stdout } = await this.executor.exec(["git", "worktree", "list", "--porcelain"]);
-      return this.parseWorktreeOutput(stdout);
-    } catch (_error) {
-      return [];
-    }
-  }
+	async listWorktrees(): Promise<Worktree[]> {
+		try {
+			const { stdout } = await this.executor.spawn("git", ["worktree", "list", "--porcelain"]);
+			return this.parseWorktreeOutput(stdout);
+		} catch (_error) {
+			return [];
+		}
+	}
 
-  private parseWorktreeOutput(output: string): Worktree[] {
-      const lines = output.split("\n");
-      const worktrees: Worktree[] = [];
-      
-      let currentWorktree: Partial<Worktree> = {};
-      
-      for (const line of lines) {
-        if (line.startsWith("worktree ")) {
-          this.addWorktreeIfValid(worktrees, currentWorktree);
-          currentWorktree = { path: line.substring(9).trim() };
-        } else if (line.startsWith("branch ")) {
-            currentWorktree.branch = line.substring(7).trim().replace("refs/heads/", "");
-        } else if (line === "") {
-             this.addWorktreeIfValid(worktrees, currentWorktree);
-             currentWorktree = {};
-        }
-      }
-      this.addWorktreeIfValid(worktrees, currentWorktree);
-      
-      return worktrees;
-  }
+	private parseWorktreeOutput(output: string): Worktree[] {
+		const lines = output.split("\n");
+		const worktrees: Worktree[] = [];
 
-  private addWorktreeIfValid(worktrees: Worktree[], current: Partial<Worktree>) {
-      if (current.path && current.branch) {
-          const path = current.path;
-          const loopId = path.split("/").pop() || "";
-          if (loopId && path.includes(".worktrees")) {
-              worktrees.push({
-                  loopId,
-                  path,
-                  branch: current.branch
-              } as Worktree);
-          }
-      }
-  }
+		let currentWorktree: Partial<Worktree> = {};
 
-  async createWorktree(loopId: string): Promise<string> {
-    const worktreePath = join(this.worktreesDir, loopId);
-    const branchName = `loop/${loopId}`;
+		for (const line of lines) {
+			if (line.startsWith("worktree ")) {
+				this.addWorktreeIfValid(worktrees, currentWorktree);
+				currentWorktree = { path: line.substring(9).trim() };
+			} else if (line.startsWith("branch ")) {
+				currentWorktree.branch = line.substring(7).trim().replace("refs/heads/", "");
+			} else if (line === "") {
+				this.addWorktreeIfValid(worktrees, currentWorktree);
+				currentWorktree = {};
+			}
+		}
+		this.addWorktreeIfValid(worktrees, currentWorktree);
 
-    if (!existsSync(this.worktreesDir)) {
-      await mkdir(this.worktreesDir, { recursive: true });
-    }
+		return worktrees;
+	}
 
-    await this.executor.exec([
-      "git",
-      "worktree",
-      "add",
-      "-b",
-      branchName,
-      worktreePath,
-      "main"
-    ]);
+	private addWorktreeIfValid(worktrees: Worktree[], current: Partial<Worktree>) {
+		if (current.path && current.branch) {
+			const path = current.path;
+			const loopId = path.split("/").pop() || "";
+			if (loopId && path.includes(".worktrees")) {
+				worktrees.push({
+					loopId,
+					path,
+					branch: current.branch,
+				} as Worktree);
+			}
+		}
+	}
 
-    const agentDir = join(worktreePath, ".agent");
-    if (!existsSync(agentDir)) {
-      await mkdir(agentDir, { recursive: true });
-    }
+	async createWorktree(loopId: string): Promise<string> {
+		const worktreePath = join(this.worktreesDir, loopId);
+		const branchName = `loop/${loopId}`;
 
-    const primaryMemoriesPath = join(this.baseDir, ".agent", "memories.md");
-    const targetMemoriesPath = join(agentDir, "memories.md");
+		if (!existsSync(this.worktreesDir)) {
+			await mkdir(this.worktreesDir, { recursive: true });
+		}
 
-    try {
-        if (existsSync(primaryMemoriesPath)) {
-             if (!existsSync(targetMemoriesPath)) {
-                 await symlink(primaryMemoriesPath, targetMemoriesPath);
-             }
-        }
-    } catch(_e) {
-        // ignore
-    }
+		await this.executor.spawn("git", ["worktree", "add", "-b", branchName, worktreePath, "main"]);
 
-    return worktreePath;
-  }
+		const agentDir = join(worktreePath, ".agent");
+		if (!existsSync(agentDir)) {
+			await mkdir(agentDir, { recursive: true });
+		}
 
-  async removeWorktree(loopId: string): Promise<void> {
-    const worktreePath = join(this.worktreesDir, loopId);
-    await this.executor.exec(["git", "worktree", "remove", "--force", worktreePath]);
-    
-    const branchName = `loop/${loopId}`;
-    await this.executor.exec(["git", "branch", "-D", branchName]);
-  }
+		const primaryMemoriesPath = join(this.baseDir, ".agent", "memories.md");
+		const targetMemoriesPath = join(agentDir, "memories.md");
 
-  async mergeWorktree(loopId: string): Promise<boolean> {
-     const branchName = `loop/${loopId}`;
-     try {
-         await this.executor.exec(["git", "merge", "--no-ff", branchName]);
-         return true;
-     } catch (_e) {
-         return false;
-     }
-  }
+		try {
+			if (existsSync(primaryMemoriesPath)) {
+				if (!existsSync(targetMemoriesPath)) {
+					await symlink(primaryMemoriesPath, targetMemoriesPath);
+				}
+			}
+		} catch (_e) {
+			// ignore
+		}
+
+		return worktreePath;
+	}
+
+	async removeWorktree(loopId: string): Promise<void> {
+		const worktreePath = join(this.worktreesDir, loopId);
+		await this.executor.spawn("git", ["worktree", "remove", "--force", worktreePath]);
+
+		const branchName = `loop/${loopId}`;
+		await this.executor.spawn("git", ["branch", "-D", branchName]);
+	}
+
+	async mergeWorktree(loopId: string): Promise<boolean> {
+		const branchName = `loop/${loopId}`;
+		try {
+			await this.executor.spawn("git", ["merge", "--no-ff", branchName]);
+			return true;
+		} catch (_e) {
+			return false;
+		}
+	}
 }

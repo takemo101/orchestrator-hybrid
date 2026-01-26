@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { LoopStateSchema, LoopSchema } from "./types.js";
 import {
 	type AutoIssueConfig,
 	AutoIssueConfigSchema,
 	ConfigSchema,
 	type LoopContext,
+	LoopSchema,
+	LoopStateSchema,
 	type PRConfig,
 	PRConfigSchema,
 	type SandboxConfig,
@@ -506,7 +507,7 @@ describe("types.ts 拡張", () => {
 		it("有効なLoopオブジェクトを受け入れる", () => {
 			const loop = {
 				id: "orch-20260126-a3f2",
-				state: "running",
+				state: "running" as const,
 				worktree_path: "/tmp/worktree",
 				created_at: new Date().toISOString(),
 				updated_at: new Date().toISOString(),
