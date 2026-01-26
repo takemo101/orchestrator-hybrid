@@ -375,3 +375,186 @@ export class IssueDependencyError extends SandboxError {
 		this.name = "IssueDependencyError";
 	}
 }
+
+// v1.4.0 新規エラークラス
+
+/**
+ * Memoryエラー
+ *
+ * Memoriesシステム（F-014）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // ファイル破損時
+ * throw new MemoryError(
+ *   "memoriesファイルが破損しています: .agent/memories.md",
+ *   { path: ".agent/memories.md" }
+ * );
+ *
+ * // サイズ上限超過時
+ * throw new MemoryError(
+ *   "memoriesファイルがサイズ上限を超えました（100KB）",
+ *   { currentSize: 150000, maxSize: 102400 }
+ * );
+ * ```
+ */
+export class MemoryError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "MEMORY_ERROR",
+			details,
+		});
+		this.name = "MemoryError";
+	}
+}
+
+/**
+ * Taskエラー
+ *
+ * Tasksシステム（F-015）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // 依存タスク不存在
+ * throw new TaskError(
+ *   "依存タスクが見つかりません: task-999",
+ *   { taskId: "task-002", missingDependency: "task-999" }
+ * );
+ *
+ * // タスクファイル破損
+ * throw new TaskError(
+ *   "tasksファイルが破損しています",
+ *   { path: ".agent/tasks.jsonl", line: 5 }
+ * );
+ * ```
+ */
+export class TaskError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "TASK_ERROR",
+			details,
+		});
+		this.name = "TaskError";
+	}
+}
+
+/**
+ * セッション記録エラー
+ *
+ * Session Recording（F-016）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // 書き込み失敗
+ * throw new SessionRecordError(
+ *   "セッション記録の書き込みに失敗しました",
+ *   { path: "session.jsonl", cause: "EACCES" }
+ * );
+ *
+ * // リプレイファイル不正
+ * throw new SessionRecordError(
+ *   "リプレイファイルの形式が不正です",
+ *   { path: "session.jsonl", line: 3 }
+ * );
+ * ```
+ */
+export class SessionRecordError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "SESSION_RECORD_ERROR",
+			details,
+		});
+		this.name = "SessionRecordError";
+	}
+}
+
+/**
+ * Worktreeエラー
+ *
+ * Multi-Loop Concurrency（F-017）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // worktree作成失敗
+ * throw new WorktreeError(
+ *   "worktreeの作成に失敗しました",
+ *   { path: ".worktrees/orch-20260126-a3f2", cause: "branch exists" }
+ * );
+ *
+ * // マージ失敗
+ * throw new WorktreeError(
+ *   "自動マージに失敗しました。手動での解決が必要です。",
+ *   { loopId: "orch-20260126-a3f2", conflicts: ["src/index.ts"] }
+ * );
+ * ```
+ */
+export class WorktreeError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "WORKTREE_ERROR",
+			details,
+		});
+		this.name = "WorktreeError";
+	}
+}
+
+/**
+ * バックエンド選択エラー
+ *
+ * Per-Hat Backend Configuration（F-018）およびCustom Backends（F-019）で
+ * 発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // バックエンド利用不可
+ * throw new BackendSelectionError(
+ *   "バックエンド 'gemini' が見つかりません",
+ *   { backend: "gemini", hat: "reviewer" }
+ * );
+ *
+ * // カスタムバックエンド設定不正
+ * throw new BackendSelectionError(
+ *   "カスタムバックエンドの設定が不正です",
+ *   { command: "my-agent", error: "command not found" }
+ * );
+ * ```
+ */
+export class BackendSelectionError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "BACKEND_SELECTION_ERROR",
+			details,
+		});
+		this.name = "BackendSelectionError";
+	}
+}
+
+/**
+ * Globパターンエラー
+ *
+ * Glob Pattern Event Matching（F-021）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // 曖昧なルーティング
+ * throw new GlobPatternError(
+ *   "複数のHatが同じパターンでマッチしました",
+ *   { topic: "build.done", matchedHats: ["builder", "tester"] }
+ * );
+ *
+ * // パターン構文エラー
+ * throw new GlobPatternError(
+ *   "無効なglobパターン: [invalid",
+ *   { pattern: "[invalid", hat: "builder" }
+ * );
+ * ```
+ */
+export class GlobPatternError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "GLOB_PATTERN_ERROR",
+			details,
+		});
+		this.name = "GlobPatternError";
+	}
+}
