@@ -348,6 +348,34 @@ program
 	});
 
 program
+	.command("emit")
+	.description("Emit an event to the event bus")
+	.argument("<topic>", "Event topic")
+	.argument("<message>", "Event message or JSON payload")
+	.option("-j, --json", "Parse message as JSON payload")
+	.option("-t, --target <hat>", "Target hat for handoff")
+	.action(async (topic: string, message: string, options: { json?: boolean; target?: string }) => {
+		try {
+			const eventBus = new EventBus();
+			const emitter = new EventEmitter(eventBus);
+
+			const event = await emitter.emit(topic, message, {
+				json: options.json,
+				target: options.target,
+			});
+
+			logger.success(`イベント発行完了: ${event.type}`);
+
+			if (options.json) {
+				console.log(JSON.stringify(event, null, 2));
+			}
+		} catch (error) {
+			logger.error(error instanceof Error ? error.message : String(error));
+			process.exit(1);
+		}
+	});
+
+program
 	.command("init")
 	.description("Initialize configuration file")
 	.option("-p, --preset <name>", "Use preset configuration")
