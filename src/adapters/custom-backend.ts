@@ -91,7 +91,7 @@ export class CustomBackend extends BaseBackend {
 		try {
 			const promptMode = this.config.promptMode ?? "arg";
 
-			let result;
+			let result: { stdout: string; stderr: string; exitCode: number };
 			if (promptMode === "stdin") {
 				// 標準入力でプロンプトを渡す
 				result = await this.executor.spawn(this.config.command, this.config.args ?? [], {
