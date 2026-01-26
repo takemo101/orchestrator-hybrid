@@ -20,6 +20,7 @@ import { buildHatPrompt, extractPublishedEvent, type HatDefinition, HatRegistry 
 import { LogWriter } from "./log-writer.js";
 import { createTaskLogger, logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
+import { SessionRecorder } from "./session-recorder.js";
 import type { TaskManager, TaskStateCallback } from "./task-manager.js";
 import type { Config, Issue, LoopContext, PRConfig } from "./types.js";
 
@@ -38,6 +39,7 @@ export interface LoopOptions {
 	prConfig?: PRConfig;
 	resolveDeps?: boolean;
 	ignoreDeps?: boolean;
+	recordSessionPath?: string;
 	onStateChange?: TaskStateCallback;
 	signal?: AbortSignal;
 }
@@ -58,7 +60,8 @@ export interface MultiLoopOptions {
 }
 
 export async function runLoop(options: LoopOptions): Promise<void> {
-	const { issueNumber, config, autoMode, taskId, onStateChange, signal } = options;
+	const { issueNumber, config, autoMode, taskId, onStateChange, signal, recordSessionPath } =
+		options;
 
 	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 	const loopConfig = buildLoopConfig(options, config);
@@ -85,7 +88,6 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	const backend = createLoopBackend(config, loopConfig.containerEnabled);
 	const collector = loopConfig.shouldGenerateReport ? createReportCollector() : null;
 
-	// LogWriter の初期化
 	const logWriter = new LogWriter({
 		taskId: taskId ?? `issue-${issueNumber}`,
 		baseDir: ".agent",
@@ -93,17 +95,30 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	await logWriter.initialize();
 	taskLogger.debug(`Log directory: ${logWriter.getLogDir()}`);
 
-	await executeLoop(
-		context,
-		backend,
-		issueNumber,
-		config,
-		collector,
-		logWriter,
-		taskId,
-		onStateChange,
-		signal,
-	);
+	let sessionRecorder: SessionRecorder | undefined;
+	if (recordSessionPath) {
+		sessionRecorder = new SessionRecorder(recordSessionPath);
+		await sessionRecorder.startRecording();
+	}
+
+	try {
+		await executeLoop(
+			context,
+			backend,
+			issueNumber,
+			config,
+			collector,
+			logWriter,
+			sessionRecorder,
+			taskId,
+			onStateChange,
+			signal,
+		);
+	} finally {
+		if (sessionRecorder) {
+			await sessionRecorder.stopRecording();
+		}
+	}
 }
 
 interface LoopConfig {
@@ -199,6 +214,7 @@ async function executeLoop(
 	config: Config,
 	collector: ReportCollector | null,
 	logWriter: LogWriter,
+	sessionRecorder?: SessionRecorder,
 	taskId?: string,
 	onStateChange?: TaskStateCallback,
 	signal?: AbortSignal,
@@ -219,6 +235,7 @@ async function executeLoop(
 			config,
 			collector,
 			logWriter,
+			sessionRecorder,
 			taskId,
 			onStateChange,
 			signal,
@@ -231,6 +248,7 @@ async function executeLoop(
 			config,
 			collector,
 			logWriter,
+			sessionRecorder,
 			taskId,
 			onStateChange,
 			signal,
@@ -306,6 +324,7 @@ interface HatIterationParams {
 	eventBus: EventBus;
 	collector: ReportCollector | null;
 	logWriter: LogWriter;
+	sessionRecorder?: SessionRecorder;
 	taskLogger: typeof logger;
 	taskId?: string;
 	onStateChange?: TaskStateCallback;
@@ -320,6 +339,7 @@ async function executeHatLoop(
 	config: Config,
 	collector: ReportCollector | null,
 	logWriter: LogWriter,
+	sessionRecorder?: SessionRecorder,
 	taskId?: string,
 	onStateChange?: TaskStateCallback,
 	signal?: AbortSignal,
@@ -338,6 +358,7 @@ async function executeHatLoop(
 		eventBus,
 		collector,
 		logWriter,
+		sessionRecorder,
 		taskLogger,
 		taskId,
 		onStateChange,
@@ -426,6 +447,7 @@ async function executeHatIteration(
 		eventBus,
 		collector,
 		logWriter,
+		sessionRecorder,
 		taskLogger,
 		taskId,
 		onStateChange,
@@ -459,7 +481,6 @@ async function executeHatIteration(
 	const result = await backend.execute(prompt);
 	const iterEndTime = new Date();
 
-	// LogWriter にログを記録
 	const iterationHeader = `\n--- Iteration ${context.iteration} (${activeHat.name ?? activeHat.id}) ---\n`;
 	await logWriter.writeOutput(iterationHeader);
 	await logWriter.writeStdout(result.output);
@@ -479,6 +500,25 @@ async function executeHatIteration(
 		publishedEvent: publishedEvent ?? undefined,
 	});
 
+	const isComplete =
+		checkCompletion(result.output, context.completionPromise) ||
+		publishedEvent === context.completionPromise;
+
+	const events: string[] = publishedEvent ? [publishedEvent] : [];
+	if (isComplete && !events.includes(context.completionPromise)) {
+		events.push(context.completionPromise);
+	}
+
+	if (sessionRecorder) {
+		await sessionRecorder.recordIteration(
+			context.iteration,
+			activeHat.name ?? activeHat.id,
+			prompt,
+			result.output,
+			events,
+		);
+	}
+
 	if (result.exitCode !== 0) {
 		return handleIterationFailure(state, taskLogger);
 	}
@@ -489,10 +529,6 @@ async function executeHatIteration(
 		taskLogger.info(`Hat ${activeHat.id} published: ${publishedEvent}`);
 		eventBus.emit(publishedEvent, activeHat.id);
 	}
-
-	const isComplete =
-		checkCompletion(result.output, context.completionPromise) ||
-		publishedEvent === context.completionPromise;
 
 	if (isComplete) {
 		state.completionReason = "completed";
@@ -632,6 +668,7 @@ async function executeSimpleLoop(
 	config: Config,
 	collector: ReportCollector | null,
 	logWriter: LogWriter,
+	sessionRecorder?: SessionRecorder,
 	taskId?: string,
 	onStateChange?: TaskStateCallback,
 	signal?: AbortSignal,
@@ -655,6 +692,7 @@ async function executeSimpleLoop(
 			logWriter,
 			historyPath,
 			state,
+			sessionRecorder,
 			taskLogger,
 			taskId,
 			onStateChange,
@@ -698,7 +736,8 @@ async function executeSimpleIteration(
 	logWriter: LogWriter,
 	historyPath: string,
 	state: LoopState,
-	taskLogger: typeof logger,
+	sessionRecorder?: SessionRecorder,
+	taskLogger: typeof logger = logger,
 	taskId?: string,
 	onStateChange?: TaskStateCallback,
 ): Promise<IterationResult> {
@@ -714,7 +753,6 @@ async function executeSimpleIteration(
 	const result = await backend.execute(prompt);
 	const iterEndTime = new Date();
 
-	// LogWriter にログを記録
 	const iterationHeader = `\n--- Iteration ${context.iteration} ---\n`;
 	await logWriter.writeOutput(iterationHeader);
 	await logWriter.writeStdout(result.output);
@@ -728,13 +766,26 @@ async function executeSimpleIteration(
 		exitCode: result.exitCode,
 	});
 
+	const isComplete = checkCompletion(result.output, context.completionPromise);
+	const events: string[] = isComplete ? [context.completionPromise] : [];
+
+	if (sessionRecorder) {
+		await sessionRecorder.recordIteration(
+			context.iteration,
+			"simple",
+			prompt,
+			result.output,
+			events,
+		);
+	}
+
 	if (result.exitCode !== 0) {
 		return handleIterationFailure(state, taskLogger);
 	}
 
 	state.consecutiveFailures = 0;
 
-	if (checkCompletion(result.output, context.completionPromise)) {
+	if (isComplete) {
 		state.completionReason = "completed";
 		return { shouldStop: true };
 	}

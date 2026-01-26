@@ -14,6 +14,7 @@ import { logger, setVerbose } from "./core/logger.js";
 import { runLoop, runMultipleLoops } from "./core/loop.js";
 import { OrchTaskManager } from "./core/orch-task-manager.js";
 import { readScratchpad } from "./core/scratchpad.js";
+import { SessionReplayer } from "./core/session-replayer.js";
 import type { TaskState } from "./core/task-manager.js";
 import { TaskManager, TaskStore } from "./core/task-manager.js";
 import type { PRConfig, TasksConfig } from "./core/types.js";
@@ -46,6 +47,7 @@ program
 	.option("--resolve-deps", "Resolve and run dependency issues first")
 	.option("--ignore-deps", "Ignore issue dependencies")
 	.option("--report [path]", "Generate execution report (default: .agent/report.md)")
+	.option("--record-session <file>", "Record session to JSONL file")
 	.option("-c, --config <path>", "Config file path")
 	.option("-v, --verbose", "Verbose output")
 	.action(async (options) => {
@@ -73,6 +75,7 @@ async function handleRunCommand(options: {
 	resolveDeps?: boolean;
 	ignoreDeps?: boolean;
 	report?: string | boolean;
+	recordSession?: string;
 }): Promise<void> {
 	if (options.verbose) {
 		setVerbose(true);
@@ -176,6 +179,7 @@ async function handleSingleIssue(
 		container?: boolean;
 		report?: string | boolean;
 		preset?: string;
+		recordSession?: string;
 	},
 	config: ReturnType<typeof loadConfig>,
 	prConfig: PRConfig,
@@ -205,6 +209,7 @@ async function handleSingleIssue(
 			prConfig,
 			resolveDeps: depConfig.resolveDeps,
 			ignoreDeps: depConfig.ignoreDeps,
+			recordSessionPath: options.recordSession,
 			onStateChange,
 			signal,
 		});
@@ -577,6 +582,29 @@ function handleTaskTable(options: { follow?: boolean; table?: boolean; interval?
 		process.exit(0);
 	});
 }
+
+program
+	.command("replay <file>")
+	.description("Replay a recorded session")
+	.action(async (file: string) => {
+		try {
+			const replayer = new SessionReplayer(file);
+			const result = await replayer.replay();
+
+			if (result.success) {
+				logger.success(`Replay completed: ${result.iterations} iterations`);
+			} else {
+				logger.error(`Replay failed: ${result.errors.length} error(s)`);
+				for (const error of result.errors) {
+					logger.error(`  ${error}`);
+				}
+				process.exit(1);
+			}
+		} catch (error) {
+			logger.error(error instanceof Error ? error.message : String(error));
+			process.exit(1);
+		}
+	});
 
 const toolsCommand = program.command("tools").description("Utility tools");
 const taskCommand = toolsCommand.command("task").description("Manage tasks in .agent/tasks.jsonl");
