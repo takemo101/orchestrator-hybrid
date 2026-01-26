@@ -12,10 +12,11 @@ import { EventBus } from "./core/event.js";
 import { LogStreamer } from "./core/log-streamer.js";
 import { logger, setVerbose } from "./core/logger.js";
 import { runLoop, runMultipleLoops } from "./core/loop.js";
+import { OrchTaskManager } from "./core/orch-task-manager.js";
 import { readScratchpad } from "./core/scratchpad.js";
 import type { TaskState } from "./core/task-manager.js";
 import { TaskManager, TaskStore } from "./core/task-manager.js";
-import type { PRConfig } from "./core/types.js";
+import type { PRConfig, TasksConfig } from "./core/types.js";
 import { fetchIssue } from "./input/github.js";
 import { IssueStatusLabelManager } from "./output/issue-status-label-manager.js";
 
@@ -575,6 +576,146 @@ function handleTaskTable(options: { follow?: boolean; table?: boolean; interval?
 		logger.info("Stopped watching");
 		process.exit(0);
 	});
+}
+
+const toolsCommand = program.command("tools").description("Utility tools");
+const taskCommand = toolsCommand.command("task").description("Manage tasks in .agent/tasks.jsonl");
+
+taskCommand
+	.command("add <title>")
+	.description("Add a new task")
+	.option("-p, --priority <number>", "Priority (1-5, lower is higher)", "3")
+	.option("--blocked-by <ids>", "Comma-separated task IDs that block this task")
+	.action(async (title: string, options: { priority: string; blockedBy?: string }) => {
+		try {
+			const config = loadConfig();
+			const tasksConfig: TasksConfig = config.tasks ?? { enabled: true };
+			const manager = new OrchTaskManager(tasksConfig, ".agent");
+
+			const priority = Number.parseInt(options.priority, 10);
+			if (Number.isNaN(priority) || priority < 1 || priority > 5) {
+				logger.error("Priority must be a number between 1 and 5");
+				process.exit(1);
+			}
+
+			const blockedBy = options.blockedBy
+				? options.blockedBy.split(",").map((id) => id.trim())
+				: [];
+
+			const taskId = await manager.addTask(title, priority, blockedBy);
+			if (taskId) {
+				logger.success(`Created task: ${taskId}`);
+			}
+		} catch (error) {
+			logger.error(error instanceof Error ? error.message : String(error));
+			process.exit(1);
+		}
+	});
+
+taskCommand
+	.command("list")
+	.description("List all tasks")
+	.action(async () => {
+		try {
+			const config = loadConfig();
+			const tasksConfig: TasksConfig = config.tasks ?? { enabled: true };
+			const manager = new OrchTaskManager(tasksConfig, ".agent");
+
+			const tasks = await manager.listTasks();
+
+			if (tasks.length === 0) {
+				logger.info("No tasks found");
+				return;
+			}
+
+			console.log("");
+			console.log(
+				chalk.gray(
+					"ID".padEnd(12) +
+						"Priority".padEnd(10) +
+						"Status".padEnd(14) +
+						"Blocked By".padEnd(20) +
+						"Title",
+				),
+			);
+			console.log(chalk.gray("─".repeat(80)));
+
+			for (const task of tasks) {
+				const statusIcon = getTaskStatusIcon(task.status);
+				const blockedBy = task.blocked_by.length > 0 ? task.blocked_by.join(", ") : "-";
+				console.log(
+					`${task.id.padEnd(12)}` +
+						`${task.priority.toString().padEnd(10)}` +
+						`${statusIcon} ${task.status.padEnd(12)}` +
+						`${blockedBy.substring(0, 18).padEnd(20)}` +
+						`${task.title}`,
+				);
+			}
+			console.log("");
+		} catch (error) {
+			logger.error(error instanceof Error ? error.message : String(error));
+			process.exit(1);
+		}
+	});
+
+taskCommand
+	.command("ready")
+	.description("List tasks that are not blocked")
+	.action(async () => {
+		try {
+			const config = loadConfig();
+			const tasksConfig: TasksConfig = config.tasks ?? { enabled: true };
+			const manager = new OrchTaskManager(tasksConfig, ".agent");
+
+			const tasks = await manager.getReadyTasks();
+
+			if (tasks.length === 0) {
+				logger.info("No ready tasks found");
+				return;
+			}
+
+			console.log("");
+			console.log(chalk.bold("Ready Tasks:"));
+			console.log(chalk.gray("─".repeat(50)));
+
+			for (const task of tasks) {
+				console.log(`  ${task.id}: ${task.title} (priority: ${task.priority})`);
+			}
+			console.log("");
+		} catch (error) {
+			logger.error(error instanceof Error ? error.message : String(error));
+			process.exit(1);
+		}
+	});
+
+taskCommand
+	.command("close <id>")
+	.description("Mark a task as closed")
+	.action(async (id: string) => {
+		try {
+			const config = loadConfig();
+			const tasksConfig: TasksConfig = config.tasks ?? { enabled: true };
+			const manager = new OrchTaskManager(tasksConfig, ".agent");
+
+			await manager.updateStatus(id, "closed");
+			logger.success(`Task ${id} marked as closed`);
+		} catch (error) {
+			logger.error(error instanceof Error ? error.message : String(error));
+			process.exit(1);
+		}
+	});
+
+function getTaskStatusIcon(status: string): string {
+	switch (status) {
+		case "open":
+			return chalk.gray("○");
+		case "in-progress":
+			return chalk.blue("●");
+		case "closed":
+			return chalk.green("✓");
+		default:
+			return "?";
+	}
 }
 
 program.parse();
