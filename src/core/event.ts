@@ -126,10 +126,7 @@ export const globalEventBus = new EventBus();
  * @returns マッチしたHat名の配列
  * @throws GlobPatternError - 複数の具体的パターンがマッチした場合（曖昧なルーティング）
  */
-export function findMatchingHatsForEvent(
-	eventType: string,
-	hats: Record<string, Hat>,
-): string[] {
+export function findMatchingHatsForEvent(eventType: string, hats: Record<string, Hat>): string[] {
 	const matcher = new GlobMatcher(hats);
 	return matcher.match(eventType);
 }

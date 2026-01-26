@@ -151,9 +151,7 @@ describe("GlobMatcher", () => {
 			};
 			const matcher = new GlobMatcher(hats);
 
-			expect(() => matcher.match("task.start")).toThrow(
-				/曖昧なルーティング|multiple.*match/i,
-			);
+			expect(() => matcher.match("task.start")).toThrow(/曖昧なルーティング|multiple.*match/i);
 		});
 
 		it("Hatが複数のトリガーを持つ場合でも正しくマッチする", () => {
