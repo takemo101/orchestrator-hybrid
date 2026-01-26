@@ -241,9 +241,7 @@ describe("ModelSelector", () => {
 			};
 			const selector = new ModelSelector(config);
 			expect(selector.resolveModel("invalid")).toBe("sonnet");
-			expect(warnSpy).toHaveBeenCalledWith(
-				expect.stringContaining("Invalid model"),
-			);
+			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Invalid model"));
 		});
 
 		test("logs warning for invalid global model and falls back to default", () => {
@@ -256,9 +254,7 @@ describe("ModelSelector", () => {
 			};
 			const selector = new ModelSelector(config);
 			expect(selector.resolveModel("anyhat")).toBe("sonnet");
-			expect(warnSpy).toHaveBeenCalledWith(
-				expect.stringContaining("Invalid model"),
-			);
+			expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Invalid model"));
 		});
 	});
 });

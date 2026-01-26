@@ -60,9 +60,7 @@ export class ModelSelector {
 			if (this.isValidModel(globalModel)) {
 				return globalModel;
 			}
-			logger.warn(
-				`Invalid model "${globalModel}" in backend config. Using default model.`,
-			);
+			logger.warn(`Invalid model "${globalModel}" in backend config. Using default model.`);
 		}
 
 		// 3. デフォルトモデルを返す
