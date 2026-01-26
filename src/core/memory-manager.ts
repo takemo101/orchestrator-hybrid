@@ -124,7 +124,12 @@ export class MemoryManager {
 				// - Tags: でタグを抽出
 				if (line.startsWith("- Tags:")) {
 					const tagsStr = line.slice(7).trim();
-					currentMemory.tags = tagsStr ? tagsStr.split(",").map((t) => t.trim()).filter(Boolean) : [];
+					currentMemory.tags = tagsStr
+						? tagsStr
+								.split(",")
+								.map((t) => t.trim())
+								.filter(Boolean)
+						: [];
 				}
 				// - Date: で日付を抽出
 				else if (line.startsWith("- Date:")) {

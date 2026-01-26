@@ -124,7 +124,10 @@ describe("MemoryManager", () => {
 			const manager = new MemoryManager(config, testBaseDir);
 			await manager.addMemory("Should not be added", ["test"]);
 
-			const exists = await fs.access(memoriesPath).then(() => true).catch(() => false);
+			const exists = await fs
+				.access(memoriesPath)
+				.then(() => true)
+				.catch(() => false);
 			expect(exists).toBe(false);
 		});
 
@@ -383,7 +386,7 @@ Invalid section
 
 			// Should still parse valid memory
 			expect(memories.length).toBeGreaterThanOrEqual(1);
-			const validMemory = memories.find(m => m.title === "Valid Memory");
+			const validMemory = memories.find((m) => m.title === "Valid Memory");
 			expect(validMemory).toBeDefined();
 		});
 
