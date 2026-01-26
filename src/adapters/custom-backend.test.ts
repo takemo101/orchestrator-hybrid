@@ -1,6 +1,6 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import type { ProcessExecutor } from "../core/process-executor.js";
 import { CustomBackend, type CustomBackendConfig } from "./custom-backend.js";
-import type { ProcessExecutor, ProcessResult } from "../core/process-executor.js";
 
 describe("CustomBackend", () => {
 	let mockExecutor: ProcessExecutor;
