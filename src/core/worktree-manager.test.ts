@@ -6,7 +6,7 @@ import { WorktreeManager } from "./worktree-manager";
 class MockExecutor implements ProcessExecutor {
 	async exec(
 		command: string[],
-		options?: any,
+		_options?: unknown,
 	): Promise<{ stdout: string; stderr: string; exitCode: number }> {
 		if (command.includes("worktree") && command.includes("list")) {
 			return { stdout: "/path/to/worktree  deadbeef [branch-name]\n", stderr: "", exitCode: 0 };
