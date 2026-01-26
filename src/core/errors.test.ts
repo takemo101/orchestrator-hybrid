@@ -4,19 +4,25 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+	BackendSelectionError,
 	CircularDependencyError,
 	ContainerUseError,
 	DockerNotFoundError,
 	DockerTimeoutError,
 	EnvironmentUnavailableError,
 	ExecutionTimeoutError,
+	GlobPatternError,
 	HostExecutionError,
 	ImagePullError,
 	IssueDependencyError,
 	LogMonitorError,
+	MemoryError,
 	PRAutoMergeError,
 	ProcessExecutionError,
 	SandboxError,
+	SessionRecordError,
+	TaskError,
+	WorktreeError,
 } from "./errors.js";
 
 describe("SandboxError", () => {
@@ -383,5 +389,178 @@ describe("IssueDependencyError", () => {
 
 		expect(error).toBeInstanceOf(SandboxError);
 		expect(error).toBeInstanceOf(IssueDependencyError);
+	});
+});
+
+// v1.4.0 新規エラークラス
+
+describe("MemoryError (v1.4.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new MemoryError("memoriesファイルが破損しています");
+
+		expect(error.message).toBe("memoriesファイルが破損しています");
+		expect(error.code).toBe("MEMORY_ERROR");
+		expect(error.name).toBe("MemoryError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new MemoryError("サイズ上限超過", {
+			currentSize: 150000,
+			maxSize: 102400,
+		});
+
+		expect(error.details).toEqual({ currentSize: 150000, maxSize: 102400 });
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new MemoryError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(MemoryError);
+	});
+});
+
+describe("TaskError (v1.4.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new TaskError("依存タスクが見つかりません");
+
+		expect(error.message).toBe("依存タスクが見つかりません");
+		expect(error.code).toBe("TASK_ERROR");
+		expect(error.name).toBe("TaskError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new TaskError("依存タスクが見つかりません", {
+			taskId: "task-002",
+			missingDependency: "task-999",
+		});
+
+		expect(error.details).toEqual({
+			taskId: "task-002",
+			missingDependency: "task-999",
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new TaskError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(TaskError);
+	});
+});
+
+describe("SessionRecordError (v1.4.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new SessionRecordError("セッション記録の書き込みに失敗しました");
+
+		expect(error.message).toBe("セッション記録の書き込みに失敗しました");
+		expect(error.code).toBe("SESSION_RECORD_ERROR");
+		expect(error.name).toBe("SessionRecordError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new SessionRecordError("書き込み失敗", {
+			path: "session.jsonl",
+			cause: "EACCES",
+		});
+
+		expect(error.details).toEqual({
+			path: "session.jsonl",
+			cause: "EACCES",
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new SessionRecordError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(SessionRecordError);
+	});
+});
+
+describe("WorktreeError (v1.4.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new WorktreeError("worktreeの作成に失敗しました");
+
+		expect(error.message).toBe("worktreeの作成に失敗しました");
+		expect(error.code).toBe("WORKTREE_ERROR");
+		expect(error.name).toBe("WorktreeError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new WorktreeError("自動マージに失敗しました", {
+			loopId: "orch-20260126-a3f2",
+			conflicts: ["src/index.ts"],
+		});
+
+		expect(error.details).toEqual({
+			loopId: "orch-20260126-a3f2",
+			conflicts: ["src/index.ts"],
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new WorktreeError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(WorktreeError);
+	});
+});
+
+describe("BackendSelectionError (v1.4.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new BackendSelectionError("バックエンド 'gemini' が見つかりません");
+
+		expect(error.message).toBe("バックエンド 'gemini' が見つかりません");
+		expect(error.code).toBe("BACKEND_SELECTION_ERROR");
+		expect(error.name).toBe("BackendSelectionError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new BackendSelectionError("バックエンド選択失敗", {
+			backend: "gemini",
+			hat: "reviewer",
+		});
+
+		expect(error.details).toEqual({
+			backend: "gemini",
+			hat: "reviewer",
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new BackendSelectionError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(BackendSelectionError);
+	});
+});
+
+describe("GlobPatternError (v1.4.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new GlobPatternError("複数のHatが同じパターンでマッチしました");
+
+		expect(error.message).toBe("複数のHatが同じパターンでマッチしました");
+		expect(error.code).toBe("GLOB_PATTERN_ERROR");
+		expect(error.name).toBe("GlobPatternError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new GlobPatternError("曖昧なルーティング", {
+			topic: "build.done",
+			matchedHats: ["builder", "tester"],
+		});
+
+		expect(error.details).toEqual({
+			topic: "build.done",
+			matchedHats: ["builder", "tester"],
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new GlobPatternError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(GlobPatternError);
 	});
 });
