@@ -15,7 +15,13 @@
  *     ├── PRAutoMergeError (v1.3.0)
  *     ├── LogMonitorError (v1.3.0)
  *     ├── CircularDependencyError (v1.3.0)
- *     └── IssueDependencyError (v1.3.0)
+ *     ├── IssueDependencyError (v1.3.0)
+ *     ├── MemoryError (v1.4.0)
+ *     ├── TaskError (v1.4.0)
+ *     ├── SessionRecordError (v1.4.0)
+ *     ├── WorktreeError (v1.4.0)
+ *     ├── BackendSelectionError (v1.4.0)
+ *     └── GlobPatternError (v1.4.0)
  */
 
 /**
