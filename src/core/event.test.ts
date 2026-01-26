@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { EventBus } from "./event.js";
+import { EventBus, findMatchingHatsForEvent } from "./event.js";
+import type { Hat } from "./types.js";
 
 describe("EventBus", () => {
 	const testDir = ".test-events";
@@ -146,5 +147,89 @@ describe("EventBus", () => {
 			bus.emit("test");
 			expect(callback).toHaveBeenCalledTimes(1);
 		});
+	});
+});
+
+describe("findMatchingHatsForEvent", () => {
+	const createHat = (triggers: string[]): Hat => ({
+		triggers,
+		publishes: [],
+	});
+
+	it("should find hat with exact trigger match", () => {
+		const hats: Record<string, Hat> = {
+			tester: createHat(["task.start"]),
+			builder: createHat(["tests.failing"]),
+		};
+
+		const result = findMatchingHatsForEvent("task.start", hats);
+		expect(result).toEqual(["tester"]);
+	});
+
+	it("should find hat with wildcard prefix trigger", () => {
+		const hats: Record<string, Hat> = {
+			handler: createHat(["build.*"]),
+		};
+
+		const result = findMatchingHatsForEvent("build.done", hats);
+		expect(result).toEqual(["handler"]);
+	});
+
+	it("should find hat with wildcard suffix trigger", () => {
+		const hats: Record<string, Hat> = {
+			handler: createHat(["*.done"]),
+		};
+
+		const result = findMatchingHatsForEvent("task.done", hats);
+		expect(result).toEqual(["handler"]);
+	});
+
+	it("should use global wildcard as fallback", () => {
+		const hats: Record<string, Hat> = {
+			fallback: createHat(["*"]),
+			specific: createHat(["task.start"]),
+		};
+
+		const result = findMatchingHatsForEvent("unknown.event", hats);
+		expect(result).toEqual(["fallback"]);
+	});
+
+	it("should prioritize exact match over wildcards", () => {
+		const hats: Record<string, Hat> = {
+			wildcard: createHat(["build.*"]),
+			exact: createHat(["build.done"]),
+		};
+
+		const result = findMatchingHatsForEvent("build.done", hats);
+		expect(result).toEqual(["exact"]);
+	});
+
+	it("should return multiple hats for multiple wildcard matches", () => {
+		const hats: Record<string, Hat> = {
+			prefixHandler: createHat(["build.*"]),
+			suffixHandler: createHat(["*.done"]),
+		};
+
+		const result = findMatchingHatsForEvent("build.done", hats);
+		expect(result).toContain("prefixHandler");
+		expect(result).toContain("suffixHandler");
+	});
+
+	it("should throw error for ambiguous exact matches", () => {
+		const hats: Record<string, Hat> = {
+			hat1: createHat(["task.start"]),
+			hat2: createHat(["task.start"]),
+		};
+
+		expect(() => findMatchingHatsForEvent("task.start", hats)).toThrow();
+	});
+
+	it("should return empty array when no hats match", () => {
+		const hats: Record<string, Hat> = {
+			handler: createHat(["task.start"]),
+		};
+
+		const result = findMatchingHatsForEvent("unknown.event", hats);
+		expect(result).toEqual([]);
 	});
 });
