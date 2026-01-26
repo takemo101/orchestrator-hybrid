@@ -1,5 +1,5 @@
 import { Backend, BackendResult } from "./base.js";
-import { ProcessExecutor } from "../core/process-executor.js";
+import { ProcessExecutor, BunProcessExecutor } from "../core/bun-process-executor.js";
 
 export interface KiroAdapterConfig {
   agent: string;
@@ -7,8 +7,21 @@ export interface KiroAdapterConfig {
 
 export class KiroAdapter implements Backend {
   readonly name = "kiro";
-  constructor(private config: KiroAdapterConfig, private executor?: ProcessExecutor) {}
+  private readonly executor: ProcessExecutor;
+  
+  constructor(private config: KiroAdapterConfig, executor: ProcessExecutor = new BunProcessExecutor()) {
+    this.executor = executor;
+  }
+  
   async execute(prompt: string): Promise<BackendResult> {
-    throw new Error("Not implemented");
+    const result = await this.executor.spawn("kiro-cli", [
+      "--agent", this.config.agent, prompt
+    ]);
+    
+    if (result.exitCode !== 0) {
+      throw new Error(`Kiro実行失敗: ${result.stderr || "Unknown error"}`);
+    }
+    
+    return result;
   }
 }
