@@ -4,8 +4,8 @@ import { GeminiAdapter } from "./gemini.js";
 
 describe("GeminiAdapter", () => {
 	it("geminiコマンドを実行", async () => {
-		let calledCmd: string | null = null;
-		let calledArgs: string[] | null = null;
+		let calledCmd = "";
+		let calledArgs: string[] = [];
 		const executor: ProcessExecutor = {
 			spawn: async (cmd: string, args: string[]) => {
 				calledCmd = cmd;
