@@ -9,7 +9,6 @@ import type { Command } from "commander";
 import { loadConfig } from "../../core/config.js";
 import { logger } from "../../core/logger.js";
 import { readScratchpad } from "../../core/scratchpad.js";
-import type { TaskState } from "../../core/task-manager.js";
 import { TaskStore } from "../../core/task-manager.js";
 import { fetchIssue } from "../../input/github.js";
 import { formatDuration, formatRelativeTime, getStatusIcon } from "../utils/format.js";
