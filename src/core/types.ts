@@ -5,6 +5,12 @@ export const HatSchema = z.object({
 	triggers: z.array(z.string()),
 	publishes: z.array(z.string()),
 	instructions: z.string().optional(),
+	/**
+	 * このHat専用のモデル（v1.4.0追加）
+	 * 未指定の場合は backend.model を継承
+	 * @example "opus", "sonnet", "haiku", "claude-sonnet-4-5-20250929"
+	 */
+	model: z.string().optional(),
 });
 
 export const ContainerConfigSchema = z
