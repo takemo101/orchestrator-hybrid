@@ -9,7 +9,7 @@ import { loadConfig } from "../../core/config.js";
 import { logger, setVerbose } from "../../core/logger.js";
 import { runLoop, runMultipleLoops } from "../../core/loop.js";
 import { TaskManager } from "../../core/task-manager.js";
-import type { PRConfig, TasksConfig } from "../../core/types.js";
+import type { PRConfig } from "../../core/types.js";
 import { fetchIssue } from "../../input/github.js";
 import { loadPreset } from "../utils/preset-loader.js";
 import type { CommandHandler, RunCommandOptions } from "./types.js";
