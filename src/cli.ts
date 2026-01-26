@@ -9,6 +9,7 @@ import { parse as parseYaml } from "yaml";
 import { findTaskLogPath, readLastNLines } from "./cli-logs.js";
 import { loadConfig } from "./core/config.js";
 import { EventBus } from "./core/event.js";
+import { EventEmitter } from "./core/event-emitter.js";
 import { LogStreamer } from "./core/log-streamer.js";
 import { logger, setVerbose } from "./core/logger.js";
 import { runLoop, runMultipleLoops } from "./core/loop.js";
@@ -344,6 +345,34 @@ program
 			console.log(`  [${time}] ${event.type}${hatInfo}`);
 		}
 		console.log("");
+	});
+
+program
+	.command("emit")
+	.description("Emit an event to the event bus")
+	.argument("<topic>", "Event topic")
+	.argument("<message>", "Event message or JSON payload")
+	.option("-j, --json", "Parse message as JSON payload")
+	.option("-t, --target <hat>", "Target hat for handoff")
+	.action(async (topic: string, message: string, options: { json?: boolean; target?: string }) => {
+		try {
+			const eventBus = new EventBus();
+			const emitter = new EventEmitter(eventBus);
+
+			const event = await emitter.emit(topic, message, {
+				json: options.json,
+				target: options.target,
+			});
+
+			logger.success(`イベント発行完了: ${event.type}`);
+
+			if (options.json) {
+				console.log(JSON.stringify(event, null, 2));
+			}
+		} catch (error) {
+			logger.error(error instanceof Error ? error.message : String(error));
+			process.exit(1);
+		}
 	});
 
 program
