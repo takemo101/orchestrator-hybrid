@@ -410,3 +410,13 @@ export interface LoopEvent {
 	timestamp: Date;
 	data?: Record<string, unknown>;
 }
+
+/**
+ * Worktree - Worktree情報 (v1.4.0)
+ */
+export interface Worktree {
+	loopId: string;
+	path: string;
+	branch: string;
+}
+
