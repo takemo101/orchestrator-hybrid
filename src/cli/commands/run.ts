@@ -155,9 +155,7 @@ export class RunCommand implements CommandHandler {
 				useContainer: options.container ?? false,
 				generateReport: options.report !== undefined,
 				reportPath:
-					typeof options.report === "string"
-						? options.report
-						: `.agent/${taskState.id}/report.md`,
+					typeof options.report === "string" ? options.report : `.agent/${taskState.id}/report.md`,
 				preset: options.preset,
 				taskId: taskState.id,
 				prConfig,

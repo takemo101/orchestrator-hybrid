@@ -19,7 +19,9 @@ import type { CommandHandler, TaskToolOptions } from "./types.js";
 export class ToolsCommand implements CommandHandler {
 	register(program: Command): void {
 		const toolsCommand = program.command("tools").description("Utility tools");
-		const taskCommand = toolsCommand.command("task").description("Manage tasks in .agent/tasks.jsonl");
+		const taskCommand = toolsCommand
+			.command("task")
+			.description("Manage tasks in .agent/tasks.jsonl");
 
 		this.registerTaskAdd(taskCommand);
 		this.registerTaskList(taskCommand);

@@ -22,23 +22,17 @@ export class EmitCommand implements CommandHandler {
 			.argument("<message>", "Event message or JSON payload")
 			.option("-j, --json", "Parse message as JSON payload")
 			.option("-t, --target <hat>", "Target hat for handoff")
-			.action(
-				async (topic: string, message: string, options: EmitCommandOptions) => {
-					try {
-						await this.execute(topic, message, options);
-					} catch (error) {
-						logger.error(error instanceof Error ? error.message : String(error));
-						process.exit(1);
-					}
-				},
-			);
+			.action(async (topic: string, message: string, options: EmitCommandOptions) => {
+				try {
+					await this.execute(topic, message, options);
+				} catch (error) {
+					logger.error(error instanceof Error ? error.message : String(error));
+					process.exit(1);
+				}
+			});
 	}
 
-	async execute(
-		topic: string,
-		message: string,
-		options: EmitCommandOptions,
-	): Promise<void> {
+	async execute(topic: string, message: string, options: EmitCommandOptions): Promise<void> {
 		const eventBus = new EventBus();
 		const emitter = new EventEmitter(eventBus);
 
