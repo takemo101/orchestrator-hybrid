@@ -219,6 +219,21 @@ export const StateConfigSchema = z.object({
 });
 
 /**
+ * Tasks設定のzodスキーマ（v1.4.0）
+ *
+ * タスクをJSONL形式で管理する機能（F-015）の設定を定義します。
+ */
+export const TasksConfigSchema = z.object({
+	/**
+	 * Tasksを有効にするか
+	 * @default true
+	 */
+	enabled: z.boolean().default(true),
+});
+
+export type TasksConfig = z.infer<typeof TasksConfigSchema>;
+
+/**
  * Memories設定のzodスキーマ（v1.4.0）
  *
  * セッション間で学習内容を永続化する機能（F-014）の設定を定義します。
@@ -288,6 +303,9 @@ export const ConfigSchema = z.object({
 
 	// 新規: Memories設定（v1.4.0）
 	memories: MemoriesConfigSchema.optional(),
+
+	// 新規: Tasks設定（v1.4.0）
+	tasks: TasksConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
