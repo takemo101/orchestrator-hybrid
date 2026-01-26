@@ -27,4 +27,5 @@ export function createBackend(type: BackendType, options: CreateBackendOptions =
 export type { Backend } from "./base.js";
 export { ClaudeBackend } from "./claude.js";
 export { ContainerBackend, type ContainerConfig } from "./container.js";
+export { CustomBackend, type CustomBackendConfig } from "./custom-backend.js";
 export { OpenCodeBackend } from "./opencode.js";
