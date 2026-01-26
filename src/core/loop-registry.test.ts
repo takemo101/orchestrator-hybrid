@@ -61,6 +61,7 @@ describe("LoopRegistry", () => {
     };
 
     await registry.registerLoop(loop);
+    await new Promise((resolve) => setTimeout(resolve, 10));
     await registry.updateLoopState("orch-test-1", "queued");
     
     const loops = await registry.listLoops();
