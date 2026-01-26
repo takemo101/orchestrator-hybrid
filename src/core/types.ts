@@ -705,6 +705,9 @@ export const ConfigSchema = z.object({
 
 	// 新規: Tasks設定（v1.4.0）
 	tasks: TasksConfigSchema.optional(),
+
+	// 新規: Run設定（v2.0.0）
+	run: RunConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
