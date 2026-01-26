@@ -11,7 +11,7 @@
 
 import * as fs from "node:fs";
 import * as yaml from "yaml";
-import { RunConfigSchema, type RunConfig } from "./types.js";
+import { type RunConfig, RunConfigSchema } from "./types.js";
 
 /**
  * マージオプション

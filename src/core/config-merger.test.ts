@@ -1,8 +1,7 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { ConfigMerger } from "./config-merger.js";
-import type { RunConfig } from "./types.js";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { ConfigMerger } from "./config-merger.js";
 
 describe("ConfigMerger", () => {
 	const testDir = ".test-fixtures";
