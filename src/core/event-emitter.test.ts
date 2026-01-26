@@ -1,6 +1,6 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test";
-import { EventEmitter } from "./event-emitter.js";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { EventBus, OrchEvent } from "./event.js";
+import { EventEmitter } from "./event-emitter.js";
 
 describe("EventEmitter", () => {
 	let mockEventBus: EventBus;
