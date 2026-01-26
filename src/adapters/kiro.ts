@@ -22,6 +22,9 @@ export class KiroAdapter implements Backend {
       throw new Error(`Kiro実行失敗: ${result.stderr || "Unknown error"}`);
     }
     
-    return result;
+    return {
+      output: result.stdout,
+      exitCode: result.exitCode
+    };
   }
 }
