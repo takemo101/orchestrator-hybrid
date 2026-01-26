@@ -258,6 +258,33 @@ export const MemoriesConfigSchema = z.object({
 export type MemoriesConfig = z.infer<typeof MemoriesConfigSchema>;
 
 /**
+ * LoopState - ループ状態 (v1.4.0)
+ */
+export const LoopStateSchema = z.enum([
+	"running",
+	"queued",
+	"merging",
+	"merged",
+	"needs-review",
+	"crashed",
+	"orphan",
+	"discarded",
+]);
+export type LoopState = z.infer<typeof LoopStateSchema>;
+
+/**
+ * Loop - ループ情報 (v1.4.0)
+ */
+export const LoopSchema = z.object({
+	id: z.string(),
+	state: LoopStateSchema,
+	worktree_path: z.string().nullable(),
+	created_at: z.string(),
+	updated_at: z.string(),
+});
+export type Loop = z.infer<typeof LoopSchema>;
+
+/**
  * 設定ファイル全体のzodスキーマ（拡張版）
  */
 export const ConfigSchema = z.object({
@@ -382,4 +409,13 @@ export interface LoopEvent {
 	type: string;
 	timestamp: Date;
 	data?: Record<string, unknown>;
+}
+
+/**
+ * Worktree - Worktree情報 (v1.4.0)
+ */
+export interface Worktree {
+	loopId: string;
+	path: string;
+	branch: string;
 }
