@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { MemoryManager, type Memory, type MemoriesConfig } from "./memory-manager.js";
+import { type MemoriesConfig, MemoryManager } from "./memory-manager.js";
 
 describe("MemoryManager", () => {
 	const testBaseDir = ".agent-test";
