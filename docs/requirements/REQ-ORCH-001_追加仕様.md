@@ -5,10 +5,10 @@
 | 項目 | 内容 |
 |------|------|
 | ドキュメントID | REQ-ORCH-001 |
-| バージョン | 1.3.0 |
+| バージョン | 1.4.0 |
 | ステータス | ドラフト |
 | 作成日 | 2026-01-24 |
-| 最終更新日 | 2026-01-25 |
+| 最終更新日 | 2026-01-26 |
 | 作成者 | AI Assistant |
 | 承認者 | - |
 
@@ -32,6 +32,9 @@ orchestrator-hybridは、GitHub Issueを入力としてAIエージェントを�
 1. **実行環境の選択肢拡大**: Dockerサンドボックス、およびホスト環境での直接実行に対応し、あらゆる環境で利用可能に
 2. **開発者体験の向上**: JSON Schemaによる設定ファイルの補完・検証機能の提供
 3. **改善サイクルの自動化**: 改善点の自動Issue化による継続的改善の促進
+4. **柔軟なモデル選択**: Hat毎に異なるAIモデルを指定可能にし、コスト最適化とタスク特化を実現
+5. **永続的な学習**: セッション間で学習内容を蓄積し、プロジェクト固有の知識を活用
+6. **真の並列実行**: git worktreeを使った完全に隔離された並列タスク実行
 
 ### 1.3 ゴール
 
@@ -41,6 +44,9 @@ orchestrator-hybridは、GitHub Issueを入力としてAIエージェントを�
 | ホスト環境での実行成功率 | 99%以上 | 統合テスト結果 |
 | YAML設定ミス削減率 | 80%削減 | Issue報告数の比較 |
 | 改善Issue自動作成率 | 100% | ralph-loop実行時の自動作成数 |
+| Hat毎のモデル選択活用率 | 50%以上 | 設定ファイル分析 |
+| Memories活用による改善提案精度向上 | 30%向上 | 改善提案の品質評価 |
+| 並列実行によるスループット向上 | 2倍以上 | 複数Issue同時実行時の完了時間 |
 
 ### 1.4 スコープ
 
@@ -50,6 +56,15 @@ orchestrator-hybridは、GitHub Issueを入力としてAIエージェントを�
 - ホスト環境での直接実行アダプターの実装
 - config.yml/orch.ymlのJSON Schema定義
 - ralph-loop実行時の改善Issue自動作成機能
+- Hat毎のAIモデル選択機能
+- セッション間での学習内容永続化（Memories System）
+- タスク管理システム（Tasks System）
+- セッション記録・リプレイ機能
+- git worktreeを使った並列ループ実行
+- Hat毎のバックエンド選択機能
+- カスタムバックエンド統合機能
+- CLIイベント発行機能
+- イベントトピックのワイルドカードマッチング
 
 #### 対象外
 
@@ -100,6 +115,15 @@ orchestrator-hybridは、GitHub Issueを入力としてAIエージェントを�
 | F-010 | リアルタイムログ監視機能 | 別ターミナルから実行中タスクのログを監視 | 重要 | Phase 3 |
 | F-011 | Issue依存関係管理機能 | Issue間の依存関係を管理し、依存順に実行 | 重要 | Phase 3 |
 | F-012 | Issueステータスラベル機能 | GitHub Issueラベルでタスク状態を管理 | 重要 | Phase 3 |
+| F-013 | Per-Hat/Step Model Selection | Hat毎に異なるAIモデルを指定可能 | 必須 | Phase 4 |
+| F-014 | Memories System | `.agent/memories.md`にセッション間で学習内容を永続化 | 必須 | Phase 4 |
+| F-015 | Tasks System | `.agent/tasks.jsonl`でタスクをJSONL形式で管理 | 必須 | Phase 4 |
+| F-016 | Session Recording | `--record-session <FILE>`でJSONLにセッション記録 | 必須 | Phase 4 |
+| F-017 | Multi-Loop Concurrency | git worktreeを使った並列実行（ファイルシステム分離） | 重要 | Phase 4 |
+| F-018 | Per-Hat Backend Configuration | Hat毎に異なるバックエンドを指定 | 重要 | Phase 4 |
+| F-019 | Custom Backends | 任意のCLI AIエージェントを統合可能 | 重要 | Phase 4 |
+| F-020 | Event Emission CLI | `orch emit`コマンドでCLI経由でイベント発行 | 重要 | Phase 4 |
+| F-021 | Glob Pattern Event Matching | イベントトピックのワイルドカードマッチング | 中 | Phase 4 |
 
 ### 3.2 ユーザーストーリー
 
@@ -213,6 +237,115 @@ orchestrator-hybridは、GitHub Issueを入力としてAIエージェントを�
   - [ ] マージ時に`orch:merged`ラベルに変更される
   - [ ] 失敗時は`orch:failed`ラベルが付与される
 - **関連機能**: F-012
+
+#### US-009: Hat毎のモデル選択
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: Hat毎に異なるAIモデルを使い分けたい
+- **理由**: コスト最適化とタスク特化のため（軽いタスクはHaiku、重要な判断はOpus）
+- **受け入れ基準**:
+  - [ ] orch.ymlで`hats.<hat>.model`を指定できる
+  - [ ] Hat実行時に指定されたモデルが使用される
+  - [ ] モデル未指定時は`backend.model`を継承する
+  - [ ] Claude Code CLIのモデルエイリアス（opus/sonnet/haiku）が使える
+- **関連機能**: F-013
+
+#### US-010: セッション間での学習蓄積
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: 過去のセッションで学んだパターンや解決策を次回以降も活用したい
+- **理由**: 同じ問題を繰り返し解決する手間を省き、プロジェクト固有の知識を蓄積するため
+- **受け入れ基準**:
+  - [ ] `.agent/memories.md`に学習内容が保存される
+  - [ ] 次回実行時にmemoriesが自動的にプロンプトに注入される
+  - [ ] `orch tools memory add/search/list/show/delete`でCLI管理できる
+  - [ ] memoriesは複数ループ間で共有される（worktreeでもシンボリックリンク）
+- **関連機能**: F-014
+
+#### US-011: タスク依存関係の追跡
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: タスク間の依存関係を管理し、ブロック状態を可視化したい
+- **理由**: 複雑なタスクの進捗を把握し、ループ完了検証に活用するため
+- **受け入れ基準**:
+  - [ ] `.agent/tasks.jsonl`でタスクをJSONL形式で管理
+  - [ ] `orch tools task add/list/ready/close`でCLI管理できる
+  - [ ] `--blocked-by`オプションで依存関係を設定できる
+  - [ ] `orch tools task ready`でブロックされていないタスクのみ表示
+- **関連機能**: F-015
+
+#### US-012: セッション記録とリプレイ
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: セッションを記録してデバッグやテストに活用したい
+- **理由**: 問題発生時の再現やテストの自動化のため
+- **受け入れ基準**:
+  - [ ] `--record-session <FILE>`でJSONLにセッション記録
+  - [ ] 記録されたセッションをリプレイできる
+  - [ ] Smoke testで記録されたフィクスチャを使用できる
+  - [ ] APIコール不要で高速・決定的なテスト実行
+- **関連機能**: F-016
+
+#### US-013: 完全に隔離された並列実行
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: 複数のタスクを完全に隔離された環境で並列実行したい
+- **理由**: ファイルシステムの競合を避け、真の並列実行を実現するため
+- **受け入れ基準**:
+  - [ ] 最初のループはプライマリ環境で実行される
+  - [ ] 2つ目以降のループは自動的にworktreeに分離される
+  - [ ] 各ループは独立したevents/tasks/scratchpadを持つ
+  - [ ] memoriesはシンボリックリンクで共有される
+  - [ ] ループ完了時に自動マージされる（AI駆動のコンフリクト解決）
+- **関連機能**: F-017
+
+#### US-014: Hat毎のバックエンド選択
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: Hat毎に異なるバックエンド（Claude/Gemini/カスタム）を使い分けたい
+- **理由**: タスク特化やコスト最適化のため（例: AWS操作はKiro、コードレビューはGemini）
+- **受け入れ基準**:
+  - [ ] orch.ymlで`hats.<hat>.backend`を指定できる
+  - [ ] 文字列（"claude"/"gemini"）またはオブジェクト（Kiro agent指定）で設定可能
+  - [ ] Hat実行時に指定されたバックエンドが使用される
+  - [ ] バックエンド未指定時は`backend.type`を継承する
+- **関連機能**: F-018
+
+#### US-015: カスタムバックエンドの統合
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: 任意のCLI AIエージェントをバックエンドとして統合したい
+- **理由**: 社内ツールや新しいAIエージェントを活用するため
+- **受け入れ基準**:
+  - [ ] orch.ymlで`backend.command`と`backend.args`を指定できる
+  - [ ] `prompt_mode: arg`または`stdin`でプロンプト渡し方を選択できる
+  - [ ] `prompt_flag`でプロンプトフラグ（`-p`等）を指定できる
+  - [ ] カスタムバックエンドが正常に実行される
+- **関連機能**: F-019
+
+#### US-016: CLI経由でのイベント発行
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: CLI経由で明示的にイベントを発行したい
+- **理由**: Hat間のハンドオフを手動で制御したい場合があるため
+- **受け入れ基準**:
+  - [ ] `orch emit <topic> <message>`でイベントを発行できる
+  - [ ] `--json`オプションでJSONペイロードを渡せる
+  - [ ] `--target`オプションで特定Hatへのハンドオフができる
+  - [ ] 発行されたイベントがevents.jsonlに記録される
+- **関連機能**: F-020
+
+#### US-017: イベントトピックのワイルドカードマッチング
+
+- **ユーザー**: AIエージェント開発者
+- **したいこと**: イベントトピックをワイルドカードでマッチングしたい
+- **理由**: 複数の関連イベントを1つのHatで処理したいため
+- **受け入れ基準**:
+  - [ ] `triggers: ["build.*"]`で`build.done`、`build.blocked`等にマッチ
+  - [ ] `triggers: ["*.done"]`で任意の完了イベントにマッチ
+  - [ ] 具体的パターンがワイルドカードより優先される
+  - [ ] グローバルワイルドカード（`*`）はフォールバックとして機能
+- **関連機能**: F-021
 
 ### 3.3 機能詳細
 
@@ -818,6 +951,451 @@ orch run --issue 42 --auto
 
 ---
 
+#### F-013: Per-Hat/Step Model Selection
+
+**概要**: Hat毎に異なるAIモデルを指定可能にし、コスト最適化とタスク特化を実現
+
+**入力**:
+- Hat定義（orch.yml）
+- モデル指定（Hat固有またはグローバル）
+
+**出力**:
+- 指定されたモデルでのAI実行
+
+**処理概要**:
+1. Hat実行時に`hats.<hat>.model`を確認
+2. 未指定の場合は`backend.model`を使用
+3. それも未指定の場合はClaude CLIデフォルト（sonnet）
+4. `--model`フラグでClaude Code CLIを実行
+
+**YAML設定例**:
+```yaml
+backend:
+  type: claude
+  model: sonnet  # グローバルデフォルト
+
+hats:
+  planner:
+    model: opus  # このHatはOpusを使用
+  implementer:
+    # model省略 → backend.modelを継承
+  reviewer:
+    model: haiku  # 軽量モデルで高速レビュー
+```
+
+**ビジネスルール**:
+- BR-040: モデル解決優先度は `hats.<hat>.model` → `backend.model` → Claude CLIデフォルト
+- BR-041: Claude Code CLIのエイリアス（opus/sonnet/haiku）をサポート
+- BR-042: フルモデル名（claude-sonnet-4-5-20250929）もサポート
+
+**制約事項**:
+- Claude Code CLIがインストールされている必要がある
+- OpenCodeバックエンドは別途対応が必要
+
+---
+
+#### F-014: Memories System
+
+**概要**: `.agent/memories.md`にセッション間で学習内容を永続化し、プロジェクト固有の知識を蓄積
+
+**入力**:
+- 学習内容（パターン、アーキテクチャ決定、解決策）
+- タグ（オプション）
+
+**出力**:
+- `.agent/memories.md`への追記
+- プロンプトへの自動注入（inject: auto時）
+
+**処理概要**:
+1. セッション中に発見したパターンや解決策を記録
+2. `.agent/memories.md`に追記
+3. 次回実行時にmemoriesを読み込み
+4. `inject: auto`の場合はプロンプトに自動注入
+
+**YAML設定例**:
+```yaml
+memories:
+  enabled: true
+  inject: auto  # auto, manual, none
+```
+
+**CLIコマンド**:
+```bash
+orch tools memory add "content" -t pattern --tags tag1,tag2
+orch tools memory search "query"
+orch tools memory list
+orch tools memory show <id>
+orch tools memory delete <id>
+```
+
+**ビジネスルール**:
+- BR-043: memoriesはworktree間でシンボリックリンクで共有
+- BR-044: `inject: auto`時はプロンプトの先頭に注入
+- BR-045: `inject: manual`時はエージェントが明示的に読み込む
+- BR-046: `inject: none`時は注入しない
+
+**制約事項**:
+- memoriesファイルのサイズ上限は設定可能（デフォルト: 10MB）
+
+---
+
+#### F-015: Tasks System
+
+**概要**: `.agent/tasks.jsonl`でタスクをJSONL形式で管理し、依存関係を追跡
+
+**入力**:
+- タスク情報（タイトル、優先度、依存関係）
+
+**出力**:
+- `.agent/tasks.jsonl`への追記
+- タスク状態の更新
+
+**処理概要**:
+1. タスクをJSONL形式で`.agent/tasks.jsonl`に記録
+2. 依存関係（`blocked_by`）を追跡
+3. `orch tools task ready`でブロックされていないタスクのみ表示
+4. ループ完了検証に使用
+
+**JSONL形式**:
+```jsonl
+{"id": "task-001", "title": "Add auth", "priority": 2, "status": "open", "blocked_by": []}
+{"id": "task-002", "title": "Add tests", "priority": 3, "status": "open", "blocked_by": ["task-001"]}
+```
+
+**YAML設定例**:
+```yaml
+tasks:
+  enabled: true
+```
+
+**CLIコマンド**:
+```bash
+orch tools task add "Title" -p 2
+orch tools task add "X" --blocked-by Y
+orch tools task list
+orch tools task ready
+orch tools task close <id>
+```
+
+**ビジネスルール**:
+- BR-047: タスクIDは自動生成（task-001, task-002...）
+- BR-048: 優先度は1-5（1が最高）
+- BR-049: `status`は`open`/`in-progress`/`closed`
+- BR-050: 依存タスクが完了するまで`ready`に表示されない
+
+**制約事項**:
+- tasksファイルのサイズ上限は設定可能（デフォルト: 1MB）
+
+---
+
+#### F-016: Session Recording
+
+**概要**: `--record-session <FILE>`でJSONLにセッション記録し、デバッグやテストに活用
+
+**入力**:
+- セッション実行内容（各イテレーションの入出力）
+
+**出力**:
+- JSONL形式のセッション記録ファイル
+
+**処理概要**:
+1. `--record-session <FILE>`オプション指定時にセッション記録を開始
+2. 各イテレーションの入力プロンプト、出力、イベントをJSONL化
+3. ファイルに追記
+4. リプレイ時はJSONLを読み込んでテスト実行（APIコール不要）
+
+**CLI使用例**:
+```bash
+# セッション記録
+orch run --issue 42 --record-session session.jsonl
+
+# リプレイ（テスト用）
+orch replay session.jsonl
+```
+
+**JSONL形式（推定）**:
+```jsonl
+{"iteration": 1, "hat": "planner", "prompt": "...", "output": "...", "events": ["plan.ready"]}
+{"iteration": 2, "hat": "implementer", "prompt": "...", "output": "...", "events": ["code.written"]}
+```
+
+**ビジネスルール**:
+- BR-051: セッション記録は各イテレーション毎に1行追記
+- BR-052: リプレイ時はAPIコールせずに記録された出力を使用
+- BR-053: Smoke testで記録されたフィクスチャを使用可能
+
+**制約事項**:
+- 記録ファイルのサイズ上限は設定可能（デフォルト: 100MB）
+
+---
+
+#### F-017: Multi-Loop Concurrency
+
+**概要**: git worktreeを使った並列実行で、ファイルシステムを完全に分離
+
+**入力**:
+- 複数のループ実行要求
+
+**出力**:
+- プライマリループ（in-place実行）
+- セカンダリループ（worktreeに分離）
+- 自動マージ結果
+
+**処理概要**:
+1. 最初のループは`.orch/loop.lock`を取得してin-place実行
+2. 2つ目以降のループは`.worktrees/<loop-id>/`にworktreeを作成
+3. 各ループは独立したevents/tasks/scratchpadを持つ
+4. memoriesはシンボリックリンクで共有
+5. ループ完了時に自動マージ（AI駆動のコンフリクト解決）
+
+**ファイル構造**:
+```
+project/
+├── .orch/
+│   ├── loop.lock          # プライマリループ
+│   ├── loops.json         # ループレジストリ
+│   └── merge-queue.jsonl  # マージイベントログ
+├── .agent/
+│   └── memories.md        # 全ループで共有
+└── .worktrees/
+    └── orch-20260126-a3f2/
+        ├── .orch/events.jsonl
+        ├── .agent/
+        │   ├── memories.md → ../../.agent/memories.md
+        │   └── scratchpad.md
+        └── [project files]
+```
+
+**CLI使用例**:
+```bash
+# ターミナル1: プライマリループ
+orch run --issue 42 --auto
+
+# ターミナル2: 自動的にworktreeに分離
+orch run --issue 43 --auto
+
+# ループ一覧
+orch loops
+
+# 特定ループのログ
+orch loops logs <loop-id> --follow
+
+# 自動マージをスキップ
+orch run --issue 44 --no-auto-merge
+```
+
+**ループ状態**:
+| 状態 | 説明 |
+|------|------|
+| `running` | 実行中 |
+| `queued` | 完了、マージ待ち |
+| `merging` | マージ中 |
+| `merged` | マージ完了 |
+| `needs-review` | マージ失敗、手動解決必要 |
+| `crashed` | プロセス異常終了 |
+| `orphan` | worktree存在、未追跡 |
+| `discarded` | ユーザーが明示的に破棄 |
+
+**ビジネスルール**:
+- BR-054: プライマリループは`.orch/loop.lock`で排他制御
+- BR-055: セカンダリループは自動的にworktreeに分離
+- BR-056: memoriesはシンボリックリンクで共有（他は分離）
+- BR-057: ループ完了時に自動マージ（`--no-auto-merge`で無効化可能）
+- BR-058: マージ失敗時は`needs-review`状態にして手動解決を促す
+
+**制約事項**:
+- git worktreeが利用可能である必要がある
+- 自動マージにはAIによるコンフリクト解決が必要
+
+---
+
+#### F-018: Per-Hat Backend Configuration
+
+**概要**: Hat毎に異なるバックエンド（Claude/Gemini/Kiro/カスタム）を指定可能
+
+**入力**:
+- Hat定義（orch.yml）
+- バックエンド指定（Hat固有またはグローバル）
+
+**出力**:
+- 指定されたバックエンドでのAI実行
+
+**処理概要**:
+1. Hat実行時に`hats.<hat>.backend`を確認
+2. 未指定の場合は`backend.type`を使用
+3. バックエンドに応じたアダプターを初期化
+4. Hat実行
+
+**YAML設定例**:
+```yaml
+backend:
+  type: claude  # グローバルデフォルト
+
+hats:
+  builder:
+    backend: claude  # Claude for coding
+  researcher:
+    backend:
+      type: kiro
+      agent: researcher  # Kiro with MCP tools
+  reviewer:
+    backend: gemini  # Different model for fresh perspective
+```
+
+**バックエンドタイプ**:
+| タイプ | 構文 | 実行方法 |
+|--------|------|----------|
+| Named | `backend: "claude"` | 標準バックエンド設定を使用 |
+| Kiro Agent | `backend: { type: "kiro", agent: "builder" }` | `kiro-cli --agent builder ...` |
+| Custom | `backend: { command: "...", args: [...] }` | カスタムコマンド |
+
+**ビジネスルール**:
+- BR-059: バックエンド解決優先度は `hats.<hat>.backend` → `backend.type`
+- BR-060: Kiro agentは`{ type: "kiro", agent: "<name>" }`形式で指定
+- BR-061: カスタムバックエンドは`{ command: "...", args: [...] }`形式で指定
+
+**制約事項**:
+- 指定されたバックエンドがインストールされている必要がある
+
+---
+
+#### F-019: Custom Backends
+
+**概要**: 任意のCLI AIエージェントをバックエンドとして統合可能
+
+**入力**:
+- カスタムバックエンド設定（command, args, prompt_mode, prompt_flag）
+
+**出力**:
+- カスタムバックエンドでのAI実行
+
+**処理概要**:
+1. `backend.command`と`backend.args`を読み込み
+2. `prompt_mode`に応じてプロンプトを渡す（arg or stdin）
+3. `prompt_flag`が指定されている場合はフラグを付与
+4. カスタムコマンドを実行
+
+**YAML設定例**:
+```yaml
+backend:
+  type: custom
+  command: "my-agent"
+  args: ["--headless", "--auto-approve"]
+  prompt_mode: arg        # "arg" or "stdin"
+  prompt_flag: "-p"       # オプション
+```
+
+**設定フィールド**:
+| フィールド | 説明 |
+|-----------|------|
+| `command` | 実行するCLIコマンド |
+| `args` | プロンプト前に挿入される引数 |
+| `prompt_mode` | プロンプトの渡し方（`arg`または`stdin`） |
+| `prompt_flag` | プロンプト前のフラグ（例: `-p`, `--prompt`） |
+
+**ビジネスルール**:
+- BR-062: `prompt_mode: arg`時はコマンドライン引数でプロンプトを渡す
+- BR-063: `prompt_mode: stdin`時は標準入力でプロンプトを渡す
+- BR-064: `prompt_flag`が省略された場合はプロンプトを位置引数として渡す
+
+**制約事項**:
+- カスタムバックエンドがインストールされている必要がある
+- カスタムバックエンドの出力形式は標準出力に対応
+
+---
+
+#### F-020: Event Emission CLI
+
+**概要**: `orch emit`コマンドでCLI経由でイベントを発行し、Hat間のハンドオフを制御
+
+**入力**:
+- イベントトピック
+- メッセージまたはJSONペイロード
+- ターゲットHat（オプション）
+
+**出力**:
+- events.jsonlへのイベント記録
+- 対応するHatのトリガー
+
+**処理概要**:
+1. `orch emit <topic> <message>`でイベントを発行
+2. `--json`オプションでJSONペイロードを渡す
+3. `--target`オプションで特定Hatへのハンドオフ
+4. events.jsonlに記録
+5. 対応するHatをトリガー
+
+**CLI使用例**:
+```bash
+orch emit "build.done" "tests: pass, lint: pass"
+orch emit "review.done" --json '{"status": "approved"}'
+orch emit "handoff" --target reviewer "Please review"
+```
+
+**Agent出力内でのイベント発行**:
+```xml
+<event topic="impl.done">Implementation complete</event>
+<event topic="handoff" target="reviewer">Please review</event>
+```
+
+**ビジネスルール**:
+- BR-065: イベントトピックは任意の文字列
+- BR-066: `--json`オプション時はJSONペイロードとして解析
+- BR-067: `--target`オプション時は特定Hatへのハンドオフ
+- BR-068: イベントはevents.jsonlに記録される
+
+**制約事項**:
+- なし
+
+---
+
+#### F-021: Glob Pattern Event Matching
+
+**概要**: イベントトピックのワイルドカードマッチングで、複数の関連イベントを1つのHatで処理
+
+**入力**:
+- イベントトピック
+- Hatのトリガーパターン（globパターン）
+
+**出力**:
+- マッチしたHatのトリガー
+
+**処理概要**:
+1. イベント発行時にトピックを確認
+2. 各Hatのトリガーパターンとマッチング
+3. 具体的パターンを優先
+4. ワイルドカードパターンをフォールバックとして使用
+5. マッチしたHatをトリガー
+
+**パターン例**:
+```yaml
+triggers: ["build.*"]   # build.done, build.blocked等
+triggers: ["*.done"]    # 任意の完了イベント
+triggers: ["*"]         # グローバルワイルドカード（フォールバック用）
+```
+
+**マッチングルール**:
+| パターン | マッチ対象 |
+|---------|-----------|
+| `task.start` | 完全一致: `task.start` |
+| `build.*` | `build.done`, `build.blocked`, `build.task`等 |
+| `*.done` | `build.done`, `review.done`, `test.done`等 |
+| `*` | すべて（フォールバック） |
+
+**優先度ルール**:
+- 具体的パターンがワイルドカードより優先
+- 複数のHatが具体的パターンでマッチした場合はエラー（曖昧なルーティング）
+- グローバルワイルドカード（`*`）は具体的ハンドラーがない場合のみトリガー
+
+**ビジネスルール**:
+- BR-069: 具体的パターンがワイルドカードより優先
+- BR-070: 複数のHatが同じ具体的パターンでマッチした場合はエラー
+- BR-071: グローバルワイルドカード（`*`）はフォールバックとして機能
+
+**制約事項**:
+- なし
+
+---
+
 ## 4. 非機能要件
 
 ### 4.1 性能要件
@@ -830,6 +1408,10 @@ orch run --issue 42 --auto
 | NFR-P-004 | CI監視レスポンス時間 | 1秒以内 | 統合テスト |
 | NFR-P-005 | ログ監視遅延 | 500ms以内 | 統合テスト |
 | NFR-P-006 | 依存関係解析時間 | 2秒以内（10Issue） | 統合テスト |
+| NFR-P-007 | Memories読み込み時間 | 100ms以内（10MB） | ユニットテスト |
+| NFR-P-008 | Tasks読み込み時間 | 50ms以内（1000タスク） | ユニットテスト |
+| NFR-P-009 | Worktree作成時間 | 5秒以内 | 統合テスト |
+| NFR-P-010 | 自動マージ時間 | 30秒以内（コンフリクトなし） | 統合テスト |
 
 ### 4.2 可用性要件
 
@@ -840,6 +1422,8 @@ orch run --issue 42 --auto
 | NFR-A-003 | ホスト環境での継続実行 | コンテナ環境が全て利用不可でもhost環境で実行可能 |
 | NFR-A-004 | CIタイムアウト時の挙動 | エラーログ出力、マージせずに終了 |
 | NFR-A-005 | ログファイル破損時の挙動 | エラーログ出力、監視を継続 |
+| NFR-A-006 | Worktree作成失敗時の挙動 | エラーログ出力、プライマリループで実行 |
+| NFR-A-007 | 自動マージ失敗時の挙動 | `needs-review`状態にして手動解決を促す |
 
 ### 4.3 セキュリティ要件
 
@@ -849,6 +1433,8 @@ orch run --issue 42 --auto
 | NFR-S-002 | GitHub Token管理 | 環境変数または設定ファイル（.gitignore対象） |
 | NFR-S-003 | 機密情報のログ出力禁止 | トークン、パスワードはマスク |
 | NFR-S-004 | ホスト環境実行時の警告 | 隔離されていない環境での実行リスクをユーザーに明示 |
+| NFR-S-005 | Memoriesの機密情報保護 | 機密情報を含むmemoriesは暗号化または除外 |
+| NFR-S-006 | Worktree間の隔離 | 各worktreeは独立したファイルシステムで隔離 |
 
 ### 4.4 ユーザビリティ要件
 
@@ -860,6 +1446,9 @@ orch run --issue 42 --auto
 | NFR-U-004 | 実行ログの即時確認 | タスク実行中でもログをリアルタイムで確認可能 |
 | NFR-U-005 | CI監視の進捗表示 | CI実行状況をリアルタイムで表示 |
 | NFR-U-006 | 依存関係の可視化 | 依存関係グラフを視覚的に表示 |
+| NFR-U-007 | Memories検索の容易性 | キーワード検索、タグフィルタリングが可能 |
+| NFR-U-008 | Tasks管理の視覚性 | タスク一覧、依存関係が視覚的に確認可能 |
+| NFR-U-009 | ループ状態の可視化 | 実行中のループ一覧、状態が一目で確認可能 |
 
 ### 4.5 保守性要件
 
@@ -949,6 +1538,10 @@ orch run --issue 42 --auto
 | R-006 | CI監視中のネットワーク障害 | 中 | 低 | タイムアウト設定、リトライ機能 |
 | R-007 | 依存関係APIの利用不可 | 中 | 低 | エラーメッセージ表示、手動実行を促す |
 | R-008 | ラベル付与時のAPI rate limit | 低 | 中 | リトライ機能、rate limit確認 |
+| R-009 | Memoriesファイルの肥大化 | 中 | 中 | サイズ上限設定、古いエントリの自動削除 |
+| R-010 | Worktree自動マージのコンフリクト | 高 | 中 | AI駆動のコンフリクト解決、手動解決フォールバック |
+| R-011 | カスタムバックエンドの互換性問題 | 中 | 低 | ドキュメントで要件明記、エラーハンドリング |
+| R-012 | 並列ループ実行時のリソース枯渇 | 中 | 中 | 最大並列数制限、リソース監視 |
 
 ### 8.2 未解決課題
 
@@ -960,6 +1553,12 @@ orch run --issue 42 --auto
 | I-004 | CI監視のタイムアウト値の最適化 | 開発者 | Phase 3開始前 |
 | I-005 | 依存関係グラフの可視化方法 | 開発者 | Phase 3開始前 |
 | I-006 | ラベル体系のカスタマイズ範囲 | 開発者 | Phase 3開始前 |
+| I-007 | Memoriesの最適なサイズ上限 | 開発者 | Phase 4開始前 |
+| I-008 | Tasksの依存関係解決アルゴリズム詳細 | 開発者 | Phase 4開始前 |
+| I-009 | Worktree自動マージのAIプロンプト設計 | 開発者 | Phase 4開始前 |
+| I-010 | 並列ループの最大数制限 | 開発者 | Phase 4開始前 |
+| I-011 | OpenCodeバックエンドのモデル選択対応 | 開発者 | Phase 4開始前 |
+| I-012 | Kiroバックエンドの統合方法 | 開発者 | Phase 4開始前 |
 
 ---
 
@@ -981,6 +1580,18 @@ orch run --issue 42 --auto
 | トポロジカルソート | 依存関係を考慮した順序付けアルゴリズム |
 | 循環依存 | Issue A → B → A のように依存関係がループする状態 |
 | squash merge | 複数のコミットを1つにまとめてマージする方式 |
+| Memories | セッション間で永続化される学習内容（`.agent/memories.md`） |
+| Tasks | ランタイムタスク追跡システム（`.agent/tasks.jsonl`） |
+| Session Recording | セッション実行内容のJSONL記録 |
+| Worktree | git worktreeを使った並列実行環境 |
+| プライマリループ | 最初に実行されるループ（in-place実行） |
+| セカンダリループ | 2つ目以降のループ（worktreeに分離） |
+| 自動マージ | AI駆動のコンフリクト解決によるworktreeマージ |
+| Per-Hat Model Selection | Hat毎に異なるAIモデルを指定する機能 |
+| Per-Hat Backend | Hat毎に異なるバックエンドを指定する機能 |
+| Custom Backend | 任意のCLI AIエージェントを統合する機能 |
+| Glob Pattern | ワイルドカードを使ったパターンマッチング（例: `build.*`） |
+| Kiro | MCP toolsを持つAIエージェント |
 
 ---
 
@@ -992,6 +1603,7 @@ orch run --issue 42 --auto
 | 1.1.0 | 2026-01-24 | ホスト環境実行対応（F-002）を追加、フォールバック機能を追加 | AI Assistant |
 | 1.2.0 | 2026-01-24 | 実行ログリアルタイム確認機能（F-008）を追加 | AI Assistant |
 | 1.3.0 | 2026-01-25 | Phase 3機能を追加（F-009: PR自動マージ、F-010: リアルタイムログ監視、F-011: Issue依存関係管理、F-012: Issueステータスラベル） | AI Assistant |
+| 1.4.0 | 2026-01-26 | Phase 4機能を追加（F-013: Per-Hat Model Selection、F-014: Memories System、F-015: Tasks System、F-016: Session Recording、F-017: Multi-Loop Concurrency、F-018: Per-Hat Backend、F-019: Custom Backends、F-020: Event Emission CLI、F-021: Glob Pattern Event Matching） | AI Assistant |
 
 ---
 
@@ -1035,8 +1647,21 @@ orch run --issue 42 --auto
 3. F-011: Issue依存関係管理機能
 4. F-012: Issueステータスラベル機能
 
-### Phase 4（将来検討）
+### Phase 4（v1.4.0新機能）
+1. F-013: Per-Hat/Step Model Selection
+2. F-014: Memories System
+3. F-015: Tasks System
+4. F-016: Session Recording
+5. F-017: Multi-Loop Concurrency
+6. F-018: Per-Hat Backend Configuration
+7. F-019: Custom Backends
+8. F-020: Event Emission CLI
+9. F-021: Glob Pattern Event Matching
+
+### Phase 5（将来検討）
 - 他のコンテナランタイム対応（Podman等）
 - Issue作成時のテンプレートカスタマイズ
 - 改善点の優先度自動判定の精度向上
 - 依存関係グラフの可視化UI
+- TUI Mode（リアルタイムUI）
+- より多くのPresets（adversarial-review、scientific-method等）
