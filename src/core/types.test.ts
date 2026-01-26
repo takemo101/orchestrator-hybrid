@@ -616,4 +616,288 @@ describe("types.ts 拡張", () => {
 			expect(result.dependency).toBeUndefined();
 		});
 	});
+
+	// v1.4.0 新規型定義テスト
+
+	describe("ModelAliasSchema (v1.4.0)", () => {
+		it("エイリアス opus を受け入れる", () => {
+			expect(ModelAliasSchema.parse("opus")).toBe("opus");
+		});
+
+		it("エイリアス sonnet を受け入れる", () => {
+			expect(ModelAliasSchema.parse("sonnet")).toBe("sonnet");
+		});
+
+		it("エイリアス haiku を受け入れる", () => {
+			expect(ModelAliasSchema.parse("haiku")).toBe("haiku");
+		});
+
+		it("フルモデル名 claude-sonnet-4-5-20250929 を受け入れる", () => {
+			expect(ModelAliasSchema.parse("claude-sonnet-4-5-20250929")).toBe(
+				"claude-sonnet-4-5-20250929",
+			);
+		});
+
+		it("無効なモデル名を拒否する", () => {
+			expect(() => ModelAliasSchema.parse("invalid")).toThrow();
+			expect(() => ModelAliasSchema.parse("gpt-4")).toThrow();
+		});
+	});
+
+	describe("HatBackendSchema (v1.4.0)", () => {
+		it("文字列 claude を受け入れる", () => {
+			expect(HatBackendSchema.parse("claude")).toBe("claude");
+		});
+
+		it("文字列 opencode を受け入れる", () => {
+			expect(HatBackendSchema.parse("opencode")).toBe("opencode");
+		});
+
+		it("文字列 gemini を受け入れる", () => {
+			expect(HatBackendSchema.parse("gemini")).toBe("gemini");
+		});
+
+		it("Kiro backend オブジェクトを受け入れる", () => {
+			const result = HatBackendSchema.parse({ type: "kiro", agent: "researcher" });
+			expect(result).toEqual({ type: "kiro", agent: "researcher" });
+		});
+
+		it("空のagentを拒否する", () => {
+			expect(() => HatBackendSchema.parse({ type: "kiro", agent: "" })).toThrow();
+		});
+
+		it("カスタムバックエンドオブジェクトを受け入れる", () => {
+			const result = HatBackendSchema.parse({
+				command: "my-agent",
+				args: ["--headless"],
+				prompt_mode: "stdin",
+				prompt_flag: "-p",
+			});
+			expect(result).toEqual({
+				command: "my-agent",
+				args: ["--headless"],
+				prompt_mode: "stdin",
+				prompt_flag: "-p",
+			});
+		});
+
+		it("カスタムバックエンドのprompt_modeデフォルト値", () => {
+			const result = HatBackendSchema.parse({
+				command: "my-agent",
+			});
+			expect(result).toMatchObject({
+				command: "my-agent",
+				prompt_mode: "arg",
+			});
+		});
+	});
+
+	describe("TaskStatusSchema (v1.4.0)", () => {
+		it("有効なタスク状態を受け入れる", () => {
+			expect(TaskStatusSchema.parse("open")).toBe("open");
+			expect(TaskStatusSchema.parse("in-progress")).toBe("in-progress");
+			expect(TaskStatusSchema.parse("closed")).toBe("closed");
+		});
+
+		it("無効なタスク状態を拒否する", () => {
+			expect(() => TaskStatusSchema.parse("invalid")).toThrow();
+		});
+	});
+
+	describe("CustomBackendConfigSchema (v1.4.0)", () => {
+		it("有効なカスタムバックエンド設定を受け入れる", () => {
+			const result = CustomBackendConfigSchema.parse({
+				type: "custom",
+				command: "my-agent",
+				args: ["--headless"],
+				prompt_mode: "stdin",
+				prompt_flag: "-p",
+			});
+			expect(result.type).toBe("custom");
+			expect(result.command).toBe("my-agent");
+		});
+
+		it("デフォルト値が正しく設定される", () => {
+			const result = CustomBackendConfigSchema.parse({
+				type: "custom",
+				command: "my-agent",
+			});
+			expect(result.args).toEqual([]);
+			expect(result.prompt_mode).toBe("arg");
+			expect(result.prompt_flag).toBeUndefined();
+		});
+
+		it("空のcommandを拒否する", () => {
+			expect(() =>
+				CustomBackendConfigSchema.parse({
+					type: "custom",
+					command: "",
+				}),
+			).toThrow();
+		});
+	});
+
+	describe("MemoryEntry インターフェース (v1.4.0)", () => {
+		it("有効なMemoryEntryオブジェクトを作成できる", () => {
+			const entry: MemoryEntry = {
+				id: "mem-001",
+				type: "pattern",
+				content: "Always use async/await",
+				tags: ["async", "best-practice"],
+				createdAt: "2026-01-27T00:00:00Z",
+			};
+			expect(entry.id).toBe("mem-001");
+			expect(entry.type).toBe("pattern");
+		});
+
+		it("すべてのtypeを使用できる", () => {
+			const types: MemoryEntry["type"][] = ["pattern", "architecture", "solution", "lesson"];
+			for (const type of types) {
+				const entry: MemoryEntry = {
+					id: "mem-001",
+					type,
+					content: "content",
+					tags: [],
+					createdAt: "2026-01-27T00:00:00Z",
+				};
+				expect(entry.type).toBe(type);
+			}
+		});
+	});
+
+	describe("TaskEntry インターフェース (v1.4.0)", () => {
+		it("有効なTaskEntryオブジェクトを作成できる", () => {
+			const entry: TaskEntry = {
+				id: "task-001",
+				title: "Add authentication",
+				priority: 1,
+				status: "open",
+				blocked_by: [],
+				createdAt: "2026-01-27T00:00:00Z",
+			};
+			expect(entry.id).toBe("task-001");
+			expect(entry.priority).toBe(1);
+		});
+
+		it("closedAtはオプショナル", () => {
+			const entry: TaskEntry = {
+				id: "task-001",
+				title: "Done task",
+				priority: 3,
+				status: "closed",
+				blocked_by: [],
+				createdAt: "2026-01-27T00:00:00Z",
+				closedAt: "2026-01-27T01:00:00Z",
+			};
+			expect(entry.closedAt).toBe("2026-01-27T01:00:00Z");
+		});
+	});
+
+	describe("SessionRecordEntry インターフェース (v1.4.0)", () => {
+		it("有効なSessionRecordEntryオブジェクトを作成できる", () => {
+			const entry: SessionRecordEntry = {
+				iteration: 1,
+				hat: "planner",
+				prompt: "Create a plan",
+				output: "Plan created",
+				events: ["plan.ready"],
+				model: "opus",
+				backend: "claude",
+				durationMs: 5000,
+				timestamp: "2026-01-27T00:00:00Z",
+			};
+			expect(entry.iteration).toBe(1);
+			expect(entry.hat).toBe("planner");
+		});
+
+		it("modelとbackendはオプショナル", () => {
+			const entry: SessionRecordEntry = {
+				iteration: 1,
+				hat: "builder",
+				prompt: "Build",
+				output: "Done",
+				events: [],
+				durationMs: 1000,
+				timestamp: "2026-01-27T00:00:00Z",
+			};
+			expect(entry.model).toBeUndefined();
+			expect(entry.backend).toBeUndefined();
+		});
+	});
+
+	describe("LoopEntry インターフェース (v1.4.0)", () => {
+		it("有効なLoopEntryオブジェクトを作成できる", () => {
+			const entry: LoopEntry = {
+				id: "orch-20260127-abc1",
+				issueNumber: 42,
+				branch: "feature/issue-42",
+				state: "running",
+				isPrimary: true,
+				startedAt: "2026-01-27T00:00:00Z",
+			};
+			expect(entry.id).toBe("orch-20260127-abc1");
+			expect(entry.isPrimary).toBe(true);
+		});
+
+		it("オプショナルフィールドを使用できる", () => {
+			const entry: LoopEntry = {
+				id: "orch-20260127-abc1",
+				issueNumber: 42,
+				worktreePath: ".worktrees/orch-20260127-abc1",
+				branch: "feature/issue-42",
+				state: "merged",
+				isPrimary: false,
+				startedAt: "2026-01-27T00:00:00Z",
+				completedAt: "2026-01-27T01:00:00Z",
+				pid: 12345,
+			};
+			expect(entry.worktreePath).toBe(".worktrees/orch-20260127-abc1");
+			expect(entry.completedAt).toBeDefined();
+			expect(entry.pid).toBe(12345);
+		});
+	});
+
+	describe("EventEmission インターフェース (v1.4.0)", () => {
+		it("文字列メッセージでEventEmissionを作成できる", () => {
+			const event: EventEmission = {
+				topic: "build.done",
+				message: "Build completed successfully",
+				timestamp: "2026-01-27T00:00:00Z",
+			};
+			expect(event.topic).toBe("build.done");
+			expect(event.message).toBe("Build completed successfully");
+		});
+
+		it("JSONペイロードでEventEmissionを作成できる", () => {
+			const event: EventEmission = {
+				topic: "test.done",
+				message: { passed: 100, failed: 0 },
+				timestamp: "2026-01-27T00:00:00Z",
+			};
+			expect(event.message).toEqual({ passed: 100, failed: 0 });
+		});
+
+		it("targetを指定できる", () => {
+			const event: EventEmission = {
+				topic: "handoff",
+				message: "Please review",
+				target: "reviewer",
+				timestamp: "2026-01-27T00:00:00Z",
+			};
+			expect(event.target).toBe("reviewer");
+		});
+	});
+
+	describe("GlobMatchResult インターフェース (v1.4.0)", () => {
+		it("有効なGlobMatchResultオブジェクトを作成できる", () => {
+			const result: GlobMatchResult = {
+				hatName: "builder",
+				matchedPattern: "build.*",
+				specificityScore: 2,
+			};
+			expect(result.hatName).toBe("builder");
+			expect(result.matchedPattern).toBe("build.*");
+			expect(result.specificityScore).toBe(2);
+		});
+	});
 });
