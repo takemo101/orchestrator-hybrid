@@ -1,12 +1,12 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
-import {
-	EnvironmentStateManager,
-	type EnvironmentStateManagerConfig,
-	type EnvironmentMetadata,
-	type EnvironmentInfo,
-} from "./environment-state-manager.js";
+import { describe, expect, mock, test } from "bun:test";
 import type { ProcessResult } from "../core/process-executor.js";
 import type { IssueStatusLabelManager } from "../output/issue-status-label-manager.js";
+import {
+	type EnvironmentInfo,
+	type EnvironmentMetadata,
+	EnvironmentStateManager,
+	type EnvironmentStateManagerConfig,
+} from "./environment-state-manager.js";
 
 // Mock executor factory
 function createMockExecutor(responses: Map<string, ProcessResult>) {
