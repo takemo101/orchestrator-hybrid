@@ -6,6 +6,8 @@
  * ファイルシステムレベルで完全に分離された並列実行環境を実現します。
  */
 
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type {
 	WorktreeConfig,
 	WorktreeInfo,
@@ -14,6 +16,7 @@ import type {
 	WorktreeStatus,
 } from "../core/types";
 import { WorktreeError } from "../core/errors";
+import lockfile from "proper-lockfile";
 
 /**
  * プロセス実行結果
@@ -64,15 +67,90 @@ export class WorktreeManager {
 	 * @param projectRoot - プロジェクトルートパス
 	 * @param executor - プロセス実行器（DI用）
 	 */
-	constructor(
-		config: WorktreeConfig,
-		projectRoot: string,
-		executor?: ProcessExecutor,
-	) {
+	constructor(config: WorktreeConfig, projectRoot: string, executor?: ProcessExecutor) {
 		this.config = config;
 		this.projectRoot = projectRoot;
 		this.executor = executor ?? new BunProcessExecutor();
-		this.worktreesFilePath = `${projectRoot}/.worktrees.json`;
+		this.worktreesFilePath = path.join(projectRoot, ".worktrees.json");
+	}
+
+	/**
+	 * worktreeのパスを生成
+	 */
+	private getWorktreePath(issueNumber: number): string {
+		return path.join(this.projectRoot, this.config.base_dir, `issue-${issueNumber}`);
+	}
+
+	/**
+	 * worktreeの相対パスを生成
+	 */
+	private getWorktreeRelativePath(issueNumber: number): string {
+		return `${this.config.base_dir}/issue-${issueNumber}`;
+	}
+
+	/**
+	 * ブランチ名を生成
+	 */
+	private getBranchName(issueNumber: number): string {
+		return `feature/issue-${issueNumber}`;
+	}
+
+	/**
+	 * worktrees.jsonを読み込む
+	 */
+	private async loadWorktreesData(): Promise<WorktreesData> {
+		if (!fs.existsSync(this.worktreesFilePath)) {
+			return { worktrees: [] };
+		}
+		const content = fs.readFileSync(this.worktreesFilePath, "utf-8");
+		return JSON.parse(content) as WorktreesData;
+	}
+
+	/**
+	 * worktrees.jsonを保存
+	 */
+	private async saveWorktreesData(data: WorktreesData): Promise<void> {
+		fs.writeFileSync(this.worktreesFilePath, JSON.stringify(data, null, 2));
+	}
+
+	/**
+	 * ファイルロックを使った排他制御
+	 */
+	private async withLock<T>(fn: () => Promise<T>): Promise<T> {
+		// Ensure the file exists before locking
+		if (!fs.existsSync(this.worktreesFilePath)) {
+			await this.saveWorktreesData({ worktrees: [] });
+		}
+
+		let release: (() => Promise<void>) | undefined;
+		try {
+			release = await lockfile.lock(this.worktreesFilePath, {
+				retries: {
+					retries: 5,
+					minTimeout: 100,
+					maxTimeout: 1000,
+				},
+			});
+			return await fn();
+		} finally {
+			if (release) {
+				await release();
+			}
+		}
+	}
+
+	/**
+	 * 環境ファイルをworktreeにコピー
+	 */
+	private async copyEnvFiles(worktreePath: string): Promise<void> {
+		for (const envFile of this.config.copy_env_files) {
+			const sourcePath = path.join(this.projectRoot, envFile);
+			const destPath = path.join(worktreePath, envFile);
+
+			if (fs.existsSync(sourcePath)) {
+				fs.copyFileSync(sourcePath, destPath);
+			}
+		}
 	}
 
 	/**
@@ -89,8 +167,64 @@ export class WorktreeManager {
 		environmentType: WorktreeEnvironmentType,
 		environmentId?: string | null,
 	): Promise<WorktreeInfo | null> {
-		// TODO: Implement
-		throw new Error("Not implemented");
+		// worktreeが無効の場合は何もしない
+		if (!this.config.enabled) {
+			return null;
+		}
+
+		const worktreePath = this.getWorktreePath(issueNumber);
+		const worktreeRelativePath = this.getWorktreeRelativePath(issueNumber);
+		const branchName = this.getBranchName(issueNumber);
+
+		// 既存ディレクトリチェック
+		if (fs.existsSync(worktreePath)) {
+			throw new WorktreeError(`worktree ${worktreeRelativePath} は既に存在します`, {
+				path: worktreePath,
+				issueNumber,
+			});
+		}
+
+		// git worktree add実行
+		const result = await this.executor.execute("git", [
+			"worktree",
+			"add",
+			worktreePath,
+			"-b",
+			branchName,
+		]);
+
+		if (result.exitCode !== 0) {
+			throw new WorktreeError(`worktree作成失敗: ${result.stderr}`, {
+				path: worktreePath,
+				branchName,
+				exitCode: result.exitCode,
+			});
+		}
+
+		// 環境ファイルをコピー
+		await this.copyEnvFiles(worktreePath);
+
+		// WorktreeInfo作成
+		const info: WorktreeInfo = {
+			issueNumber,
+			path: worktreeRelativePath,
+			branch: branchName,
+			environmentType,
+			environmentId: environmentId ?? null,
+			createdAt: new Date().toISOString(),
+			status: "active",
+		};
+
+		// worktrees.jsonに保存（排他制御）
+		await this.withLock(async () => {
+			const data = await this.loadWorktreesData();
+			// 同じIssue番号の古いエントリを削除
+			data.worktrees = data.worktrees.filter((w) => w.issueNumber !== issueNumber);
+			data.worktrees.push(info);
+			await this.saveWorktreesData(data);
+		});
+
+		return info;
 	}
 
 	/**
@@ -100,12 +234,47 @@ export class WorktreeManager {
 	 * @param deleteBranch - ブランチも削除するか
 	 * @throws WorktreeError - 削除失敗時
 	 */
-	async removeWorktree(
-		issueNumber: number,
-		deleteBranch = false,
-	): Promise<void> {
-		// TODO: Implement
-		throw new Error("Not implemented");
+	async removeWorktree(issueNumber: number, deleteBranch = false): Promise<void> {
+		// worktrees.jsonから検索
+		const data = await this.loadWorktreesData();
+		const worktree = data.worktrees.find((w) => w.issueNumber === issueNumber);
+
+		// 存在しない場合は何もしない
+		if (!worktree) {
+			return;
+		}
+
+		const worktreePath = this.getWorktreePath(issueNumber);
+
+		// git worktree remove実行
+		const result = await this.executor.execute("git", [
+			"worktree",
+			"remove",
+			worktreePath,
+			"--force",
+		]);
+
+		if (result.exitCode !== 0) {
+			throw new WorktreeError(`worktree削除失敗: ${result.stderr}`, {
+				path: worktreePath,
+				exitCode: result.exitCode,
+			});
+		}
+
+		// ブランチ削除
+		if (deleteBranch) {
+			await this.executor.execute("git", ["branch", "-d", worktree.branch]);
+			// ブランチ削除の失敗は警告のみ（マージされていない場合など）
+		}
+
+		// worktrees.jsonから削除（排他制御）
+		await this.withLock(async () => {
+			const currentData = await this.loadWorktreesData();
+			currentData.worktrees = currentData.worktrees.filter(
+				(w) => w.issueNumber !== issueNumber,
+			);
+			await this.saveWorktreesData(currentData);
+		});
 	}
 
 	/**
@@ -114,8 +283,8 @@ export class WorktreeManager {
 	 * @returns WorktreeInfo配列
 	 */
 	async listWorktrees(): Promise<WorktreeInfo[]> {
-		// TODO: Implement
-		throw new Error("Not implemented");
+		const data = await this.loadWorktreesData();
+		return data.worktrees;
 	}
 
 	/**
@@ -125,8 +294,8 @@ export class WorktreeManager {
 	 * @returns WorktreeInfo（存在しない場合はnull）
 	 */
 	async getWorktree(issueNumber: number): Promise<WorktreeInfo | null> {
-		// TODO: Implement
-		throw new Error("Not implemented");
+		const data = await this.loadWorktreesData();
+		return data.worktrees.find((w) => w.issueNumber === issueNumber) ?? null;
 	}
 
 	/**
@@ -140,7 +309,28 @@ export class WorktreeManager {
 		issueNumber: number,
 		updates: Partial<Pick<WorktreeInfo, "environmentId" | "environmentType" | "status">>,
 	): Promise<void> {
-		// TODO: Implement
-		throw new Error("Not implemented");
+		await this.withLock(async () => {
+			const data = await this.loadWorktreesData();
+			const worktree = data.worktrees.find((w) => w.issueNumber === issueNumber);
+
+			if (!worktree) {
+				throw new WorktreeError(`worktree for Issue #${issueNumber} が見つかりません`, {
+					issueNumber,
+				});
+			}
+
+			// 更新
+			if (updates.environmentId !== undefined) {
+				worktree.environmentId = updates.environmentId;
+			}
+			if (updates.environmentType !== undefined) {
+				worktree.environmentType = updates.environmentType;
+			}
+			if (updates.status !== undefined) {
+				worktree.status = updates.status;
+			}
+
+			await this.saveWorktreesData(data);
+		});
 	}
 }
