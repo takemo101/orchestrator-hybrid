@@ -602,3 +602,63 @@ export class HybridEnvironmentError extends SandboxError {
 		this.name = "HybridEnvironmentError";
 	}
 }
+
+/**
+ * 環境状態管理エラー
+ *
+ * 環境状態管理（F-203）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // 更新失敗
+ * throw new EnvironmentStateError(
+ *   "環境状態更新失敗: permission denied",
+ *   { issueNumber: 42 }
+ * );
+ *
+ * // 取得失敗
+ * throw new EnvironmentStateError(
+ *   "環境状態取得失敗: Issue not found",
+ *   { issueNumber: 42 }
+ * );
+ * ```
+ */
+export class EnvironmentStateError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "ENVIRONMENT_STATE_ERROR",
+			details,
+		});
+		this.name = "EnvironmentStateError";
+	}
+}
+
+/**
+ * 自動クリーンアップエラー
+ *
+ * 自動クリーンアップ（F-204）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // worktree削除失敗
+ * throw new AutoCleanupError(
+ *   "worktree削除失敗: .worktrees/issue-42",
+ *   { issueNumber: 42, path: ".worktrees/issue-42" }
+ * );
+ *
+ * // 環境削除失敗
+ * throw new AutoCleanupError(
+ *   "container-use環境削除失敗",
+ *   { issueNumber: 42, environmentId: "abc-123" }
+ * );
+ * ```
+ */
+export class AutoCleanupError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "AUTO_CLEANUP_ERROR",
+			details,
+		});
+		this.name = "AutoCleanupError";
+	}
+}
