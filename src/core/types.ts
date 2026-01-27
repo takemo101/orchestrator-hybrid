@@ -370,50 +370,24 @@ export const SandboxConfigSchema = z.object({
 	/**
 	 * サンドボックスタイプ
 	 * - docker: Dockerコンテナ
-	 * - container-use: container-use環境
 	 * - host: ホスト環境（隔離なし）
 	 */
-	type: z.enum(["docker", "container-use", "host"]).default("container-use"),
+	type: z.enum(["docker", "host"]).default("docker"),
 
 	/**
 	 * フォールバック先のサンドボックスタイプ
 	 * プライマリが利用できない場合に使用
 	 */
-	fallback: z.enum(["docker", "container-use", "host"]).optional(),
+	fallback: z.enum(["docker", "host"]).optional(),
 
 	/**
 	 * Docker設定
 	 */
 	docker: z
 		.object({
-			/**
-			 * Dockerイメージ名
-			 * @example "node:20-alpine"
-			 */
 			image: z.string().default("node:20-alpine"),
-
-			/**
-			 * ネットワークモード
-			 * - none: ネットワーク無効（最も安全）
-			 * - bridge: ブリッジネットワーク
-			 * - host: ホストネットワーク
-			 */
 			network: z.enum(["none", "bridge", "host"]).optional(),
-
-			/**
-			 * タイムアウト（秒）
-			 */
 			timeout: z.number().default(300),
-		})
-		.optional(),
-
-	/**
-	 * container-use設定
-	 */
-	container_use: z
-		.object({
-			image: z.string().optional(),
-			env_id: z.string().optional(),
 		})
 		.optional(),
 
@@ -422,14 +396,7 @@ export const SandboxConfigSchema = z.object({
 	 */
 	host: z
 		.object({
-			/**
-			 * タイムアウト（秒）
-			 */
 			timeout: z.number().default(300),
-
-			/**
-			 * 初回実行時に警告を表示するか
-			 */
 			warn_on_start: z.boolean().default(true),
 		})
 		.optional(),
@@ -696,7 +663,7 @@ export type WorktreeConfig = z.infer<typeof WorktreeConfigSchema>;
 /**
  * Worktree環境タイプ (v2.0.0)
  */
-export const WorktreeEnvironmentTypeSchema = z.enum(["container-use", "docker", "host"]);
+export const WorktreeEnvironmentTypeSchema = z.enum(["docker", "host"]);
 export type WorktreeEnvironmentType = z.infer<typeof WorktreeEnvironmentTypeSchema>;
 
 /**
@@ -730,7 +697,6 @@ export interface WorktreeInfo {
 
 	/**
 	 * 実行環境タイプ
-	 * - container-use: container-use環境
 	 * - docker: Dockerコンテナ
 	 * - host: ホスト環境
 	 */
@@ -738,7 +704,6 @@ export interface WorktreeInfo {
 
 	/**
 	 * 環境ID（hostの場合はnull）
-	 * @example "abc-123" (container-use)
 	 * @example "container-xyz" (docker)
 	 */
 	environmentId: string | null;

@@ -1,27 +1,13 @@
-/**
- * SandboxFactory テスト
- *
- * SandboxFactory が設定に基づいて適切な SandboxAdapter を返すことを検証
- */
-
 import { describe, expect, test } from "bun:test";
 import { EnvironmentUnavailableError } from "../core/errors.js";
 import type { ProcessExecutor, ProcessResult, SpawnOptions } from "../core/process-executor.js";
 import type { Config } from "../core/types.js";
-import { ContainerAdapter } from "./container-adapter.js";
 import { DockerAdapter } from "./docker-adapter.js";
 import { HostAdapter } from "./host-adapter.js";
 import { SandboxFactory } from "./sandbox-factory.js";
 
-/**
- * モックProcessExecutorを作成
- */
-function createMockExecutor(options: {
-	dockerAvailable?: boolean;
-	cuAvailable?: boolean;
-}): ProcessExecutor {
+function createMockExecutor(options: { dockerAvailable?: boolean }): ProcessExecutor {
 	const dockerAvailable = options.dockerAvailable ?? false;
-	const cuAvailable = options.cuAvailable ?? false;
 
 	return {
 		spawn: async (
@@ -29,17 +15,9 @@ function createMockExecutor(options: {
 			args: string[],
 			_opts?: SpawnOptions,
 		): Promise<ProcessResult> => {
-			// docker --version
 			if (command === "docker" && args[0] === "--version") {
 				return dockerAvailable
 					? { stdout: "Docker version 24.0.0", stderr: "", exitCode: 0 }
-					: { stdout: "", stderr: "command not found", exitCode: 127 };
-			}
-
-			// cu --version
-			if (command === "cu" && args[0] === "--version") {
-				return cuAvailable
-					? { stdout: "container-use 1.0.0", stderr: "", exitCode: 0 }
 					: { stdout: "", stderr: "command not found", exitCode: 127 };
 			}
 
@@ -48,9 +26,6 @@ function createMockExecutor(options: {
 	};
 }
 
-/**
- * 最小限のConfig（sandbox設定なし）
- */
 const minimalConfig: Config = {
 	version: "1.0",
 	backend: { type: "claude" },
@@ -63,16 +38,16 @@ const minimalConfig: Config = {
 
 describe("SandboxFactory", () => {
 	describe("create()", () => {
-		test("sandbox設定がない場合、container-useをデフォルトで試行する", async () => {
-			const executor = createMockExecutor({ cuAvailable: true });
+		test("sandbox設定がない場合、dockerをデフォルトで試行する", async () => {
+			const executor = createMockExecutor({ dockerAvailable: true });
 			const adapter = await SandboxFactory.create(minimalConfig, executor);
 
-			expect(adapter).toBeInstanceOf(ContainerAdapter);
-			expect(adapter.name).toBe("container-use");
+			expect(adapter).toBeInstanceOf(DockerAdapter);
+			expect(adapter.name).toBe("docker");
 		});
 
-		test("sandbox設定がなくcuが利用不可の場合、EnvironmentUnavailableErrorをスローする", async () => {
-			const executor = createMockExecutor({ cuAvailable: false, dockerAvailable: false });
+		test("sandbox設定がなくdockerが利用不可の場合、EnvironmentUnavailableErrorをスローする", async () => {
+			const executor = createMockExecutor({ dockerAvailable: false });
 
 			await expect(SandboxFactory.create(minimalConfig, executor)).rejects.toThrow(
 				EnvironmentUnavailableError,
@@ -104,19 +79,6 @@ describe("SandboxFactory", () => {
 			expect(adapter).toBeInstanceOf(HostAdapter);
 			expect(adapter.name).toBe("host");
 		});
-
-		test("type=container-useが指定された場合、ContainerAdapterを返す", async () => {
-			const config: Config = {
-				...minimalConfig,
-				sandbox: { type: "container-use" },
-			};
-			const executor = createMockExecutor({ cuAvailable: true });
-
-			const adapter = await SandboxFactory.create(config, executor);
-
-			expect(adapter).toBeInstanceOf(ContainerAdapter);
-			expect(adapter.name).toBe("container-use");
-		});
 	});
 
 	describe("フォールバック動作", () => {
@@ -136,21 +98,6 @@ describe("SandboxFactory", () => {
 			expect(adapter.name).toBe("host");
 		});
 
-		test("プライマリもフォールバックも利用不可の場合、EnvironmentUnavailableErrorをスローする", async () => {
-			const config: Config = {
-				...minimalConfig,
-				sandbox: {
-					type: "docker",
-					fallback: "container-use",
-				},
-			};
-			const executor = createMockExecutor({ dockerAvailable: false, cuAvailable: false });
-
-			await expect(SandboxFactory.create(config, executor)).rejects.toThrow(
-				EnvironmentUnavailableError,
-			);
-		});
-
 		test("フォールバックが設定されていない場合、プライマリ不可でエラーをスローする", async () => {
 			const config: Config = {
 				...minimalConfig,
@@ -163,37 +110,6 @@ describe("SandboxFactory", () => {
 			await expect(SandboxFactory.create(config, executor)).rejects.toThrow(
 				EnvironmentUnavailableError,
 			);
-		});
-
-		test("docker -> container-use フォールバック", async () => {
-			const config: Config = {
-				...minimalConfig,
-				sandbox: {
-					type: "docker",
-					fallback: "container-use",
-				},
-			};
-			const executor = createMockExecutor({ dockerAvailable: false, cuAvailable: true });
-
-			const adapter = await SandboxFactory.create(config, executor);
-
-			expect(adapter).toBeInstanceOf(ContainerAdapter);
-			expect(adapter.name).toBe("container-use");
-		});
-
-		test("container-use -> host フォールバック", async () => {
-			const config: Config = {
-				...minimalConfig,
-				sandbox: {
-					type: "container-use",
-					fallback: "host",
-				},
-			};
-			const executor = createMockExecutor({ cuAvailable: false });
-
-			const adapter = await SandboxFactory.create(config, executor);
-
-			expect(adapter).toBeInstanceOf(HostAdapter);
 		});
 	});
 
@@ -215,27 +131,6 @@ describe("SandboxFactory", () => {
 			const adapter = await SandboxFactory.create(config, executor);
 
 			expect(adapter).toBeInstanceOf(DockerAdapter);
-			// DockerAdapterの内部設定は直接アクセスできないが、正しくインスタンス化されていることを確認
-		});
-
-		test("ContainerAdapterに設定値が渡される", async () => {
-			const config: Config = {
-				...minimalConfig,
-				sandbox: {
-					type: "container-use",
-					container_use: {
-						image: "node:20",
-						env_id: "existing-env",
-					},
-				},
-			};
-			const executor = createMockExecutor({ cuAvailable: true });
-
-			const adapter = (await SandboxFactory.create(config, executor)) as ContainerAdapter;
-
-			expect(adapter).toBeInstanceOf(ContainerAdapter);
-			// env_idが設定されていることを確認
-			expect(adapter.getEnvironmentId()).toBe("existing-env");
 		});
 
 		test("HostAdapterに設定値が渡される", async () => {
@@ -262,7 +157,7 @@ describe("SandboxFactory", () => {
 			const config: Config = {
 				...minimalConfig,
 				sandbox: {
-					type: "unknown" as "docker", // 型チェックを回避
+					type: "unknown" as "docker",
 				},
 			};
 			const executor = createMockExecutor({});
@@ -279,26 +174,6 @@ describe("SandboxFactory", () => {
 				...minimalConfig,
 				sandbox: {
 					type: "docker",
-					fallback: "container-use",
-				},
-			};
-			const executor = createMockExecutor({ dockerAvailable: false, cuAvailable: false });
-
-			try {
-				await SandboxFactory.create(config, executor);
-				expect(true).toBe(false); // ここには到達しない
-			} catch (error) {
-				expect(error).toBeInstanceOf(EnvironmentUnavailableError);
-				expect((error as Error).message).toContain("docker");
-				expect((error as Error).message).toContain("container-use");
-			}
-		});
-
-		test("フォールバックがない場合、プライマリのみがエラーメッセージに含まれる", async () => {
-			const config: Config = {
-				...minimalConfig,
-				sandbox: {
-					type: "docker",
 				},
 			};
 			const executor = createMockExecutor({ dockerAvailable: false });
@@ -309,7 +184,6 @@ describe("SandboxFactory", () => {
 			} catch (error) {
 				expect(error).toBeInstanceOf(EnvironmentUnavailableError);
 				expect((error as Error).message).toContain("docker");
-				expect((error as Error).message).not.toContain("container-use");
 			}
 		});
 	});

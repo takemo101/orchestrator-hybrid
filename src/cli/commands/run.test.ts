@@ -106,12 +106,13 @@ describe("RunCommand", () => {
 			expect(result.worktreeConfig?.auto_cleanup).toBe(true);
 		});
 
-		it("should pass sandbox config to LoopOptions when container-use type", () => {
+		it("should pass sandbox config to LoopOptions when docker type", () => {
 			const config: Partial<Config> = {
 				sandbox: {
-					type: "container-use",
-					container_use: {
-						image: "node:20",
+					type: "docker",
+					docker: {
+						image: "node:20-alpine",
+						timeout: 300,
 					},
 				},
 			};
@@ -119,7 +120,7 @@ describe("RunCommand", () => {
 			const result = buildEnvironmentConfig(config);
 
 			expect(result.sandboxConfig).toBeDefined();
-			expect(result.sandboxConfig?.type).toBe("container-use");
+			expect(result.sandboxConfig?.type).toBe("docker");
 		});
 
 		it("should pass both configs when hybrid mode enabled", () => {
@@ -131,14 +132,14 @@ describe("RunCommand", () => {
 					copy_env_files: [".env"],
 				},
 				sandbox: {
-					type: "container-use",
+					type: "docker",
 				},
 			};
 
 			const result = buildEnvironmentConfig(config);
 
 			expect(result.worktreeConfig?.enabled).toBe(true);
-			expect(result.sandboxConfig?.type).toBe("container-use");
+			expect(result.sandboxConfig?.type).toBe("docker");
 		});
 
 		it("should return undefined configs when not configured", () => {

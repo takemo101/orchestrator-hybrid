@@ -71,14 +71,14 @@ describe("WorktreeManager", () => {
 		it("worktreeを正常に作成できる", async () => {
 			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
 
-			const result = await manager.createWorktree(42, "container-use", "env-123");
+			const result = await manager.createWorktree(42, "docker", "container-123");
 
 			expect(result).not.toBeNull();
 			expect(result?.issueNumber).toBe(42);
 			expect(result?.path).toMatch(/^\.worktrees\/issue-42-[a-z0-9]+$/);
 			expect(result?.branch).toMatch(/^feature\/issue-42-[a-z0-9]+$/);
-			expect(result?.environmentType).toBe("container-use");
-			expect(result?.environmentId).toBe("env-123");
+			expect(result?.environmentType).toBe("docker");
+			expect(result?.environmentId).toBe("container-123");
 			expect(result?.status).toBe("active");
 			expect(result?.createdAt).toBeDefined();
 
@@ -143,7 +143,7 @@ describe("WorktreeManager", () => {
 		it("worktrees.jsonに保存される", async () => {
 			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
 
-			await manager.createWorktree(42, "container-use", "env-123");
+			await manager.createWorktree(42, "docker", "container-123");
 
 			// Read worktrees.json and verify
 			expect(fs.existsSync(worktreesJsonPath)).toBe(true);
@@ -243,7 +243,7 @@ describe("WorktreeManager", () => {
 			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
 
 			await manager.createWorktree(42, "host");
-			await manager.createWorktree(43, "container-use", "env-456");
+			await manager.createWorktree(43, "docker", "container-456");
 
 			const result = await manager.listWorktrees();
 
@@ -265,13 +265,13 @@ describe("WorktreeManager", () => {
 		it("指定したworktreeを返す", async () => {
 			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
 
-			await manager.createWorktree(42, "container-use", "env-123");
+			await manager.createWorktree(42, "docker", "container-123");
 
 			const result = await manager.getWorktree(42);
 
 			expect(result).not.toBeNull();
 			expect(result?.issueNumber).toBe(42);
-			expect(result?.environmentId).toBe("env-123");
+			expect(result?.environmentId).toBe("container-123");
 		});
 	});
 
@@ -311,10 +311,10 @@ describe("WorktreeManager", () => {
 			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
 
 			await manager.createWorktree(42, "host");
-			await manager.updateWorktree(42, { environmentType: "container-use" });
+			await manager.updateWorktree(42, { environmentType: "docker" });
 
 			const result = await manager.getWorktree(42);
-			expect(result?.environmentType).toBe("container-use");
+			expect(result?.environmentType).toBe("docker");
 		});
 
 		it("複数フィールドを同時に更新できる", async () => {

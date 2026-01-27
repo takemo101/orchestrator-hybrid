@@ -14,13 +14,13 @@ export interface HybridEnvironmentBuilderConfig {
 	};
 }
 
-export type EnvironmentType = "hybrid" | "worktree-only" | "container-only" | "host";
+export type EnvironmentType = "hybrid" | "worktree-only" | "docker-only" | "host";
 
 export interface EnvironmentInfo {
 	issueNumber: number;
 	type: EnvironmentType;
 	worktree?: WorktreeInfo;
-	environmentType: "container-use" | "docker" | "host";
+	environmentType: "docker" | "host";
 	environmentId?: string;
 	workingDirectory: string;
 }
@@ -50,18 +50,14 @@ export class HybridEnvironmentBuilder {
 
 		let worktree: WorktreeInfo | undefined;
 		let environmentId: string | undefined;
-		let environmentType: "container-use" | "docker" | "host";
+		let environmentType: "docker" | "host";
 		let type: EnvironmentType;
 		let workingDirectory: string;
 
 		if (worktreeEnabled) {
 			const worktreeResult = await this.worktreeManager.createWorktree(
 				issueNumber,
-				sandboxType === "container-use"
-					? "container-use"
-					: sandboxType === "docker"
-						? "docker"
-						: "host",
+				sandboxType === "docker" ? "docker" : "host",
 			);
 			if (worktreeResult) {
 				worktree = worktreeResult;
@@ -70,12 +66,7 @@ export class HybridEnvironmentBuilder {
 				workingDirectory = this.projectRoot;
 			}
 
-			if (sandboxType === "container-use") {
-				environmentId = await this.createContainerUseEnvironment(workingDirectory);
-				await this.worktreeManager.updateWorktree(issueNumber, { environmentId });
-				environmentType = "container-use";
-				type = "hybrid";
-			} else if (sandboxType === "docker") {
+			if (sandboxType === "docker") {
 				environmentId = await this.createDockerEnvironment(workingDirectory);
 				await this.worktreeManager.updateWorktree(issueNumber, { environmentId });
 				environmentType = "docker";
@@ -87,14 +78,10 @@ export class HybridEnvironmentBuilder {
 		} else {
 			workingDirectory = this.projectRoot;
 
-			if (sandboxType === "container-use") {
-				environmentId = await this.createContainerUseEnvironment(workingDirectory);
-				environmentType = "container-use";
-				type = "container-only";
-			} else if (sandboxType === "docker") {
+			if (sandboxType === "docker") {
 				environmentId = await this.createDockerEnvironment(workingDirectory);
 				environmentType = "docker";
-				type = "container-only";
+				type = "docker-only";
 			} else {
 				environmentType = "host";
 				type = "host";
@@ -117,12 +104,8 @@ export class HybridEnvironmentBuilder {
 	async destroyEnvironment(issueNumber: number): Promise<void> {
 		const info = this.environmentStore.get(issueNumber);
 
-		if (info?.environmentId) {
-			if (info.environmentType === "container-use") {
-				await this.deleteContainerUseEnvironment(info.environmentId);
-			} else if (info.environmentType === "docker") {
-				await this.deleteDockerContainer(info.environmentId);
-			}
+		if (info?.environmentId && info.environmentType === "docker") {
+			await this.deleteDockerContainer(info.environmentId);
 		}
 
 		if (info?.worktree) {
@@ -130,20 +113,6 @@ export class HybridEnvironmentBuilder {
 		}
 
 		this.environmentStore.delete(issueNumber);
-	}
-
-	private async createContainerUseEnvironment(sourcePath: string): Promise<string> {
-		const result = await this.executor.execute("cu", ["env", "create", "--source", sourcePath]);
-
-		if (result.exitCode !== 0) {
-			throw new HybridEnvironmentError(`container-use環境作成失敗: ${result.stderr}`, {
-				sourcePath,
-				stderr: result.stderr,
-				exitCode: result.exitCode,
-			});
-		}
-
-		return result.stdout.trim();
 	}
 
 	private async createDockerEnvironment(workspacePath: string): Promise<string> {
@@ -176,10 +145,6 @@ export class HybridEnvironmentBuilder {
 		}
 
 		return result.stdout.trim();
-	}
-
-	private async deleteContainerUseEnvironment(environmentId: string): Promise<void> {
-		await this.executor.execute("cu", ["env", "delete", environmentId]);
 	}
 
 	private async deleteDockerContainer(containerId: string): Promise<void> {

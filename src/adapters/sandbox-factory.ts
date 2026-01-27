@@ -9,7 +9,6 @@ import { EnvironmentUnavailableError } from "../core/errors.js";
 import { logger } from "../core/logger.js";
 import type { ProcessExecutor } from "../core/process-executor.js";
 import type { Config } from "../core/types.js";
-import { ContainerAdapter } from "./container-adapter.js";
 import { DockerAdapter } from "./docker-adapter.js";
 import { HostAdapter } from "./host-adapter.js";
 import type { SandboxAdapter } from "./sandbox-adapter.js";
@@ -46,7 +45,7 @@ export class SandboxFactory {
 	 * @throws Error 未知のサンドボックスタイプの場合
 	 */
 	static async create(config: Config, executor?: ProcessExecutor): Promise<SandboxAdapter> {
-		const sandboxType = config.sandbox?.type ?? "container-use";
+		const sandboxType = config.sandbox?.type ?? "docker";
 		const fallbackType = config.sandbox?.fallback;
 
 		// プライマリ環境を試行
@@ -98,15 +97,6 @@ export class SandboxFactory {
 						timeout: config.sandbox?.docker?.timeout
 							? config.sandbox.docker.timeout * 1000 // 秒→ミリ秒
 							: undefined,
-					},
-					resolvedExecutor,
-				);
-
-			case "container-use":
-				return new ContainerAdapter(
-					{
-						image: config.sandbox?.container_use?.image,
-						envId: config.sandbox?.container_use?.env_id,
 					},
 					resolvedExecutor,
 				);

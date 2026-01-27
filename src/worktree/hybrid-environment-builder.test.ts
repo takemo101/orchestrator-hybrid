@@ -48,36 +48,7 @@ describe("HybridEnvironmentBuilder", () => {
 	});
 
 	describe("buildEnvironment", () => {
-		it("パターンA: ハイブリッド環境（worktree + container-use）を構築できる", async () => {
-			const config: HybridEnvironmentBuilderConfig = {
-				worktree: defaultWorktreeConfig,
-				sandbox: { type: "container-use" },
-			};
-
-			const cuExecutor: MockProcessExecutor = {
-				execute: mock(async (command: string, args: string[]): Promise<ProcessResult> => {
-					if (command === "cu" && args.includes("env") && args.includes("create")) {
-						return { stdout: "env-abc-123", stderr: "", exitCode: 0 };
-					}
-					return { stdout: "", stderr: "", exitCode: 0 };
-				}),
-			};
-
-			const worktreeManager = new WorktreeManager(defaultWorktreeConfig, tempDir, mockExecutor);
-			const builder = new HybridEnvironmentBuilder(config, worktreeManager, tempDir, cuExecutor);
-
-			const result = await builder.buildEnvironment(42);
-
-			expect(result.type).toBe("hybrid");
-			expect(result.issueNumber).toBe(42);
-			expect(result.environmentType).toBe("container-use");
-			expect(result.environmentId).toBe("env-abc-123");
-			expect(result.worktree).toBeDefined();
-			expect(result.worktree?.issueNumber).toBe(42);
-			expect(result.workingDirectory).toContain(".worktrees/issue-42");
-		});
-
-		it("パターンB: ハイブリッド環境（worktree + docker）を構築できる", async () => {
+		it("パターンA: ハイブリッド環境（worktree + docker）を構築できる", async () => {
 			const config: HybridEnvironmentBuilderConfig = {
 				worktree: defaultWorktreeConfig,
 				sandbox: {
@@ -131,16 +102,19 @@ describe("HybridEnvironmentBuilder", () => {
 			expect(result.workingDirectory).toContain(".worktrees/issue-44");
 		});
 
-		it("パターンD: container-useのみ構築（worktree無効）", async () => {
+		it("パターンD: dockerのみ構築（worktree無効）", async () => {
 			const config: HybridEnvironmentBuilderConfig = {
 				worktree: { ...defaultWorktreeConfig, enabled: false },
-				sandbox: { type: "container-use" },
+				sandbox: {
+					type: "docker",
+					docker: { image: "node:20-alpine", network: "none", timeout: 300 },
+				},
 			};
 
-			const cuExecutor: MockProcessExecutor = {
+			const dockerExecutor: MockProcessExecutor = {
 				execute: mock(async (command: string, args: string[]): Promise<ProcessResult> => {
-					if (command === "cu" && args.includes("env") && args.includes("create")) {
-						return { stdout: "env-only-456", stderr: "", exitCode: 0 };
+					if (command === "docker" && args.includes("run")) {
+						return { stdout: "docker-only-456", stderr: "", exitCode: 0 };
 					}
 					return { stdout: "", stderr: "", exitCode: 0 };
 				}),
@@ -151,19 +125,24 @@ describe("HybridEnvironmentBuilder", () => {
 				tempDir,
 				mockExecutor,
 			);
-			const builder = new HybridEnvironmentBuilder(config, worktreeManager, tempDir, cuExecutor);
+			const builder = new HybridEnvironmentBuilder(
+				config,
+				worktreeManager,
+				tempDir,
+				dockerExecutor,
+			);
 
 			const result = await builder.buildEnvironment(45);
 
-			expect(result.type).toBe("container-only");
+			expect(result.type).toBe("docker-only");
 			expect(result.issueNumber).toBe(45);
-			expect(result.environmentType).toBe("container-use");
-			expect(result.environmentId).toBe("env-only-456");
+			expect(result.environmentType).toBe("docker");
+			expect(result.environmentId).toBe("docker-only-456");
 			expect(result.worktree).toBeUndefined();
 			expect(result.workingDirectory).toBe(tempDir);
 		});
 
-		it("パターンF: ホスト環境構築（worktree無効 & host）", async () => {
+		it("パターンE: ホスト環境構築（worktree無効 & host）", async () => {
 			const config: HybridEnvironmentBuilderConfig = {
 				worktree: { ...defaultWorktreeConfig, enabled: false },
 				sandbox: { type: "host" },
@@ -184,33 +163,6 @@ describe("HybridEnvironmentBuilder", () => {
 			expect(result.environmentId).toBeUndefined();
 			expect(result.worktree).toBeUndefined();
 			expect(result.workingDirectory).toBe(tempDir);
-		});
-
-		it("container-use作成失敗時にエラーをスローする", async () => {
-			const config: HybridEnvironmentBuilderConfig = {
-				worktree: defaultWorktreeConfig,
-				sandbox: { type: "container-use" },
-			};
-
-			const failingExecutor: MockProcessExecutor = {
-				execute: mock(async (command: string, _args: string[]): Promise<ProcessResult> => {
-					if (command === "cu") {
-						return { stdout: "", stderr: "connection refused", exitCode: 1 };
-					}
-					return { stdout: "", stderr: "", exitCode: 0 };
-				}),
-			};
-
-			const worktreeManager = new WorktreeManager(defaultWorktreeConfig, tempDir, mockExecutor);
-			const builder = new HybridEnvironmentBuilder(
-				config,
-				worktreeManager,
-				tempDir,
-				failingExecutor,
-			);
-
-			await expect(builder.buildEnvironment(47)).rejects.toThrow(HybridEnvironmentError);
-			await expect(builder.buildEnvironment(47)).rejects.toThrow(/container-use環境作成失敗/);
 		});
 
 		it("docker起動失敗時にエラーをスローする", async () => {
@@ -245,23 +197,31 @@ describe("HybridEnvironmentBuilder", () => {
 	});
 
 	describe("destroyEnvironment", () => {
-		it("ハイブリッド環境（worktree + container-use）を削除できる", async () => {
+		it("ハイブリッド環境（worktree + docker）を削除できる", async () => {
 			const config: HybridEnvironmentBuilderConfig = {
 				worktree: defaultWorktreeConfig,
-				sandbox: { type: "container-use" },
+				sandbox: {
+					type: "docker",
+					docker: { image: "node:20-alpine", network: "none", timeout: 300 },
+				},
 			};
 
-			const cuExecutor: MockProcessExecutor = {
+			const dockerExecutor: MockProcessExecutor = {
 				execute: mock(async (command: string, args: string[]): Promise<ProcessResult> => {
-					if (command === "cu" && args.includes("env") && args.includes("create")) {
-						return { stdout: "env-to-delete", stderr: "", exitCode: 0 };
+					if (command === "docker" && args.includes("run")) {
+						return { stdout: "container-to-delete", stderr: "", exitCode: 0 };
 					}
 					return { stdout: "", stderr: "", exitCode: 0 };
 				}),
 			};
 
 			const worktreeManager = new WorktreeManager(defaultWorktreeConfig, tempDir, mockExecutor);
-			const builder = new HybridEnvironmentBuilder(config, worktreeManager, tempDir, cuExecutor);
+			const builder = new HybridEnvironmentBuilder(
+				config,
+				worktreeManager,
+				tempDir,
+				dockerExecutor,
+			);
 
 			await builder.buildEnvironment(49);
 			await builder.destroyEnvironment(49);

@@ -27,7 +27,7 @@ describe("types.ts 拡張", () => {
 	describe("SandboxConfigSchema", () => {
 		it("デフォルト値が正しく設定される", () => {
 			const result = SandboxConfigSchema.parse({});
-			expect(result.type).toBe("container-use");
+			expect(result.type).toBe("docker");
 		});
 
 		it("type=dockerが指定できる", () => {
@@ -38,11 +38,6 @@ describe("types.ts 拡張", () => {
 		it("type=hostが指定できる", () => {
 			const result = SandboxConfigSchema.parse({ type: "host" });
 			expect(result.type).toBe("host");
-		});
-
-		it("type=container-useが指定できる", () => {
-			const result = SandboxConfigSchema.parse({ type: "container-use" });
-			expect(result.type).toBe("container-use");
 		});
 
 		it("無効なtypeでエラーになる", () => {
@@ -76,17 +71,6 @@ describe("types.ts 拡張", () => {
 			});
 			expect(result.docker?.image).toBe("node:20-alpine");
 			expect(result.docker?.timeout).toBe(300);
-		});
-
-		it("container_use設定が指定できる", () => {
-			const result = SandboxConfigSchema.parse({
-				container_use: {
-					image: "custom-image",
-					env_id: "my-env-123",
-				},
-			});
-			expect(result.container_use?.image).toBe("custom-image");
-			expect(result.container_use?.env_id).toBe("my-env-123");
 		});
 
 		it("host設定が指定できる", () => {
@@ -217,10 +201,10 @@ describe("types.ts 拡張", () => {
 			const result = ConfigSchema.parse({
 				backend: { type: "claude" },
 				loop: {},
-				sandbox: { type: "container-use" },
+				sandbox: { type: "docker" },
 				auto_issue: { enabled: false },
 			});
-			expect(result.sandbox?.type).toBe("container-use");
+			expect(result.sandbox?.type).toBe("docker");
 			expect(result.auto_issue?.enabled).toBe(false);
 		});
 	});
