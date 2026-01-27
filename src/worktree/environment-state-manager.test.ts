@@ -129,9 +129,7 @@ describe("EnvironmentStateManager", () => {
 				environmentId: "abc-123",
 			};
 
-			await expect(manager.updateEnvironmentState(42, envInfo)).rejects.toThrow(
-				"環境状態更新失敗",
-			);
+			await expect(manager.updateEnvironmentState(42, envInfo)).rejects.toThrow("環境状態更新失敗");
 		});
 	});
 
@@ -151,7 +149,10 @@ describe("EnvironmentStateManager", () => {
 			const bodyWithMetadata = `## Description\nTest\n\n<!-- ORCH_ENV_METADATA\n${JSON.stringify(metadata)}\n-->`;
 
 			const mockResponses = new Map<string, ProcessResult>([
-				["issue view 42", { exitCode: 0, stdout: JSON.stringify({ body: bodyWithMetadata }), stderr: "" }],
+				[
+					"issue view 42",
+					{ exitCode: 0, stdout: JSON.stringify({ body: bodyWithMetadata }), stderr: "" },
+				],
 			]);
 			const executor = createMockExecutor(mockResponses);
 			const labelManager = createMockLabelManager();
@@ -167,7 +168,10 @@ describe("EnvironmentStateManager", () => {
 
 		test("存在しない場合はnullを返す", async () => {
 			const mockResponses = new Map<string, ProcessResult>([
-				["issue view 42", { exitCode: 0, stdout: JSON.stringify({ body: "No metadata here" }), stderr: "" }],
+				[
+					"issue view 42",
+					{ exitCode: 0, stdout: JSON.stringify({ body: "No metadata here" }), stderr: "" },
+				],
 			]);
 			const executor = createMockExecutor(mockResponses);
 			const labelManager = createMockLabelManager();
@@ -225,7 +229,10 @@ describe("EnvironmentStateManager", () => {
 			const bodyWithMetadata = `## Description\nTest\n\n<!-- ORCH_ENV_METADATA\n${JSON.stringify(metadata)}\n-->`;
 
 			const mockResponses = new Map<string, ProcessResult>([
-				["issue view 42", { exitCode: 0, stdout: JSON.stringify({ body: bodyWithMetadata }), stderr: "" }],
+				[
+					"issue view 42",
+					{ exitCode: 0, stdout: JSON.stringify({ body: bodyWithMetadata }), stderr: "" },
+				],
 				["issue edit 42", { exitCode: 0, stdout: "", stderr: "" }],
 			]);
 			const executor = createMockExecutor(mockResponses);
@@ -256,7 +263,10 @@ describe("EnvironmentStateManager", () => {
 
 		test("メタデータが存在しない場合も正常終了する", async () => {
 			const mockResponses = new Map<string, ProcessResult>([
-				["issue view 42", { exitCode: 0, stdout: JSON.stringify({ body: "No metadata" }), stderr: "" }],
+				[
+					"issue view 42",
+					{ exitCode: 0, stdout: JSON.stringify({ body: "No metadata" }), stderr: "" },
+				],
 			]);
 			const executor = createMockExecutor(mockResponses);
 			const labelManager = createMockLabelManager();
