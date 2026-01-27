@@ -1028,7 +1028,10 @@ async function buildHybridEnvironment(
 	const worktreeConfig = options.worktreeConfig ?? options.config.worktree;
 	const sandboxConfig = options.sandboxConfig ?? options.config.sandbox;
 
-	if (!worktreeConfig?.enabled && sandboxConfig?.type === "host") {
+	const worktreeDisabled = !worktreeConfig?.enabled;
+	const sandboxIsHost = !sandboxConfig || sandboxConfig.type === "host";
+
+	if (worktreeDisabled && sandboxIsHost) {
 		return null;
 	}
 
