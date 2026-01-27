@@ -73,25 +73,22 @@ export class WorktreeManager {
 		this.worktreesFilePath = path.join(projectRoot, ".worktrees.json");
 	}
 
-	/**
-	 * worktreeのパスを生成
-	 */
-	private getWorktreePath(issueNumber: number): string {
-		return path.join(this.projectRoot, this.config.base_dir, `issue-${issueNumber}`);
+	private getWorktreePath(issueNumber: number, suffix?: string): string {
+		const name = suffix ? `issue-${issueNumber}-${suffix}` : `issue-${issueNumber}`;
+		return path.join(this.projectRoot, this.config.base_dir, name);
 	}
 
-	/**
-	 * worktreeの相対パスを生成
-	 */
-	private getWorktreeRelativePath(issueNumber: number): string {
-		return `${this.config.base_dir}/issue-${issueNumber}`;
+	private getWorktreeRelativePath(issueNumber: number, suffix?: string): string {
+		const name = suffix ? `issue-${issueNumber}-${suffix}` : `issue-${issueNumber}`;
+		return `${this.config.base_dir}/${name}`;
 	}
 
-	/**
-	 * ブランチ名を生成
-	 */
-	private getBranchName(issueNumber: number): string {
-		return `feature/issue-${issueNumber}`;
+	private getBranchName(issueNumber: number, suffix?: string): string {
+		return suffix ? `feature/issue-${issueNumber}-${suffix}` : `feature/issue-${issueNumber}`;
+	}
+
+	private generateSuffix(): string {
+		return Math.random().toString(36).substring(2, 8);
 	}
 
 	/**
@@ -166,24 +163,15 @@ export class WorktreeManager {
 		environmentType: WorktreeEnvironmentType,
 		environmentId?: string | null,
 	): Promise<WorktreeInfo | null> {
-		// worktreeが無効の場合は何もしない
 		if (!this.config.enabled) {
 			return null;
 		}
 
-		const worktreePath = this.getWorktreePath(issueNumber);
-		const worktreeRelativePath = this.getWorktreeRelativePath(issueNumber);
-		const branchName = this.getBranchName(issueNumber);
+		const suffix = this.generateSuffix();
+		const worktreePath = this.getWorktreePath(issueNumber, suffix);
+		const worktreeRelativePath = this.getWorktreeRelativePath(issueNumber, suffix);
+		const branchName = this.getBranchName(issueNumber, suffix);
 
-		// 既存ディレクトリチェック
-		if (fs.existsSync(worktreePath)) {
-			throw new WorktreeError(`worktree ${worktreeRelativePath} は既に存在します`, {
-				path: worktreePath,
-				issueNumber,
-			});
-		}
-
-		// git worktree add実行
 		const result = await this.executor.execute("git", [
 			"worktree",
 			"add",
@@ -200,10 +188,8 @@ export class WorktreeManager {
 			});
 		}
 
-		// 環境ファイルをコピー
 		await this.copyEnvFiles(worktreePath);
 
-		// WorktreeInfo作成
 		const info: WorktreeInfo = {
 			issueNumber,
 			path: worktreeRelativePath,
@@ -214,11 +200,8 @@ export class WorktreeManager {
 			status: "active",
 		};
 
-		// worktrees.jsonに保存（排他制御）
 		await this.withLock(async () => {
 			const data = await this.loadWorktreesData();
-			// 同じIssue番号の古いエントリを削除
-			data.worktrees = data.worktrees.filter((w) => w.issueNumber !== issueNumber);
 			data.worktrees.push(info);
 			await this.saveWorktreesData(data);
 		});
