@@ -576,6 +576,36 @@ export const TasksConfigSchema = z.object({
 export type TasksConfig = z.infer<typeof TasksConfigSchema>;
 
 /**
+ * Run設定のzodスキーマ (v2.0.0)
+ *
+ * CLIオプションのデフォルト値を設定ファイルで定義可能にします。
+ */
+export const RunConfigSchema = z.object({
+	/**
+	 * 承認ゲートを自動承認するか
+	 * CLIの --auto オプションに対応
+	 * @default false
+	 */
+	auto_mode: z.boolean().default(false),
+
+	/**
+	 * 完了後にPRを自動作成するか
+	 * CLIの --create-pr オプションに対応
+	 * @default false
+	 */
+	create_pr: z.boolean().default(false),
+
+	/**
+	 * PRをドラフトとして作成するか
+	 * CLIの --draft オプションに対応
+	 * @default false
+	 */
+	draft_pr: z.boolean().default(false),
+});
+
+export type RunConfig = z.infer<typeof RunConfigSchema>;
+
+/**
  * Memories設定のzodスキーマ（v1.4.0）
  *
  * セッション間で学習内容を永続化する機能（F-014）の設定を定義します。
@@ -675,6 +705,9 @@ export const ConfigSchema = z.object({
 
 	// 新規: Tasks設定（v1.4.0）
 	tasks: TasksConfigSchema.optional(),
+
+	// 新規: Run設定（v2.0.0）
+	run: RunConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
