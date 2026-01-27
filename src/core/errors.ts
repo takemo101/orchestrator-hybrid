@@ -564,3 +564,41 @@ export class GlobPatternError extends SandboxError {
 		this.name = "GlobPatternError";
 	}
 }
+
+// v2.0.0 新規エラークラス
+
+/**
+ * ハイブリッド環境エラー
+ *
+ * Worktree + Container-Use統合（F-202）で発生するエラーを表現します。
+ *
+ * @example
+ * ```typescript
+ * // worktree作成失敗
+ * throw new HybridEnvironmentError(
+ *   "worktree作成失敗: .worktrees/issue-42",
+ *   { issueNumber: 42, cause: "branch already exists" }
+ * );
+ *
+ * // container-use環境作成失敗
+ * throw new HybridEnvironmentError(
+ *   "container-use環境作成失敗",
+ *   { issueNumber: 42, worktreePath: ".worktrees/issue-42", stderr: "connection refused" }
+ * );
+ *
+ * // 環境削除失敗
+ * throw new HybridEnvironmentError(
+ *   "環境削除失敗",
+ *   { issueNumber: 42, environmentId: "env-123" }
+ * );
+ * ```
+ */
+export class HybridEnvironmentError extends SandboxError {
+	constructor(message: string, details?: Record<string, unknown>) {
+		super(message, {
+			code: "HYBRID_ENVIRONMENT_ERROR",
+			details,
+		});
+		this.name = "HybridEnvironmentError";
+	}
+}
