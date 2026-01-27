@@ -15,7 +15,7 @@ import { logger } from "../../core/logger.js";
 import type { TaskState } from "../../core/task-manager.js";
 import { TaskStore } from "../../core/task-manager.js";
 import { getStatusIcon } from "../utils/format.js";
-import type { CommandHandler, LogsCommandOptions, LogSource } from "./types.js";
+import type { CommandHandler, LogSource, LogsCommandOptions } from "./types.js";
 
 /**
  * ログソースに応じたログファイル名を取得
