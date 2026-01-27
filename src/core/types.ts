@@ -597,6 +597,12 @@ export const WorktreeConfigSchema = z.object({
 	base_dir: z.string().default(".worktrees"),
 
 	/**
+	 * 派生元ブランチ（指定しない場合は現在のHEAD）
+	 * @example "main", "develop"
+	 */
+	base_branch: z.string().optional(),
+
+	/**
 	 * マージ後に自動クリーンアップするか
 	 * @default true
 	 */

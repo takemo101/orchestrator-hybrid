@@ -172,13 +172,12 @@ export class WorktreeManager {
 		const worktreeRelativePath = this.getWorktreeRelativePath(issueNumber, suffix);
 		const branchName = this.getBranchName(issueNumber, suffix);
 
-		const result = await this.executor.execute("git", [
-			"worktree",
-			"add",
-			worktreePath,
-			"-b",
-			branchName,
-		]);
+		const args = ["worktree", "add", worktreePath, "-b", branchName];
+		if (this.config.base_branch) {
+			args.push(this.config.base_branch);
+		}
+
+		const result = await this.executor.execute("git", args);
 
 		if (result.exitCode !== 0) {
 			throw new WorktreeError(`worktree作成失敗: ${result.stderr}`, {

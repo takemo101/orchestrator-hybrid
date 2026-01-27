@@ -151,6 +151,25 @@ describe("WorktreeManager", () => {
 			expect(data.worktrees).toHaveLength(1);
 			expect(data.worktrees[0].issueNumber).toBe(42);
 		});
+
+		it("base_branchが指定されている場合、派生元として使用される", async () => {
+			const configWithBaseBranch: WorktreeConfig = {
+				...defaultConfig,
+				base_branch: "develop",
+			};
+			const manager = new WorktreeManager(configWithBaseBranch, tempDir, mockExecutor);
+
+			await manager.createWorktree(42, "host");
+
+			expect(mockExecutor.execute).toHaveBeenCalledWith("git", [
+				"worktree",
+				"add",
+				expect.stringMatching(/issue-42-[a-z0-9]+$/),
+				"-b",
+				expect.stringMatching(/^feature\/issue-42-[a-z0-9]+$/),
+				"develop",
+			]);
+		});
 	});
 
 	describe("removeWorktree", () => {
