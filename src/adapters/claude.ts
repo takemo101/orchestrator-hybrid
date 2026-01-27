@@ -9,15 +9,21 @@ export interface ClaudeBackendConfig {
 	 * 設定すると、stdout/stderrをリアルタイムでログファイルに書き込む
 	 */
 	outputStreamer?: BackendOutputStreamer;
+	/**
+	 * ワーキングディレクトリ
+	 */
+	workdir?: string;
 }
 
 export class ClaudeBackend extends BaseBackend {
 	readonly name = "claude";
 	private readonly outputStreamer?: BackendOutputStreamer;
+	private readonly workdir?: string;
 
 	constructor(config: ClaudeBackendConfig = {}) {
 		super();
 		this.outputStreamer = config.outputStreamer;
+		this.workdir = config.workdir;
 	}
 
 	async execute(prompt: string): Promise<BackendResult> {
@@ -25,7 +31,7 @@ export class ClaudeBackend extends BaseBackend {
 			const { stdout, exitCode } = await exec(
 				"claude",
 				["-p", prompt, "--allowedTools", "Edit,Write,Bash,Read,Glob,Grep"],
-				{ reject: false, outputStreamer: this.outputStreamer },
+				{ reject: false, outputStreamer: this.outputStreamer, cwd: this.workdir },
 			);
 
 			return {
