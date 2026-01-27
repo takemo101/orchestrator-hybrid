@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import chalk from "chalk";
 import { type Backend, createBackend } from "../adapters/index.js";
 import { requestApproval } from "../gates/approval.js";
-import { fetchIssue, updateIssueLabel } from "../input/github.js";
+import { fetchIssue } from "../input/github.js";
 import { generatePrompt } from "../input/prompt.js";
 import { IssueGenerator } from "../output/issue-generator.js";
 import { checkForUncommittedChanges, createPR } from "../output/pr.js";
@@ -176,7 +176,6 @@ async function initializeLoopEnvironment(
 		config.promptPath,
 	);
 	initScratchpad(config.scratchpadPath);
-	await updateIssueLabel(issue.number, "env:active");
 }
 
 function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions): LoopContext {
@@ -373,7 +372,6 @@ async function executeHatLoop(
 	}
 
 	taskLogger.error(`Max iterations (${context.maxIterations}) reached without completion`);
-	await updateIssueLabel(issueNumber, "env:blocked");
 	await finalizeReport(
 		context,
 		config,
@@ -565,7 +563,6 @@ async function handleLoopEnd(
 
 	if (state.completionReason === "completed") {
 		taskLogger.success(`Task completed! (${context.completionPromise} detected)`);
-		await updateIssueLabel(issueNumber, "env:pr-created");
 
 		const postApproval = await requestApproval({
 			gateName: "Post-Completion",
@@ -596,8 +593,6 @@ async function handleLoopEnd(
 			// IssueGenerator で改善Issueを作成（設定有効時）
 			await handleIssueGeneration(context, config, taskLogger);
 		}
-	} else if (state.completionReason === "error") {
-		await updateIssueLabel(issueNumber, "env:blocked");
 	}
 
 	await finalizeReport(
@@ -634,9 +629,6 @@ async function handlePRAutoMerge(
 
 	try {
 		const merged = await merger.autoMerge(prNumber);
-		if (merged) {
-			await updateIssueLabel(issueNumber, "env:merged");
-		}
 		return merged;
 	} catch (error) {
 		// CI失敗時はエラーログのみ、タスク自体は成功扱い
@@ -724,7 +716,6 @@ async function executeSimpleLoop(
 	}
 
 	taskLogger.error(`Max iterations (${context.maxIterations}) reached without completion`);
-	await updateIssueLabel(issueNumber, "env:blocked");
 	await finalizeReport(context, config, collector, null, state.completionReason, state.prResult);
 	throw new Error("Max iterations reached");
 }
