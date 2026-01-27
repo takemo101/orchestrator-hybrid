@@ -121,13 +121,17 @@ describe("WorktreeManager", () => {
 			const envFile = path.join(tempDir, ".env");
 			fs.writeFileSync(envFile, "TEST_VAR=123");
 
-			// Create worktree directory (simulating what git worktree add does)
 			const worktreeDir = path.join(tempDir, ".worktrees", "issue-42");
-			fs.mkdirSync(worktreeDir, { recursive: true });
 
-			// Mock executor that also "creates" the worktree directory
+			// Mock executor that creates the worktree directory (simulating what git worktree add does)
 			const copyTestExecutor: MockProcessExecutor = {
-				execute: mock(async () => ({ stdout: "", stderr: "", exitCode: 0 })),
+				execute: mock(async (command: string, args: string[]): Promise<ProcessResult> => {
+					// Simulate git worktree add creating the directory
+					if (args.includes("worktree") && args.includes("add")) {
+						fs.mkdirSync(worktreeDir, { recursive: true });
+					}
+					return { stdout: "", stderr: "", exitCode: 0 };
+				}),
 			};
 
 			const manager = new WorktreeManager(defaultConfig, tempDir, copyTestExecutor);
