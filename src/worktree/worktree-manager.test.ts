@@ -75,8 +75,8 @@ describe("WorktreeManager", () => {
 
 			expect(result).not.toBeNull();
 			expect(result?.issueNumber).toBe(42);
-			expect(result?.path).toBe(".worktrees/issue-42");
-			expect(result?.branch).toBe("feature/issue-42");
+			expect(result?.path).toMatch(/^\.worktrees\/issue-42-[a-z0-9]+$/);
+			expect(result?.branch).toMatch(/^feature\/issue-42-[a-z0-9]+$/);
 			expect(result?.environmentType).toBe("container-use");
 			expect(result?.environmentId).toBe("env-123");
 			expect(result?.status).toBe("active");
@@ -86,23 +86,22 @@ describe("WorktreeManager", () => {
 			expect(mockExecutor.execute).toHaveBeenCalledWith("git", [
 				"worktree",
 				"add",
-				expect.stringContaining(".worktrees/issue-42"),
+				expect.stringMatching(/issue-42-[a-z0-9]+$/),
 				"-b",
-				"feature/issue-42",
+				expect.stringMatching(/^feature\/issue-42-[a-z0-9]+$/),
 			]);
 		});
 
-		it("既存ディレクトリがある場合はエラーをスローする", async () => {
-			// Create existing worktree directory
-			const worktreeDir = path.join(tempDir, ".worktrees", "issue-42");
-			fs.mkdirSync(worktreeDir, { recursive: true });
-
+		it("同一Issue番号でも異なるsuffixで複数作成できる", async () => {
 			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
 
-			await expect(manager.createWorktree(42, "host")).rejects.toThrow(WorktreeError);
-			await expect(manager.createWorktree(42, "host")).rejects.toThrow(
-				/worktree .+ は既に存在します/,
-			);
+			const result1 = await manager.createWorktree(42, "host");
+			const result2 = await manager.createWorktree(42, "host");
+
+			expect(result1).not.toBeNull();
+			expect(result2).not.toBeNull();
+			expect(result1?.path).not.toBe(result2?.path);
+			expect(result1?.branch).not.toBe(result2?.branch);
 		});
 
 		it("git worktree addが失敗した場合はエラーをスローする", async () => {
@@ -117,18 +116,16 @@ describe("WorktreeManager", () => {
 		});
 
 		it("環境ファイルがコピーされる", async () => {
-			// Create .env file in project root
 			const envFile = path.join(tempDir, ".env");
 			fs.writeFileSync(envFile, "TEST_VAR=123");
 
-			const worktreeDir = path.join(tempDir, ".worktrees", "issue-42");
+			let createdWorktreeDir = "";
 
-			// Mock executor that creates the worktree directory (simulating what git worktree add does)
 			const copyTestExecutor: MockProcessExecutor = {
 				execute: mock(async (_command: string, args: string[]): Promise<ProcessResult> => {
-					// Simulate git worktree add creating the directory
 					if (args.includes("worktree") && args.includes("add")) {
-						fs.mkdirSync(worktreeDir, { recursive: true });
+						createdWorktreeDir = args[2];
+						fs.mkdirSync(createdWorktreeDir, { recursive: true });
 					}
 					return { stdout: "", stderr: "", exitCode: 0 };
 				}),
@@ -138,8 +135,7 @@ describe("WorktreeManager", () => {
 
 			await manager.createWorktree(42, "host");
 
-			// Check if .env was copied to worktree path
-			const copiedEnvFile = path.join(worktreeDir, ".env");
+			const copiedEnvFile = path.join(createdWorktreeDir, ".env");
 			expect(fs.existsSync(copiedEnvFile)).toBe(true);
 			expect(fs.readFileSync(copiedEnvFile, "utf-8")).toBe("TEST_VAR=123");
 		});
@@ -192,21 +188,13 @@ describe("WorktreeManager", () => {
 		it("deleteBranch=trueでブランチも削除される", async () => {
 			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
 
-			// First create a worktree
-			await manager.createWorktree(42, "host");
+			const worktree = await manager.createWorktree(42, "host");
 
-			// Reset mock
 			(mockExecutor.execute as ReturnType<typeof mock>).mockClear();
 
-			// Remove with branch deletion
 			await manager.removeWorktree(42, true);
 
-			// git branch -dが呼ばれたことを確認
-			expect(mockExecutor.execute).toHaveBeenCalledWith("git", [
-				"branch",
-				"-d",
-				"feature/issue-42",
-			]);
+			expect(mockExecutor.execute).toHaveBeenCalledWith("git", ["branch", "-d", worktree?.branch]);
 		});
 
 		it("git worktree removeが失敗した場合はエラーをスローする", async () => {
