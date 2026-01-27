@@ -656,6 +656,114 @@ export const LoopSchema = z.object({
 });
 export type Loop = z.infer<typeof LoopSchema>;
 
+// ================================
+// v2.0.0 Worktree関連型定義
+// ================================
+
+/**
+ * Worktree設定のzodスキーマ (v2.0.0)
+ *
+ * git worktreeを使用した並列実行環境（F-201）の設定を定義します。
+ */
+export const WorktreeConfigSchema = z.object({
+	/**
+	 * worktree機能を有効にするか
+	 * @default false
+	 */
+	enabled: z.boolean().default(false),
+
+	/**
+	 * worktreeのベースディレクトリ
+	 * @default ".worktrees"
+	 */
+	base_dir: z.string().default(".worktrees"),
+
+	/**
+	 * マージ後に自動クリーンアップするか
+	 * @default true
+	 */
+	auto_cleanup: z.boolean().default(true),
+
+	/**
+	 * worktreeにコピーする環境ファイル
+	 * @default [".env", ".envrc", ".env.local"]
+	 */
+	copy_env_files: z.array(z.string()).default([".env", ".envrc", ".env.local"]),
+});
+
+export type WorktreeConfig = z.infer<typeof WorktreeConfigSchema>;
+
+/**
+ * Worktree環境タイプ (v2.0.0)
+ */
+export const WorktreeEnvironmentTypeSchema = z.enum(["container-use", "docker", "host"]);
+export type WorktreeEnvironmentType = z.infer<typeof WorktreeEnvironmentTypeSchema>;
+
+/**
+ * Worktreeステータス (v2.0.0)
+ */
+export const WorktreeStatusSchema = z.enum(["active", "merged", "abandoned"]);
+export type WorktreeStatus = z.infer<typeof WorktreeStatusSchema>;
+
+/**
+ * Worktree情報 (v2.0.0)
+ *
+ * git worktreeの状態を表すインターフェースです。
+ */
+export interface WorktreeInfo {
+	/**
+	 * Issue番号
+	 */
+	issueNumber: number;
+
+	/**
+	 * worktreeのパス
+	 * @example ".worktrees/issue-42"
+	 */
+	path: string;
+
+	/**
+	 * ブランチ名
+	 * @example "feature/issue-42"
+	 */
+	branch: string;
+
+	/**
+	 * 実行環境タイプ
+	 * - container-use: container-use環境
+	 * - docker: Dockerコンテナ
+	 * - host: ホスト環境
+	 */
+	environmentType: WorktreeEnvironmentType;
+
+	/**
+	 * 環境ID（hostの場合はnull）
+	 * @example "abc-123" (container-use)
+	 * @example "container-xyz" (docker)
+	 */
+	environmentId: string | null;
+
+	/**
+	 * 作成日時（ISO 8601形式）
+	 */
+	createdAt: string;
+
+	/**
+	 * ステータス
+	 * - active: 使用中
+	 * - merged: マージ済み
+	 * - abandoned: 放棄
+	 */
+	status: WorktreeStatus;
+}
+
+/**
+ * worktrees.jsonのデータ構造 (v2.0.0)
+ */
+export interface WorktreesData {
+	worktrees: WorktreeInfo[];
+}
+
 /**
  * 設定ファイル全体のzodスキーマ（拡張版）
  */
@@ -708,6 +816,9 @@ export const ConfigSchema = z.object({
 
 	// 新規: Run設定（v2.0.0）
 	run: RunConfigSchema.optional(),
+
+	// 新規: Worktree設定（v2.0.0）
+	worktree: WorktreeConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
