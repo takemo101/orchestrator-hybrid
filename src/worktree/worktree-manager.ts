@@ -217,18 +217,15 @@ export class WorktreeManager {
 	 * @throws WorktreeError - 削除失敗時
 	 */
 	async removeWorktree(issueNumber: number, deleteBranch = false): Promise<void> {
-		// worktrees.jsonから検索
 		const data = await this.loadWorktreesData();
 		const worktree = data.worktrees.find((w) => w.issueNumber === issueNumber);
 
-		// 存在しない場合は何もしない
 		if (!worktree) {
 			return;
 		}
 
-		const worktreePath = this.getWorktreePath(issueNumber);
+		const worktreePath = path.join(this.projectRoot, worktree.path);
 
-		// git worktree remove実行
 		const result = await this.executor.execute("git", [
 			"worktree",
 			"remove",
