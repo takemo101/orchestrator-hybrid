@@ -14,15 +14,6 @@ describe("RunCommand", () => {
 			};
 		};
 
-		const buildEnvironmentConfig = (
-			config: Partial<Config>,
-		): { worktreeConfig?: WorktreeConfig; sandboxConfig?: SandboxConfig } => {
-			return {
-				worktreeConfig: config.worktree,
-				sandboxConfig: config.sandbox,
-			};
-		};
-
 		it("should use CLI options when provided", () => {
 			const options = { auto: true, createPr: true, draft: true };
 			const config: Partial<Config> = {
