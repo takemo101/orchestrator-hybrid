@@ -1,13 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { ProcessResult } from "../core/process-executor.js";
-import {
-	AutoCleanupService,
-	type AutoCleanupServiceConfig,
-} from "./auto-cleanup-service.js";
-import type {
-	EnvironmentMetadata,
-	EnvironmentStateManager,
-} from "./environment-state-manager.js";
+import { AutoCleanupService, type AutoCleanupServiceConfig } from "./auto-cleanup-service.js";
+import type { EnvironmentMetadata, EnvironmentStateManager } from "./environment-state-manager.js";
 import type { HybridEnvironmentBuilder } from "./hybrid-environment-builder.js";
 
 // Mock executor factory
