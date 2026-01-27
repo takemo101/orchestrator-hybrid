@@ -34,10 +34,7 @@ export function getLogFileName(source: LogSource | undefined): string {
  * @param source - ログソース（task | backend）
  * @returns ログファイルパス（存在しない場合はnull）
  */
-export function findLogPath(
-	taskDir: string,
-	source: LogSource | undefined,
-): string | null {
+export function findLogPath(taskDir: string, source: LogSource | undefined): string | null {
 	const logFileName = getLogFileName(source);
 	const logPath = join(taskDir, logFileName);
 	return existsSync(logPath) ? logPath : null;
@@ -88,9 +85,7 @@ export class LogsCommand implements CommandHandler {
 
 		// 無効なソース指定のチェック
 		if (source && source !== "task" && source !== "backend") {
-			throw new Error(
-				`Invalid log source: ${source}. Must be 'task' or 'backend'`,
-			);
+			throw new Error(`Invalid log source: ${source}. Must be 'task' or 'backend'`);
 		}
 
 		// タスクディレクトリを検索
@@ -116,9 +111,7 @@ export class LogsCommand implements CommandHandler {
 				logFileName: getLogFileName(source),
 			});
 
-			logger.info(
-				`Streaming ${sourceLabel} logs for task: ${taskId} (Ctrl+C to stop)`,
-			);
+			logger.info(`Streaming ${sourceLabel} logs for task: ${taskId} (Ctrl+C to stop)`);
 			console.log("");
 
 			// 既存の行を表示
