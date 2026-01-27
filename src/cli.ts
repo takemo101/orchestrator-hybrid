@@ -10,6 +10,7 @@
 import { Command } from "commander";
 import {
 	cancelCommand,
+	cleanupCommand,
 	clearCommand,
 	emitCommand,
 	eventsCommand,
@@ -36,6 +37,7 @@ logsCommand.register(program);
 eventsCommand.register(program);
 emitCommand.register(program);
 cancelCommand.register(program);
+cleanupCommand.register(program);
 clearCommand.register(program);
 replayCommand.register(program);
 toolsCommand.register(program);

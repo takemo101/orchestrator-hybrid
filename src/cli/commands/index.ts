@@ -5,6 +5,7 @@
  */
 
 export { cancelCommand } from "./cancel.js";
+export { cleanupCommand } from "./cleanup.js";
 export { clearCommand } from "./clear.js";
 export { emitCommand } from "./emit.js";
 export { eventsCommand } from "./events.js";

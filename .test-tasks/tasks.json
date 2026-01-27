@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "tasks": {
+    "task-mkworo01-ornh": {
+      "id": "task-mkworo01-ornh",
+      "issueNumber": 42,
+      "issueTitle": "Test Issue",
+      "status": "completed",
+      "currentHat": null,
+      "iteration": 0,
+      "maxIterations": 10,
+      "lastEvent": null,
+      "error": null,
+      "startedAt": "2026-01-27T14:22:56.065Z",
+      "updatedAt": "2026-01-27T14:22:57.066Z",
+      "completedAt": "2026-01-27T14:22:57.066Z"
+    }
+  }
+}
