@@ -121,13 +121,23 @@ describe("WorktreeManager", () => {
 			const envFile = path.join(tempDir, ".env");
 			fs.writeFileSync(envFile, "TEST_VAR=123");
 
-			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
+			// Create worktree directory (simulating what git worktree add does)
+			const worktreeDir = path.join(tempDir, ".worktrees", "issue-42");
+			fs.mkdirSync(worktreeDir, { recursive: true });
+
+			// Mock executor that also "creates" the worktree directory
+			const copyTestExecutor: MockProcessExecutor = {
+				execute: mock(async () => ({ stdout: "", stderr: "", exitCode: 0 })),
+			};
+
+			const manager = new WorktreeManager(defaultConfig, tempDir, copyTestExecutor);
 
 			await manager.createWorktree(42, "host");
 
-			// Check if .env was copied (would be in the worktree path)
-			// Note: In real implementation, the worktree path would exist after git worktree add
-			expect(mockExecutor.execute).toHaveBeenCalled();
+			// Check if .env was copied to worktree path
+			const copiedEnvFile = path.join(worktreeDir, ".env");
+			expect(fs.existsSync(copiedEnvFile)).toBe(true);
+			expect(fs.readFileSync(copiedEnvFile, "utf-8")).toBe("TEST_VAR=123");
 		});
 
 		it("worktrees.jsonに保存される", async () => {
