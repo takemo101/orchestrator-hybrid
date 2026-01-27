@@ -6,6 +6,7 @@ import { requestApproval } from "../gates/approval.js";
 import { fetchIssue } from "../input/github.js";
 import { generatePrompt } from "../input/prompt.js";
 import { IssueGenerator } from "../output/issue-generator.js";
+import { IssueStatusLabelManager } from "../output/issue-status-label-manager.js";
 import { checkForUncommittedChanges, createPR } from "../output/pr.js";
 import { PRAutoMerger } from "../output/pr-auto-merger.js";
 import {
@@ -72,6 +73,11 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 	const loopConfig = buildLoopConfig(options, config);
 
+	const labelManager = new IssueStatusLabelManager({
+		enabled: config.state?.use_github_labels ?? true,
+		labelPrefix: config.state?.label_prefix ?? "orch",
+	});
+
 	logLoopStart(taskLogger, issueNumber, loopConfig);
 
 	const issue = await fetchIssue(issueNumber);
@@ -94,6 +100,8 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 		}
 		return;
 	}
+
+	await labelManager.updateStatus(issueNumber, "running");
 
 	const context = buildLoopContext(issue, loopConfig, options);
 	const backend = createLoopBackend(config, environmentInfo?.workingDirectory);
@@ -124,6 +132,7 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 			taskId,
 			onStateChange,
 			signal,
+			labelManager,
 		);
 	} finally {
 		if (sessionRecorder) {
@@ -213,10 +222,11 @@ async function executeLoop(
 	config: Config,
 	collector: ReportCollector | null,
 	logWriter: LogWriter,
-	sessionRecorder?: SessionRecorder,
-	taskId?: string,
-	onStateChange?: TaskStateCallback,
-	signal?: AbortSignal,
+	sessionRecorder: SessionRecorder | undefined,
+	taskId: string | undefined,
+	onStateChange: TaskStateCallback | undefined,
+	signal: AbortSignal | undefined,
+	labelManager: IssueStatusLabelManager,
 ): Promise<void> {
 	const useHats = config.hats && Object.keys(config.hats).length > 0;
 
@@ -238,6 +248,7 @@ async function executeLoop(
 			taskId,
 			onStateChange,
 			signal,
+			labelManager,
 		);
 	} else {
 		await executeSimpleLoop(
@@ -251,6 +262,7 @@ async function executeLoop(
 			taskId,
 			onStateChange,
 			signal,
+			labelManager,
 		);
 	}
 }
@@ -338,10 +350,11 @@ async function executeHatLoop(
 	config: Config,
 	collector: ReportCollector | null,
 	logWriter: LogWriter,
-	sessionRecorder?: SessionRecorder,
-	taskId?: string,
-	onStateChange?: TaskStateCallback,
-	signal?: AbortSignal,
+	sessionRecorder: SessionRecorder | undefined,
+	taskId: string | undefined,
+	onStateChange: TaskStateCallback | undefined,
+	signal: AbortSignal | undefined,
+	labelManager: IssueStatusLabelManager,
 ): Promise<void> {
 	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 	const historyPath = taskId ? `.agent/${taskId}/output_history.txt` : ".agent/output_history.txt";
@@ -366,7 +379,16 @@ async function executeHatLoop(
 	const loopResult = await runHatLoopIterations(params, state, signal);
 
 	if (loopResult.completed) {
-		await handleLoopEnd(context, config, collector, eventBus, state, issueNumber, taskId);
+		await handleLoopEnd(
+			context,
+			config,
+			collector,
+			eventBus,
+			state,
+			issueNumber,
+			taskId,
+			labelManager,
+		);
 		if (loopResult.error) throw loopResult.error;
 		return;
 	}
@@ -557,7 +579,8 @@ async function handleLoopEnd(
 	eventBus: EventBus | null,
 	state: LoopState,
 	issueNumber: number,
-	taskId?: string,
+	taskId: string | undefined,
+	labelManager: IssueStatusLabelManager,
 ): Promise<void> {
 	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 
@@ -578,21 +601,27 @@ async function handleLoopEnd(
 			if (eventBus) printEventSummary(eventBus, taskId);
 			if (context.createPR) {
 				state.prResult = await handlePRCreation(context, taskId);
+				await labelManager.updateStatus(issueNumber, "pr-created");
 
-				// PR自動マージ（prConfigが有効な場合）
 				if (state.prResult && context.prConfig?.auto_merge) {
 					state.merged = await handlePRAutoMerge(
 						state.prResult.number,
 						context.prConfig,
 						issueNumber,
 						taskLogger,
+						labelManager,
 					);
 				}
+			} else {
+				await labelManager.updateStatus(issueNumber, "completed");
 			}
 
-			// IssueGenerator で改善Issueを作成（設定有効時）
 			await handleIssueGeneration(context, config, taskLogger);
 		}
+	} else if (state.completionReason === "error") {
+		await labelManager.updateStatus(issueNumber, "failed");
+	} else if (state.completionReason === "aborted") {
+		await labelManager.updateStatus(issueNumber, "blocked");
 	}
 
 	await finalizeReport(
@@ -605,20 +634,12 @@ async function handleLoopEnd(
 	);
 }
 
-/**
- * PR自動マージを実行
- *
- * @param prNumber PR番号
- * @param prConfig PR設定
- * @param issueNumber Issue番号
- * @param taskLogger タスクロガー
- * @returns マージ成功時はtrue
- */
 async function handlePRAutoMerge(
 	prNumber: number,
 	prConfig: PRConfig,
 	issueNumber: number,
 	taskLogger: typeof logger,
+	labelManager: IssueStatusLabelManager,
 ): Promise<boolean> {
 	const merger = new PRAutoMerger({
 		enabled: true,
@@ -629,9 +650,11 @@ async function handlePRAutoMerge(
 
 	try {
 		const merged = await merger.autoMerge(prNumber);
+		if (merged) {
+			await labelManager.updateStatus(issueNumber, "merged");
+		}
 		return merged;
 	} catch (error) {
-		// CI失敗時はエラーログのみ、タスク自体は成功扱い
 		taskLogger.error(`PR自動マージ失敗: ${error instanceof Error ? error.message : String(error)}`);
 		return false;
 	}
@@ -660,10 +683,11 @@ async function executeSimpleLoop(
 	config: Config,
 	collector: ReportCollector | null,
 	logWriter: LogWriter,
-	sessionRecorder?: SessionRecorder,
-	taskId?: string,
-	onStateChange?: TaskStateCallback,
-	signal?: AbortSignal,
+	sessionRecorder: SessionRecorder | undefined,
+	taskId: string | undefined,
+	onStateChange: TaskStateCallback | undefined,
+	signal: AbortSignal | undefined,
+	labelManager: IssueStatusLabelManager,
 ): Promise<void> {
 	const taskLogger = taskId ? createTaskLogger(taskId) : logger;
 	const historyPath = taskId ? `.agent/${taskId}/output_history.txt` : ".agent/output_history.txt";
@@ -691,7 +715,16 @@ async function executeSimpleLoop(
 		);
 
 		if (iterResult.shouldStop) {
-			await handleLoopEnd(context, config, collector, null, state, issueNumber, taskId);
+			await handleLoopEnd(
+				context,
+				config,
+				collector,
+				null,
+				state,
+				issueNumber,
+				taskId,
+				labelManager,
+			);
 			if (iterResult.error) throw iterResult.error;
 			return;
 		}
