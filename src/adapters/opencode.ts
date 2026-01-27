@@ -9,15 +9,21 @@ export interface OpenCodeBackendConfig {
 	 * 設定すると、stdout/stderrをリアルタイムでログファイルに書き込む
 	 */
 	outputStreamer?: BackendOutputStreamer;
+	/**
+	 * ワーキングディレクトリ
+	 */
+	workdir?: string;
 }
 
 export class OpenCodeBackend extends BaseBackend {
 	readonly name = "opencode";
 	private readonly outputStreamer?: BackendOutputStreamer;
+	private readonly workdir?: string;
 
 	constructor(config: OpenCodeBackendConfig = {}) {
 		super();
 		this.outputStreamer = config.outputStreamer;
+		this.workdir = config.workdir;
 	}
 
 	async execute(prompt: string): Promise<BackendResult> {
@@ -25,6 +31,7 @@ export class OpenCodeBackend extends BaseBackend {
 			const { stdout, exitCode } = await exec("opencode", ["run", prompt], {
 				reject: false,
 				outputStreamer: this.outputStreamer,
+				cwd: this.workdir,
 			});
 
 			return {

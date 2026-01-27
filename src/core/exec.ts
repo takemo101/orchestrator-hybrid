@@ -12,6 +12,11 @@ export interface ExecOptions {
 	 * 設定すると、stdout/stderrをリアルタイムでログファイルに書き込む
 	 */
 	outputStreamer?: BackendOutputStreamer;
+	/**
+	 * ワーキングディレクトリ
+	 * 指定するとこのディレクトリでコマンドを実行する
+	 */
+	cwd?: string;
 }
 
 export async function exec(
@@ -19,11 +24,12 @@ export async function exec(
 	args: string[],
 	options: ExecOptions = {},
 ): Promise<ExecResult> {
-	const { reject = true, outputStreamer } = options;
+	const { reject = true, outputStreamer, cwd } = options;
 
 	const proc = Bun.spawn([cmd, ...args], {
 		stdout: "pipe",
 		stderr: "pipe",
+		cwd,
 	});
 
 	// ストリーミングが有効な場合、リアルタイムでログに書き込む

@@ -7,14 +7,15 @@ export type BackendType = "claude" | "opencode" | "gemini" | "container";
 
 export interface CreateBackendOptions {
 	container?: ContainerConfig;
+	workdir?: string;
 }
 
 export function createBackend(type: BackendType, options: CreateBackendOptions = {}): Backend {
 	switch (type) {
 		case "claude":
-			return new ClaudeBackend();
+			return new ClaudeBackend({ workdir: options.workdir });
 		case "opencode":
-			return new OpenCodeBackend();
+			return new OpenCodeBackend({ workdir: options.workdir });
 		case "container":
 			return new ContainerBackend(options.container);
 		case "gemini":

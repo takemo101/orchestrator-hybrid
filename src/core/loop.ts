@@ -108,7 +108,11 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	}
 
 	const context = buildLoopContext(issue, loopConfig, options);
-	const backend = createLoopBackend(config, loopConfig.containerEnabled);
+	const backend = createLoopBackend(
+		config,
+		loopConfig.containerEnabled,
+		environmentInfo?.workingDirectory,
+	);
 	const collector = loopConfig.shouldGenerateReport ? createReportCollector() : null;
 
 	const logWriter = new LogWriter({
@@ -222,7 +226,7 @@ function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions
 	};
 }
 
-function createLoopBackend(config: Config, containerEnabled: boolean): Backend {
+function createLoopBackend(config: Config, containerEnabled: boolean, workdir?: string): Backend {
 	const backendType = containerEnabled
 		? "container"
 		: (config.backend.type as "claude" | "opencode");
@@ -230,6 +234,7 @@ function createLoopBackend(config: Config, containerEnabled: boolean): Backend {
 		container: config.container
 			? { image: config.container.image, envId: config.container.env_id }
 			: undefined,
+		workdir,
 	});
 }
 
