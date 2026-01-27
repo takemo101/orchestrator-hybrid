@@ -2,9 +2,11 @@
  * logsコマンド
  *
  * v2.0.0 F-102: CLIリファクタリング
+ * v2.0.0 F-104: logsコマンド拡張（--source オプション追加）
  */
 
 import { existsSync, watch } from "node:fs";
+import { join } from "node:path";
 import chalk from "chalk";
 import type { Command } from "commander";
 import { findTaskLogPath, readLastNLines } from "../../cli-logs.js";
@@ -13,7 +15,33 @@ import { logger } from "../../core/logger.js";
 import type { TaskState } from "../../core/task-manager.js";
 import { TaskStore } from "../../core/task-manager.js";
 import { getStatusIcon } from "../utils/format.js";
-import type { CommandHandler, LogsCommandOptions } from "./types.js";
+import type { CommandHandler, LogsCommandOptions, LogSource } from "./types.js";
+
+/**
+ * ログソースに応じたログファイル名を取得
+ *
+ * @param source - ログソース（task | backend）
+ * @returns ログファイル名
+ */
+export function getLogFileName(source: LogSource | undefined): string {
+	return source === "backend" ? "backend.log" : "task.log";
+}
+
+/**
+ * ログソースに応じたログファイルパスを取得
+ *
+ * @param taskDir - タスクディレクトリパス
+ * @param source - ログソース（task | backend）
+ * @returns ログファイルパス（存在しない場合はnull）
+ */
+export function findLogPath(
+	taskDir: string,
+	source: LogSource | undefined,
+): string | null {
+	const logFileName = getLogFileName(source);
+	const logPath = join(taskDir, logFileName);
+	return existsSync(logPath) ? logPath : null;
+}
 
 /**
  * logsコマンドハンドラー
@@ -25,6 +53,11 @@ export class LogsCommand implements CommandHandler {
 			.description("Show task logs or watch task status")
 			.option("-f, --follow", "Follow mode (stream logs in real-time or watch task status)")
 			.option("-t, --task <id>", "Task ID to show logs for")
+			.option(
+				"-s, --source <type>",
+				"Log source: task (orchestrator logs) or backend (AI agent output)",
+				"task",
+			)
 			.option("-n, --lines <num>", "Number of lines to display (default: 100)", Number.parseInt)
 			.option("--table", "Show task status table (legacy mode)")
 			.option("--interval <ms>", "Refresh interval in ms for table mode", Number.parseInt)
@@ -51,20 +84,41 @@ export class LogsCommand implements CommandHandler {
 
 	private async handleTaskLogs(options: LogsCommandOptions): Promise<void> {
 		const taskId = options.task as string;
-		const logPath = await findTaskLogPath(taskId);
+		const source = options.source;
 
-		if (!logPath) {
-			throw new Error(`Log file not found for task: ${taskId}`);
+		// 無効なソース指定のチェック
+		if (source && source !== "task" && source !== "backend") {
+			throw new Error(
+				`Invalid log source: ${source}. Must be 'task' or 'backend'`,
+			);
 		}
+
+		// タスクディレクトリを検索
+		const taskDir = await this.findTaskDir(taskId);
+		if (!taskDir) {
+			throw new Error(`Task directory not found for: ${taskId}`);
+		}
+
+		// ログファイルパスを取得
+		const logPath = findLogPath(taskDir, source);
+		if (!logPath) {
+			const logFileName = getLogFileName(source);
+			throw new Error(`Log file not found: ${logFileName} (task: ${taskId})`);
+		}
+
+		const sourceLabel = source === "backend" ? "backend" : "task";
 
 		if (options.follow) {
 			// リアルタイムストリーミングモード
 			const streamer = new LogStreamer({
 				taskId,
 				follow: true,
+				logFileName: getLogFileName(source),
 			});
 
-			logger.info(`Streaming logs for task: ${taskId} (Ctrl+C to stop)`);
+			logger.info(
+				`Streaming ${sourceLabel} logs for task: ${taskId} (Ctrl+C to stop)`,
+			);
 			console.log("");
 
 			// 既存の行を表示
@@ -91,7 +145,7 @@ export class LogsCommand implements CommandHandler {
 			const lines = await readLastNLines(logPath, options.lines ?? 100);
 
 			if (lines.length === 0) {
-				logger.info("No logs found");
+				logger.info(`No ${sourceLabel} logs found for task: ${taskId}`);
 				return;
 			}
 
@@ -99,6 +153,31 @@ export class LogsCommand implements CommandHandler {
 				console.log(line);
 			}
 		}
+	}
+
+	/**
+	 * タスクディレクトリを検索
+	 */
+	private async findTaskDir(taskId: string): Promise<string | null> {
+		// .agent 配下のタスクディレクトリを検索
+		const baseDir = ".agent";
+
+		// 完全一致
+		const exactPath = join(baseDir, taskId);
+		if (existsSync(exactPath)) {
+			return exactPath;
+		}
+
+		// 既存のfindTaskLogPath関数を使用してログパスを取得し、ディレクトリを抽出
+		const logPath = await findTaskLogPath(taskId);
+		if (logPath) {
+			// ログパスからディレクトリを抽出
+			const parts = logPath.split("/");
+			parts.pop(); // ファイル名を除去
+			return parts.join("/");
+		}
+
+		return null;
 	}
 
 	private handleTaskTable(options: LogsCommandOptions): void {
