@@ -15,6 +15,11 @@ import {
 	type ReportData,
 } from "../output/report.js";
 import { extractImprovements } from "../utils/improvement-extractor.js";
+import {
+	type EnvironmentInfo,
+	HybridEnvironmentBuilder,
+} from "../worktree/hybrid-environment-builder.js";
+import { WorktreeManager } from "../worktree/worktree-manager.js";
 import { EventBus } from "./event.js";
 import { buildHatPrompt, extractPublishedEvent, type HatDefinition, HatRegistry } from "./hat.js";
 import { LogWriter } from "./log-writer.js";
@@ -22,7 +27,14 @@ import { createTaskLogger, logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
 import { SessionRecorder } from "./session-recorder.js";
 import type { TaskManager, TaskStateCallback } from "./task-manager.js";
-import type { Config, Issue, LoopContext, PRConfig } from "./types.js";
+import type {
+	Config,
+	Issue,
+	LoopContext,
+	PRConfig,
+	SandboxConfig,
+	WorktreeConfig,
+} from "./types.js";
 
 export interface LoopOptions {
 	issueNumber: number;
@@ -42,6 +54,10 @@ export interface LoopOptions {
 	recordSessionPath?: string;
 	onStateChange?: TaskStateCallback;
 	signal?: AbortSignal;
+	/** worktree設定（v2.0.0） */
+	worktreeConfig?: WorktreeConfig;
+	/** sandbox設定（v2.0.0） */
+	sandboxConfig?: SandboxConfig;
 }
 
 export interface MultiLoopOptions {
@@ -57,6 +73,8 @@ export interface MultiLoopOptions {
 	prConfig?: PRConfig;
 	resolveDeps?: boolean;
 	ignoreDeps?: boolean;
+	worktreeConfig?: WorktreeConfig;
+	sandboxConfig?: SandboxConfig;
 }
 
 export async function runLoop(options: LoopOptions): Promise<void> {
@@ -71,6 +89,8 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	const issue = await fetchIssue(issueNumber);
 	onStateChange?.({ issueTitle: issue.title });
 
+	const environmentInfo = await buildHybridEnvironment(options, issueNumber, taskLogger);
+
 	await initializeLoopEnvironment(issue, loopConfig, taskId);
 
 	const preApproval = await requestApproval({
@@ -81,6 +101,9 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	});
 
 	if (preApproval === "abort") {
+		if (environmentInfo) {
+			await cleanupHybridEnvironment(options, issueNumber, taskLogger);
+		}
 		return;
 	}
 
@@ -117,6 +140,9 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	} finally {
 		if (sessionRecorder) {
 			await sessionRecorder.stopRecording();
+		}
+		if (environmentInfo && options.worktreeConfig?.auto_cleanup) {
+			await cleanupHybridEnvironment(options, issueNumber, taskLogger);
 		}
 	}
 }
@@ -271,6 +297,8 @@ export async function runMultipleLoops(
 		generateReport: shouldGenerateReport = false,
 		preset,
 		prConfig,
+		worktreeConfig,
+		sandboxConfig,
 	} = options;
 
 	const issues: Issue[] = [];
@@ -301,6 +329,8 @@ export async function runMultipleLoops(
 				preset,
 				taskId,
 				prConfig,
+				worktreeConfig,
+				sandboxConfig,
 				onStateChange,
 				signal,
 			});
@@ -981,4 +1011,79 @@ async function finalizeReport(
 	};
 
 	generateReport(reportData, context.reportPath);
+}
+
+const environmentBuilderCache = new Map<number, HybridEnvironmentBuilder>();
+
+async function buildHybridEnvironment(
+	options: LoopOptions,
+	issueNumber: number,
+	taskLogger: typeof logger,
+): Promise<EnvironmentInfo | null> {
+	const worktreeConfig = options.worktreeConfig ?? options.config.worktree;
+	const sandboxConfig = options.sandboxConfig ?? options.config.sandbox;
+
+	if (!worktreeConfig?.enabled && sandboxConfig?.type === "host") {
+		return null;
+	}
+
+	const projectRoot = process.cwd();
+	const effectiveWorktreeConfig = worktreeConfig ?? {
+		enabled: false,
+		base_dir: ".worktrees",
+		auto_cleanup: true,
+		copy_env_files: [".env", ".envrc", ".env.local"],
+	};
+	const effectiveSandboxConfig = sandboxConfig ?? {
+		type: "host" as const,
+	};
+
+	const worktreeManager = new WorktreeManager(effectiveWorktreeConfig, projectRoot);
+	const builder = new HybridEnvironmentBuilder(
+		{
+			worktree: effectiveWorktreeConfig,
+			sandbox: effectiveSandboxConfig,
+			container: options.config.container,
+		},
+		worktreeManager,
+		projectRoot,
+	);
+
+	environmentBuilderCache.set(issueNumber, builder);
+
+	try {
+		const envInfo = await builder.buildEnvironment(issueNumber);
+		taskLogger.info(`Environment created: ${envInfo.type} (${envInfo.workingDirectory})`);
+		if (envInfo.environmentId) {
+			taskLogger.info(`Environment ID: ${envInfo.environmentId}`);
+		}
+		return envInfo;
+	} catch (error) {
+		taskLogger.warn(
+			`Failed to build hybrid environment: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return null;
+	}
+}
+
+async function cleanupHybridEnvironment(
+	options: LoopOptions,
+	issueNumber: number,
+	taskLogger: typeof logger,
+): Promise<void> {
+	const builder = environmentBuilderCache.get(issueNumber);
+	if (!builder) {
+		return;
+	}
+
+	try {
+		await builder.destroyEnvironment(issueNumber);
+		taskLogger.info(`Environment cleaned up for Issue #${issueNumber}`);
+	} catch (error) {
+		taskLogger.warn(
+			`Failed to cleanup environment: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	} finally {
+		environmentBuilderCache.delete(issueNumber);
+	}
 }
