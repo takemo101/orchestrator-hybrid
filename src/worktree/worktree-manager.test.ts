@@ -43,7 +43,7 @@ describe("WorktreeManager", () => {
 
 		// Mock executor
 		mockExecutor = {
-			execute: mock(async (command: string, args: string[]): Promise<ProcessResult> => {
+			execute: mock(async (_command: string, _args: string[]): Promise<ProcessResult> => {
 				return { stdout: "", stderr: "", exitCode: 0 };
 			}),
 		};
