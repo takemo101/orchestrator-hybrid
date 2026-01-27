@@ -270,9 +270,7 @@ export class WorktreeManager {
 		// worktrees.jsonから削除（排他制御）
 		await this.withLock(async () => {
 			const currentData = await this.loadWorktreesData();
-			currentData.worktrees = currentData.worktrees.filter(
-				(w) => w.issueNumber !== issueNumber,
-			);
+			currentData.worktrees = currentData.worktrees.filter((w) => w.issueNumber !== issueNumber);
 			await this.saveWorktreesData(currentData);
 		});
 	}

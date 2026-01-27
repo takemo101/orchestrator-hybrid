@@ -291,12 +291,12 @@ describe("WorktreeManager", () => {
 		it("存在しないworktreeの更新はエラーをスローする", async () => {
 			const manager = new WorktreeManager(defaultConfig, tempDir, mockExecutor);
 
-			await expect(
-				manager.updateWorktree(999, { status: "merged" }),
-			).rejects.toThrow(WorktreeError);
-			await expect(
-				manager.updateWorktree(999, { status: "merged" }),
-			).rejects.toThrow(/が見つかりません/);
+			await expect(manager.updateWorktree(999, { status: "merged" })).rejects.toThrow(
+				WorktreeError,
+			);
+			await expect(manager.updateWorktree(999, { status: "merged" })).rejects.toThrow(
+				/が見つかりません/,
+			);
 		});
 
 		it("environmentIdを更新できる", async () => {
