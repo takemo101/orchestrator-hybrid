@@ -4,15 +4,18 @@
  */
 import { describe, expect, it } from "bun:test";
 import {
+	AutoCleanupError,
 	BackendSelectionError,
 	CircularDependencyError,
 	ContainerUseError,
 	DockerNotFoundError,
 	DockerTimeoutError,
+	EnvironmentStateError,
 	EnvironmentUnavailableError,
 	ExecutionTimeoutError,
 	GlobPatternError,
 	HostExecutionError,
+	HybridEnvironmentError,
 	ImagePullError,
 	IssueDependencyError,
 	LogMonitorError,
