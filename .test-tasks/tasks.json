@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "tasks": {
+    "task-mkvw0gn0-7o0c": {
+      "id": "task-mkvw0gn0-7o0c",
+      "issueNumber": 42,
+      "issueTitle": "Test Issue",
+      "status": "completed",
+      "currentHat": null,
+      "iteration": 0,
+      "maxIterations": 10,
+      "lastEvent": null,
+      "error": null,
+      "startedAt": "2026-01-27T00:57:57.564Z",
+      "updatedAt": "2026-01-27T00:57:58.571Z",
+      "completedAt": "2026-01-27T00:57:58.571Z"
+    }
+  }
+}
