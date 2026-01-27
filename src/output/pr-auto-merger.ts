@@ -111,6 +111,12 @@ export class PRAutoMerger {
 	 * @throws PRAutoMergeError - タイムアウト時
 	 */
 	private async waitForCI(prNumber: number): Promise<boolean> {
+		const hasChecks = await this.hasCI(prNumber);
+		if (!hasChecks) {
+			logger.info("CIチェックが設定されていません。マージを続行します。");
+			return true;
+		}
+
 		const result = await this.executor.spawn("gh", ["pr", "checks", String(prNumber), "--watch"], {
 			timeout: this.config.ci_timeout_secs * 1000,
 		});
@@ -135,6 +141,33 @@ export class PRAutoMerger {
 		}
 
 		return false; // CI失敗
+	}
+
+	/**
+	 * CIチェックが設定されているか確認
+	 *
+	 * @param prNumber - PR番号
+	 * @returns CIチェックがある場合はtrue
+	 */
+	private async hasCI(prNumber: number): Promise<boolean> {
+		const result = await this.executor.spawn("gh", [
+			"pr",
+			"checks",
+			String(prNumber),
+			"--json",
+			"name",
+		]);
+
+		if (result.exitCode !== 0) {
+			return false;
+		}
+
+		try {
+			const checks = JSON.parse(result.stdout);
+			return Array.isArray(checks) && checks.length > 0;
+		} catch {
+			return false;
+		}
 	}
 
 	/**
