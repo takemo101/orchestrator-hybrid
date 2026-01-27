@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-XX-XX (Unreleased)
+
+### Added
+
+#### Worktree Manager (F-201)
+- **Git Worktree管理**: Issue単位での並列実行環境を提供
+  - worktree作成・削除の自動化
+  - ブランチ命名規則: `feature/issue-{number}-{slug}`
+  - 複数Issueの同時並列作業をサポート
+
+#### Hybrid Environment Builder (F-202)
+- **Worktree + Container統合**: 環境タイプに応じた柔軟な実行環境構築
+  - `hybrid`: Worktree + Container-Use（推奨）
+  - `worktree-only`: Git worktreeのみ
+  - `container-only`: Container-Useのみ
+  - `host`: ホスト環境で直接実行
+
+#### Environment State Manager (F-203)
+- **GitHub Issueメタデータによる状態管理**: 環境情報をIssueに永続化
+  - 環境タイプ、パス、コンテナID等をIssueメタデータとして保存
+  - IssueStatusLabelManagerとの統合
+  - 環境の復元・継続実行をサポート
+
+#### Auto Cleanup Service (F-204)
+- **PRマージ後の自動クリーンアップ**: 不要リソースの自動削除
+  - Worktree削除
+  - ローカル・リモートブランチ削除
+  - Container-Use環境削除
+  - dry-runモードによる安全な確認
+
+### Internal
+
+- 726テストケースで品質保証（v1.2.0: 328 → v2.0.0: 726）
+- v2.0.0エラークラス追加:
+  - `WorktreeError`: Worktree操作エラー
+  - `HybridEnvironmentError`: ハイブリッド環境構築エラー
+  - `EnvironmentStateError`: 環境状態管理エラー
+  - `AutoCleanupError`: 自動クリーンアップエラー
+
+---
+
 ## [1.2.0] - 2026-01-25
 
 ### Added

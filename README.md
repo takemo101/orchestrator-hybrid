@@ -715,6 +715,11 @@ src/
 │   ├── report.ts       # 実行レポート生成
 │   ├── issue-generator.ts    # 改善Issue自動作成（v1.2.0+）
 │   └── issue-status-label-manager.ts  # Issueステータスラベル管理（v1.3.0+）
+├── worktree/               # 並列実行環境管理（v2.0.0+）
+│   ├── worktree-manager.ts           # Git worktree管理
+│   ├── hybrid-environment-builder.ts # Worktree + Container統合
+│   ├── environment-state-manager.ts  # 環境状態管理（GitHub Issue連携）
+│   └── auto-cleanup-service.ts       # PRマージ後の自動クリーンアップ
 ├── utils/
 │   └── improvement-extractor.ts  # 改善点抽出（v1.2.0+）
 └── schemas/
