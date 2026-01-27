@@ -125,7 +125,7 @@ describe("WorktreeManager", () => {
 
 			// Mock executor that creates the worktree directory (simulating what git worktree add does)
 			const copyTestExecutor: MockProcessExecutor = {
-				execute: mock(async (command: string, args: string[]): Promise<ProcessResult> => {
+				execute: mock(async (_command: string, args: string[]): Promise<ProcessResult> => {
 					// Simulate git worktree add creating the directory
 					if (args.includes("worktree") && args.includes("add")) {
 						fs.mkdirSync(worktreeDir, { recursive: true });
@@ -216,7 +216,7 @@ describe("WorktreeManager", () => {
 			await manager.createWorktree(42, "host");
 
 			// Make remove fail
-			mockExecutor.execute = mock(async (command: string, args: string[]) => {
+			mockExecutor.execute = mock(async (_command: string, args: string[]) => {
 				if (args.includes("remove")) {
 					return { stdout: "", stderr: "error: worktree is dirty", exitCode: 1 };
 				}

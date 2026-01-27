@@ -8,15 +8,14 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import lockfile from "proper-lockfile";
+import { WorktreeError } from "../core/errors";
 import type {
 	WorktreeConfig,
+	WorktreeEnvironmentType,
 	WorktreeInfo,
 	WorktreesData,
-	WorktreeEnvironmentType,
-	WorktreeStatus,
 } from "../core/types";
-import { WorktreeError } from "../core/errors";
-import lockfile from "proper-lockfile";
 
 /**
  * プロセス実行結果
