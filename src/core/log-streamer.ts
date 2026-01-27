@@ -37,6 +37,12 @@ export interface LogStreamerConfig {
 	 * @default undefined (全行)
 	 */
 	lines?: number;
+
+	/**
+	 * ログファイル名
+	 * @default "task.log"
+	 */
+	logFileName?: string;
 }
 
 /**
