@@ -223,7 +223,6 @@ describe("EnvironmentStateManager", () => {
 			};
 
 			const bodyWithMetadata = `## Description\nTest\n\n<!-- ORCH_ENV_METADATA\n${JSON.stringify(metadata)}\n-->`;
-			const bodyWithoutMetadata = "## Description\nTest";
 
 			const mockResponses = new Map<string, ProcessResult>([
 				["issue view 42", { exitCode: 0, stdout: JSON.stringify({ body: bodyWithMetadata }), stderr: "" }],
