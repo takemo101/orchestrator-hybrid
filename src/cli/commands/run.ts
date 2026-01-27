@@ -70,6 +70,13 @@ export class RunCommand implements CommandHandler {
 			config.backend.type = options.backend as "claude" | "opencode" | "gemini" | "container";
 		}
 
+		// run設定を構築（CLIオプションが設定ファイルより優先）
+		const runConfig = {
+			autoMode: options.auto ?? config.run?.auto_mode ?? false,
+			createPR: options.createPr ?? config.run?.create_pr ?? false,
+			draftPR: options.draft ?? config.run?.draft_pr ?? false,
+		};
+
 		// PR設定を構築（CLIオプションが設定ファイルより優先）
 		const prConfig: PRConfig = {
 			auto_merge: options.autoMerge ?? config.pr?.auto_merge ?? false,
@@ -85,15 +92,16 @@ export class RunCommand implements CommandHandler {
 		};
 
 		if (options.issues) {
-			await this.handleMultipleIssues(options, config, prConfig, depConfig);
+			await this.handleMultipleIssues(options, config, runConfig, prConfig, depConfig);
 		} else {
-			await this.handleSingleIssue(options, config, prConfig, depConfig);
+			await this.handleSingleIssue(options, config, runConfig, prConfig, depConfig);
 		}
 	}
 
 	private async handleMultipleIssues(
 		options: RunCommandOptions,
 		config: ReturnType<typeof loadConfig>,
+		runConfig: { autoMode: boolean; createPR: boolean; draftPR: boolean },
 		prConfig: PRConfig,
 		depConfig: { resolveDeps: boolean; ignoreDeps: boolean },
 	): Promise<void> {
@@ -114,10 +122,10 @@ export class RunCommand implements CommandHandler {
 			{
 				issueNumbers,
 				config,
-				autoMode: options.auto ?? false,
+				autoMode: runConfig.autoMode,
 				maxIterations: options.maxIterations,
-				createPR: options.createPr ?? false,
-				draftPR: options.draft ?? false,
+				createPR: runConfig.createPR,
+				draftPR: runConfig.draftPR,
 				useContainer: options.container ?? false,
 				generateReport: options.report !== undefined,
 				preset: options.preset,
@@ -134,6 +142,7 @@ export class RunCommand implements CommandHandler {
 	private async handleSingleIssue(
 		options: RunCommandOptions,
 		config: ReturnType<typeof loadConfig>,
+		runConfig: { autoMode: boolean; createPR: boolean; draftPR: boolean },
 		prConfig: PRConfig,
 		depConfig: { resolveDeps: boolean; ignoreDeps: boolean },
 	): Promise<void> {
@@ -148,10 +157,10 @@ export class RunCommand implements CommandHandler {
 			await runLoop({
 				issueNumber,
 				config,
-				autoMode: options.auto ?? false,
+				autoMode: runConfig.autoMode,
 				maxIterations,
-				createPR: options.createPr ?? false,
-				draftPR: options.draft ?? false,
+				createPR: runConfig.createPR,
+				draftPR: runConfig.draftPR,
 				useContainer: options.container ?? false,
 				generateReport: options.report !== undefined,
 				reportPath:
