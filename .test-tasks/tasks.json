@@ -1,8 +1,8 @@
 {
   "version": "1.0",
   "tasks": {
-    "task-mkvwcl64-l9c7": {
-      "id": "task-mkvwcl64-l9c7",
+    "task-mkvwdp8m-v0ky": {
+      "id": "task-mkvwdp8m-v0ky",
       "issueNumber": 42,
       "issueTitle": "Test Issue",
       "status": "completed",
@@ -11,9 +11,9 @@
       "maxIterations": 10,
       "lastEvent": null,
       "error": null,
-      "startedAt": "2026-01-27T01:07:23.308Z",
-      "updatedAt": "2026-01-27T01:07:24.310Z",
-      "completedAt": "2026-01-27T01:07:24.310Z"
+      "startedAt": "2026-01-27T01:08:15.238Z",
+      "updatedAt": "2026-01-27T01:08:16.243Z",
+      "completedAt": "2026-01-27T01:08:16.243Z"
     }
   }
 }
