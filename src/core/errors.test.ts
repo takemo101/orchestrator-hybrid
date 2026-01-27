@@ -564,3 +564,92 @@ describe("GlobPatternError (v1.4.0)", () => {
 		expect(error).toBeInstanceOf(GlobPatternError);
 	});
 });
+
+// v2.0.0 新規エラークラス
+
+describe("HybridEnvironmentError (v2.0.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new HybridEnvironmentError("worktree作成失敗");
+
+		expect(error.message).toBe("worktree作成失敗");
+		expect(error.code).toBe("HYBRID_ENVIRONMENT_ERROR");
+		expect(error.name).toBe("HybridEnvironmentError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new HybridEnvironmentError("worktree作成失敗", {
+			issueNumber: 42,
+			cause: "branch already exists",
+		});
+
+		expect(error.details).toEqual({
+			issueNumber: 42,
+			cause: "branch already exists",
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new HybridEnvironmentError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(HybridEnvironmentError);
+	});
+});
+
+describe("EnvironmentStateError (v2.0.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new EnvironmentStateError("環境状態更新失敗");
+
+		expect(error.message).toBe("環境状態更新失敗");
+		expect(error.code).toBe("ENVIRONMENT_STATE_ERROR");
+		expect(error.name).toBe("EnvironmentStateError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new EnvironmentStateError("環境状態更新失敗", {
+			issueNumber: 42,
+			stderr: "permission denied",
+		});
+
+		expect(error.details).toEqual({
+			issueNumber: 42,
+			stderr: "permission denied",
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new EnvironmentStateError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(EnvironmentStateError);
+	});
+});
+
+describe("AutoCleanupError (v2.0.0)", () => {
+	it("メッセージで初期化できる", () => {
+		const error = new AutoCleanupError("worktree削除失敗");
+
+		expect(error.message).toBe("worktree削除失敗");
+		expect(error.code).toBe("AUTO_CLEANUP_ERROR");
+		expect(error.name).toBe("AutoCleanupError");
+	});
+
+	it("detailsを設定できる", () => {
+		const error = new AutoCleanupError("container-use環境削除失敗", {
+			issueNumber: 42,
+			environmentId: "abc-123",
+		});
+
+		expect(error.details).toEqual({
+			issueNumber: 42,
+			environmentId: "abc-123",
+		});
+	});
+
+	it("SandboxErrorを継承している", () => {
+		const error = new AutoCleanupError("Error");
+
+		expect(error).toBeInstanceOf(SandboxError);
+		expect(error).toBeInstanceOf(AutoCleanupError);
+	});
+});
