@@ -816,6 +816,9 @@ export const ConfigSchema = z.object({
 
 	// 新規: Run設定（v2.0.0）
 	run: RunConfigSchema.optional(),
+
+	// 新規: Worktree設定（v2.0.0）
+	worktree: WorktreeConfigSchema.optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
