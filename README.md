@@ -97,7 +97,6 @@ bun run dev run --issue <Issue番号> [オプション]
 | `--auto-merge` | - | CI成功後にPRを自動マージ（v1.3.0+） | false |
 | `--resolve-deps` | - | 依存Issueを先に実行（v1.3.0+） | false |
 | `--ignore-deps` | - | 依存関係を無視（v1.3.0+） | false |
-| `--container` | - | 隔離されたcontainer-use環境で実行 | false |
 | `--report [パス]` | - | 実行レポートを生成 | .agent/report.md |
 | `--preset <名前>` | `-p` | プリセット設定を使用 | - |
 | `--backend <種類>` | `-b` | バックエンド: `claude` / `opencode` | claude |
@@ -125,9 +124,6 @@ bun run dev run --issue 42 --max-iterations 30 --auto
 
 # 完了後にドラフトPRを作成
 bun run dev run --issue 42 --auto --create-pr --draft
-
-# container-use環境で隔離実行
-bun run dev run --issue 42 --auto --container
 
 # 実行レポートを生成
 bun run dev run --issue 42 --auto --report
@@ -319,28 +315,8 @@ version: "1.0"
 
 # バックエンド設定
 backend:
-  type: claude                    # claude | opencode | container
+  type: claude                    # claude | opencode
   model: claude-sonnet-4-20250514 # オプション
-
-# container-use設定（隔離環境）
-container:
-  enabled: false                  # trueで常にcontainer環境を使用
-  image: node:20                  # ベースイメージ
-  env_id: ""                      # 既存の環境IDを再利用（オプション）
-
-# サンドボックス環境設定（v1.2.0+）
-sandbox:
-  type: docker                    # docker | container-use | host
-  fallback: host                  # プライマリ環境が使えない場合のフォールバック
-  docker:
-    image: node:20-alpine         # Dockerイメージ
-    network: none                 # ネットワーク設定（none = 隔離）
-    timeout: 300                  # タイムアウト（秒）
-  container_use:
-    image: node:20                # container-use用イメージ
-    env_id: ""                    # 既存環境ID（オプション）
-  host:
-    warn_on_start: true           # ホスト環境使用時に警告
 
 # ループ設定
 loop:
@@ -499,42 +475,6 @@ state:
 ```
 
 ラベル接頭辞を変更すると、例えば `myapp:running` のようなラベルになります。
-
----
-
-## Container-Use モード（隔離環境）
-
-`--container` フラグまたは設定ファイルで container-use 環境での実行が可能です。
-
-### 特徴
-
-- **隔離実行**: ホスト環境に影響を与えない安全な実行
-- **再現性**: 同じ環境で繰り返し実行可能
-- **クリーンな状態**: 毎回クリーンな環境から開始
-
-### 使用方法
-
-```bash
-# CLIフラグで有効化
-bun run dev run --issue 42 --auto --container
-
-# 設定ファイルで常に有効化
-# orch.yml に以下を追加:
-container:
-  enabled: true
-  image: node:20
-```
-
-### 前提条件
-
-- `cu` (container-use CLI) がインストール済み
-- Docker が実行中
-
-### 注意事項
-
-- container-use 環境はループ完了後も保持されます
-- 明示的に削除するまで環境は残ります
-- 既存の環境を再利用するには `container.env_id` を設定
 
 ---
 
@@ -699,12 +639,7 @@ src/
 ├── adapters/
 │   ├── base.ts         # バックエンド抽象基底
 │   ├── claude.ts       # Claude Code アダプター
-│   ├── opencode.ts     # OpenCode アダプター
-│   ├── container.ts    # Container-use アダプター（リファクタリング済み）
-│   ├── docker-adapter.ts     # Docker sandbox（v1.2.0+）
-│   ├── host-adapter.ts       # ホスト環境 sandbox（v1.2.0+）
-│   ├── sandbox-adapter.ts    # Sandbox抽象インターフェース（v1.2.0+）
-│   └── sandbox-factory.ts    # Sandboxファクトリ（v1.2.0+）
+│   └── opencode.ts     # OpenCode アダプター
 ├── input/
 │   ├── github.ts       # GitHub Issue取得
 │   └── prompt.ts       # プロンプト生成

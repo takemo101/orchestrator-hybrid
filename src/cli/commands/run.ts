@@ -31,7 +31,6 @@ export class RunCommand implements CommandHandler {
 			.option("-a, --auto", "Auto-approve all gates")
 			.option("--create-pr", "Create PR after completion")
 			.option("--draft", "Create PR as draft")
-			.option("--container", "Run in isolated container-use environment")
 			.option("--auto-merge", "Auto-merge PR after CI passes")
 			.option("--resolve-deps", "Resolve and run dependency issues first")
 			.option("--ignore-deps", "Ignore issue dependencies")
@@ -67,7 +66,7 @@ export class RunCommand implements CommandHandler {
 		}
 
 		if (options.backend) {
-			config.backend.type = options.backend as "claude" | "opencode" | "gemini" | "container";
+			config.backend.type = options.backend as "claude" | "opencode" | "gemini";
 		}
 
 		// run設定を構築（CLIオプションが設定ファイルより優先）
@@ -126,14 +125,12 @@ export class RunCommand implements CommandHandler {
 				maxIterations: options.maxIterations,
 				createPR: runConfig.createPR,
 				draftPR: runConfig.draftPR,
-				useContainer: options.container ?? false,
 				generateReport: options.report !== undefined,
 				preset: options.preset,
 				prConfig,
 				resolveDeps: depConfig.resolveDeps,
 				ignoreDeps: depConfig.ignoreDeps,
 				worktreeConfig: config.worktree,
-				sandboxConfig: config.sandbox,
 			},
 			taskManager,
 		);
@@ -163,7 +160,6 @@ export class RunCommand implements CommandHandler {
 				maxIterations,
 				createPR: runConfig.createPR,
 				draftPR: runConfig.draftPR,
-				useContainer: options.container ?? false,
 				generateReport: options.report !== undefined,
 				reportPath:
 					typeof options.report === "string" ? options.report : `.agent/${taskState.id}/report.md`,
@@ -174,7 +170,6 @@ export class RunCommand implements CommandHandler {
 				ignoreDeps: depConfig.ignoreDeps,
 				recordSessionPath: options.recordSession,
 				worktreeConfig: config.worktree,
-				sandboxConfig: config.sandbox,
 				onStateChange,
 				signal,
 			});

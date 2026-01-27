@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Config, SandboxConfig, WorktreeConfig } from "../../core/types.js";
+import type { Config, WorktreeConfig } from "../../core/types.js";
 
 describe("RunCommand", () => {
 	describe("run config merge logic", () => {
@@ -78,13 +78,12 @@ describe("RunCommand", () => {
 		});
 	});
 
-	describe("worktree/sandbox config propagation (UT-F106-001)", () => {
+	describe("worktree config propagation", () => {
 		const buildEnvironmentConfig = (
 			config: Partial<Config>,
-		): { worktreeConfig?: WorktreeConfig; sandboxConfig?: SandboxConfig } => {
+		): { worktreeConfig?: WorktreeConfig } => {
 			return {
 				worktreeConfig: config.worktree,
-				sandboxConfig: config.sandbox,
 			};
 		};
 
@@ -106,49 +105,12 @@ describe("RunCommand", () => {
 			expect(result.worktreeConfig?.auto_cleanup).toBe(true);
 		});
 
-		it("should pass sandbox config to LoopOptions when docker type", () => {
-			const config: Partial<Config> = {
-				sandbox: {
-					type: "docker",
-					docker: {
-						image: "node:20-alpine",
-						timeout: 300,
-					},
-				},
-			};
-
-			const result = buildEnvironmentConfig(config);
-
-			expect(result.sandboxConfig).toBeDefined();
-			expect(result.sandboxConfig?.type).toBe("docker");
-		});
-
-		it("should pass both configs when hybrid mode enabled", () => {
-			const config: Partial<Config> = {
-				worktree: {
-					enabled: true,
-					base_dir: ".worktrees",
-					auto_cleanup: true,
-					copy_env_files: [".env"],
-				},
-				sandbox: {
-					type: "docker",
-				},
-			};
-
-			const result = buildEnvironmentConfig(config);
-
-			expect(result.worktreeConfig?.enabled).toBe(true);
-			expect(result.sandboxConfig?.type).toBe("docker");
-		});
-
-		it("should return undefined configs when not configured", () => {
+		it("should return undefined config when not configured", () => {
 			const config: Partial<Config> = {};
 
 			const result = buildEnvironmentConfig(config);
 
 			expect(result.worktreeConfig).toBeUndefined();
-			expect(result.sandboxConfig).toBeUndefined();
 		});
 	});
 });

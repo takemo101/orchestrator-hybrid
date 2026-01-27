@@ -34,7 +34,7 @@ export interface EnvironmentMetadata {
 	/**
 	 * 環境タイプ
 	 */
-	type: "hybrid" | "worktree-only" | "container-only" | "host";
+	type: "worktree" | "host";
 
 	/**
 	 * worktreeパス（worktree使用時）
@@ -45,16 +45,6 @@ export interface EnvironmentMetadata {
 	 * ブランチ名（worktree使用時）
 	 */
 	branch?: string;
-
-	/**
-	 * 実行環境タイプ
-	 */
-	environmentType: "container-use" | "docker" | "host";
-
-	/**
-	 * 環境ID（container-use/dockerの場合）
-	 */
-	environmentId?: string;
 
 	/**
 	 * 作成日時（ISO 8601形式）
@@ -74,7 +64,7 @@ export interface EnvironmentInfo {
 	/**
 	 * 環境タイプ
 	 */
-	type: "hybrid" | "worktree-only" | "container-only" | "host";
+	type: "worktree" | "host";
 
 	/**
 	 * worktreeパス（worktree使用時）
@@ -85,16 +75,6 @@ export interface EnvironmentInfo {
 	 * ブランチ名（worktree使用時）
 	 */
 	branch?: string;
-
-	/**
-	 * 実行環境タイプ
-	 */
-	environmentType: "container-use" | "docker" | "host";
-
-	/**
-	 * 環境ID（container-use/dockerの場合）
-	 */
-	environmentId?: string;
 }
 
 /** メタデータマーカー開始 */

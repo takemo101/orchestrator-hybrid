@@ -15,8 +15,6 @@ import {
 	ModelAliasSchema,
 	type PRConfig,
 	PRConfigSchema,
-	type SandboxConfig,
-	SandboxConfigSchema,
 	type SessionRecordEntry,
 	StateConfigSchema,
 	type TaskEntry,
@@ -24,84 +22,6 @@ import {
 } from "./types.js";
 
 describe("types.ts 拡張", () => {
-	describe("SandboxConfigSchema", () => {
-		it("デフォルト値が正しく設定される", () => {
-			const result = SandboxConfigSchema.parse({});
-			expect(result.type).toBe("docker");
-		});
-
-		it("type=dockerが指定できる", () => {
-			const result = SandboxConfigSchema.parse({ type: "docker" });
-			expect(result.type).toBe("docker");
-		});
-
-		it("type=hostが指定できる", () => {
-			const result = SandboxConfigSchema.parse({ type: "host" });
-			expect(result.type).toBe("host");
-		});
-
-		it("無効なtypeでエラーになる", () => {
-			expect(() => SandboxConfigSchema.parse({ type: "invalid" })).toThrow();
-		});
-
-		it("fallbackが指定できる", () => {
-			const result = SandboxConfigSchema.parse({
-				type: "docker",
-				fallback: "host",
-			});
-			expect(result.fallback).toBe("host");
-		});
-
-		it("docker設定が指定できる", () => {
-			const result = SandboxConfigSchema.parse({
-				docker: {
-					image: "node:20-alpine",
-					network: "none",
-					timeout: 600,
-				},
-			});
-			expect(result.docker?.image).toBe("node:20-alpine");
-			expect(result.docker?.network).toBe("none");
-			expect(result.docker?.timeout).toBe(600);
-		});
-
-		it("docker設定のデフォルト値が正しい", () => {
-			const result = SandboxConfigSchema.parse({
-				docker: {},
-			});
-			expect(result.docker?.image).toBe("node:20-alpine");
-			expect(result.docker?.timeout).toBe(300);
-		});
-
-		it("host設定が指定できる", () => {
-			const result = SandboxConfigSchema.parse({
-				host: {
-					timeout: 600,
-					warn_on_start: false,
-				},
-			});
-			expect(result.host?.timeout).toBe(600);
-			expect(result.host?.warn_on_start).toBe(false);
-		});
-
-		it("host設定のデフォルト値が正しい", () => {
-			const result = SandboxConfigSchema.parse({
-				host: {},
-			});
-			expect(result.host?.timeout).toBe(300);
-			expect(result.host?.warn_on_start).toBe(true);
-		});
-
-		it("SandboxConfig型が正しく推論される", () => {
-			const config: SandboxConfig = {
-				type: "docker",
-				fallback: "host",
-				docker: { image: "node:20", timeout: 300 },
-			};
-			expect(config.type).toBe("docker");
-		});
-	});
-
 	describe("AutoIssueConfigSchema", () => {
 		it("デフォルト値が正しく設定される", () => {
 			const result = AutoIssueConfigSchema.parse({});
@@ -155,27 +75,6 @@ describe("types.ts 拡張", () => {
 	});
 
 	describe("ConfigSchema 拡張", () => {
-		it("sandbox設定が指定できる", () => {
-			const result = ConfigSchema.parse({
-				backend: { type: "claude" },
-				loop: {},
-				sandbox: {
-					type: "docker",
-					fallback: "host",
-				},
-			});
-			expect(result.sandbox?.type).toBe("docker");
-			expect(result.sandbox?.fallback).toBe("host");
-		});
-
-		it("sandbox設定がオプショナル", () => {
-			const result = ConfigSchema.parse({
-				backend: { type: "claude" },
-				loop: {},
-			});
-			expect(result.sandbox).toBeUndefined();
-		});
-
 		it("auto_issue設定が指定できる", () => {
 			const result = ConfigSchema.parse({
 				backend: { type: "claude" },
@@ -195,17 +94,6 @@ describe("types.ts 拡張", () => {
 				loop: {},
 			});
 			expect(result.auto_issue).toBeUndefined();
-		});
-
-		it("sandbox と auto_issue 両方指定できる", () => {
-			const result = ConfigSchema.parse({
-				backend: { type: "claude" },
-				loop: {},
-				sandbox: { type: "docker" },
-				auto_issue: { enabled: false },
-			});
-			expect(result.sandbox?.type).toBe("docker");
-			expect(result.auto_issue?.enabled).toBe(false);
 		});
 	});
 
@@ -312,7 +200,7 @@ describe("types.ts 拡張", () => {
 				autoMode: false,
 				createPR: false,
 				draftPR: false,
-				useContainer: false,
+
 				generateReport: false,
 				reportPath: ".agent/report.md",
 				taskId: "task-1737705600000-42",
@@ -338,7 +226,7 @@ describe("types.ts 拡張", () => {
 				autoMode: false,
 				createPR: false,
 				draftPR: false,
-				useContainer: false,
+
 				generateReport: false,
 				reportPath: ".agent/report.md",
 				taskId: "task-123",
@@ -365,7 +253,7 @@ describe("types.ts 拡張", () => {
 				autoMode: false,
 				createPR: false,
 				draftPR: false,
-				useContainer: false,
+
 				generateReport: false,
 				reportPath: ".agent/report.md",
 			};
@@ -390,7 +278,7 @@ describe("types.ts 拡張", () => {
 				autoMode: false,
 				createPR: false,
 				draftPR: false,
-				useContainer: false,
+
 				generateReport: false,
 				reportPath: ".agent/report.md",
 				prConfig: {
@@ -420,7 +308,7 @@ describe("types.ts 拡張", () => {
 				autoMode: false,
 				createPR: false,
 				draftPR: false,
-				useContainer: false,
+
 				generateReport: false,
 				reportPath: ".agent/report.md",
 				resolveDeps: true,
@@ -445,7 +333,7 @@ describe("types.ts 拡張", () => {
 				autoMode: false,
 				createPR: false,
 				draftPR: false,
-				useContainer: false,
+
 				generateReport: false,
 				reportPath: ".agent/report.md",
 				ignoreDeps: true,
@@ -470,7 +358,7 @@ describe("types.ts 拡張", () => {
 				autoMode: false,
 				createPR: false,
 				draftPR: false,
-				useContainer: false,
+
 				generateReport: false,
 				reportPath: ".agent/report.md",
 			};

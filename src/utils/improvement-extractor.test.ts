@@ -53,7 +53,7 @@ DockerAdapterのbuildDockerRunArgsメソッドが100行を超えており、
 			autoMode: false,
 			createPR: false,
 			draftPR: false,
-			useContainer: false,
+
 			generateReport: false,
 			reportPath: ".agent/report.md",
 		};
@@ -89,7 +89,7 @@ DockerAdapterのbuildDockerRunArgsメソッドが100行を超えており、
 			autoMode: false,
 			createPR: false,
 			draftPR: false,
-			useContainer: false,
+
 			generateReport: false,
 			reportPath: ".agent/report.md",
 		};
@@ -139,7 +139,7 @@ DockerAdapterのbuildDockerRunArgsメソッドが100行を超えており、
 			autoMode: false,
 			createPR: false,
 			draftPR: false,
-			useContainer: false,
+
 			generateReport: false,
 			reportPath: ".agent/report.md",
 		};
@@ -180,7 +180,7 @@ DockerAdapterのbuildDockerRunArgsメソッドが100行を超えており、
 			autoMode: false,
 			createPR: false,
 			draftPR: false,
-			useContainer: false,
+
 			generateReport: false,
 			reportPath: ".agent/report.md",
 		};
@@ -203,7 +203,7 @@ DockerAdapterのbuildDockerRunArgsメソッドが100行を超えており、
 			autoMode: false,
 			createPR: false,
 			draftPR: false,
-			useContainer: false,
+
 			generateReport: false,
 			reportPath: ".agent/report.md",
 		};
@@ -241,7 +241,7 @@ DockerAdapterのbuildDockerRunArgsメソッドが100行を超えており、
 			autoMode: false,
 			createPR: false,
 			draftPR: false,
-			useContainer: false,
+
 			generateReport: false,
 			reportPath: ".agent/report.md",
 		};
@@ -276,7 +276,7 @@ DockerAdapterのbuildDockerRunArgsメソッドが100行を超えており、
 			autoMode: false,
 			createPR: false,
 			draftPR: false,
-			useContainer: false,
+
 			generateReport: false,
 			reportPath: ".agent/report.md",
 		};

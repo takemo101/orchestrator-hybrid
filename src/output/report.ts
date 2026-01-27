@@ -28,7 +28,6 @@ export interface ReportData {
 		backend: string;
 		maxIterations: number;
 		completionPromise: string;
-		useContainer: boolean;
 		preset?: string;
 	};
 	prCreated?: {
@@ -82,7 +81,6 @@ function formatSummarySection(data: ReportData): string {
 | Duration | ${durationStr} |
 | Iterations | ${data.totalIterations} |
 | Backend | ${data.config.backend} |
-| Container | ${data.config.useContainer ? "Yes" : "No"} |
 
 `;
 }
@@ -144,7 +142,6 @@ function formatConfigSection(config: ReportData["config"]): string {
 backend: ${config.backend}
 max_iterations: ${config.maxIterations}
 completion_promise: ${config.completionPromise}
-use_container: ${config.useContainer}
 ${config.preset ? `preset: ${config.preset}` : ""}
 \`\`\`
 

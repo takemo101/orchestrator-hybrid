@@ -1,8 +1,8 @@
 {
   "version": "1.0",
   "tasks": {
-    "task-mkworo01-ornh": {
-      "id": "task-mkworo01-ornh",
+    "task-mkwqbj4d-mzao": {
+      "id": "task-mkwqbj4d-mzao",
       "issueNumber": 42,
       "issueTitle": "Test Issue",
       "status": "completed",
@@ -11,9 +11,9 @@
       "maxIterations": 10,
       "lastEvent": null,
       "error": null,
-      "startedAt": "2026-01-27T14:22:56.065Z",
-      "updatedAt": "2026-01-27T14:22:57.066Z",
-      "completedAt": "2026-01-27T14:22:57.066Z"
+      "startedAt": "2026-01-27T15:06:22.477Z",
+      "updatedAt": "2026-01-27T15:06:23.479Z",
+      "completedAt": "2026-01-27T15:06:23.479Z"
     }
   }
 }

@@ -128,21 +128,6 @@ loop:
 
 			expect(() => loadConfig(testConfigPath)).toThrow(ConfigValidationError);
 		});
-
-		it("should throw ConfigValidationError for invalid sandbox type", () => {
-			const configContent = `
-version: "1.0"
-backend:
-  type: claude
-loop:
-  max_iterations: 100
-sandbox:
-  type: invalid-sandbox
-`;
-			writeFileSync(testConfigPath, configContent);
-
-			expect(() => loadConfig(testConfigPath)).toThrow(ConfigValidationError);
-		});
 	});
 
 	describe("validateConfig", () => {
@@ -196,34 +181,6 @@ sandbox:
 				const validationError = error as ConfigValidationError;
 				expect(validationError.message).toContain("custom-config.yml");
 			}
-		});
-
-		it("should validate sandbox configuration", () => {
-			const validInput = {
-				version: "1.0",
-				backend: { type: "claude" },
-				loop: { max_iterations: 100 },
-				sandbox: {
-					type: "docker",
-					docker: { image: "node:20-alpine" },
-				},
-			};
-
-			const result = validateConfig(validInput);
-
-			expect(result.sandbox?.type).toBe("docker");
-			expect(result.sandbox?.docker?.image).toBe("node:20-alpine");
-		});
-
-		it("should reject invalid sandbox type", () => {
-			const invalidInput = {
-				version: "1.0",
-				backend: { type: "claude" },
-				loop: { max_iterations: 100 },
-				sandbox: { type: "invalid-type" },
-			};
-
-			expect(() => validateConfig(invalidInput)).toThrow(ConfigValidationError);
 		});
 
 		it("should validate auto_issue configuration", () => {

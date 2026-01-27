@@ -43,11 +43,6 @@ export interface CleanupResult {
 	cleaned: boolean;
 
 	/**
-	 * 削除された環境タイプ
-	 */
-	environmentType?: "container-use" | "docker" | "host";
-
-	/**
 	 * worktreeが削除されたか
 	 */
 	worktreeRemoved: boolean;
@@ -66,7 +61,7 @@ export interface CleanupResult {
 /**
  * 自動クリーンアップを実行するクラス
  *
- * PRマージ後に、worktree + container-use/docker環境を自動的に削除します。
+ * PRマージ後にworktree環境を自動的に削除します。
  */
 export class AutoCleanupService {
 	private readonly config: AutoCleanupServiceConfig;
@@ -127,40 +122,22 @@ export class AutoCleanupService {
 			return result;
 		}
 
-		result.environmentType = metadata.environmentType;
-
 		try {
 			// 環境タイプに応じたクリーンアップ
-			if (metadata.type === "hybrid") {
-				// container-use/docker環境を削除
-				await this.environmentBuilder.destroyEnvironment(issueNumber);
-
+			if (metadata.type === "worktree") {
 				// worktreeを削除
-				if (metadata.worktreePath) {
-					await this.removeWorktree(metadata.worktreePath);
-					result.worktreeRemoved = true;
-				}
-
-				// ブランチを削除
-				if (this.config.deleteBranch && metadata.branch) {
-					await this.removeBranch(metadata.branch);
-					result.branchRemoved = true;
-				}
-			} else if (metadata.type === "worktree-only") {
-				// worktreeのみ削除
-				if (metadata.worktreePath) {
-					await this.removeWorktree(metadata.worktreePath);
-					result.worktreeRemoved = true;
-				}
-
-				// ブランチを削除
-				if (this.config.deleteBranch && metadata.branch) {
-					await this.removeBranch(metadata.branch);
-					result.branchRemoved = true;
-				}
-			} else if (metadata.type === "container-only") {
-				// container-use/docker環境のみ削除
 				await this.environmentBuilder.destroyEnvironment(issueNumber);
+
+				if (metadata.worktreePath) {
+					await this.removeWorktree(metadata.worktreePath);
+					result.worktreeRemoved = true;
+				}
+
+				// ブランチを削除
+				if (this.config.deleteBranch && metadata.branch) {
+					await this.removeBranch(metadata.branch);
+					result.branchRemoved = true;
+				}
 			}
 			// host環境の場合は何もしない
 
@@ -174,7 +151,6 @@ export class AutoCleanupService {
 			result.error = errorMessage;
 			throw new AutoCleanupError(`クリーンアップ失敗: ${errorMessage}`, {
 				issueNumber,
-				environmentType: metadata.environmentType,
 			});
 		}
 

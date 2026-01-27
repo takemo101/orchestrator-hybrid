@@ -41,7 +41,7 @@ describe("EnvironmentStateManager", () => {
 	};
 
 	describe("updateEnvironmentState", () => {
-		test("ハイブリッド環境の状態を更新できる", async () => {
+		test("worktree環境の状態を更新できる", async () => {
 			const mockResponses = new Map<string, ProcessResult>([
 				["issue view 42", { exitCode: 0, stdout: JSON.stringify({ body: "test" }), stderr: "" }],
 				["issue edit 42", { exitCode: 0, stdout: "", stderr: "" }],
@@ -52,11 +52,9 @@ describe("EnvironmentStateManager", () => {
 			const manager = new EnvironmentStateManager(defaultConfig, labelManager, executor);
 
 			const envInfo: EnvironmentInfo = {
-				type: "hybrid",
+				type: "worktree",
 				worktreePath: ".worktrees/issue-42",
 				branch: "feature/issue-42",
-				environmentType: "container-use",
-				environmentId: "abc-123",
 			};
 
 			await manager.updateEnvironmentState(42, envInfo);
@@ -65,7 +63,7 @@ describe("EnvironmentStateManager", () => {
 			expect(labelManager.updateStatus).toHaveBeenCalledWith(42, "running");
 		});
 
-		test("worktreeのみの状態を更新できる", async () => {
+		test("host環境の状態を更新できる", async () => {
 			const mockResponses = new Map<string, ProcessResult>([
 				["issue view 42", { exitCode: 0, stdout: JSON.stringify({ body: "test" }), stderr: "" }],
 				["issue edit 42", { exitCode: 0, stdout: "", stderr: "" }],
@@ -76,10 +74,7 @@ describe("EnvironmentStateManager", () => {
 			const manager = new EnvironmentStateManager(defaultConfig, labelManager, executor);
 
 			const envInfo: EnvironmentInfo = {
-				type: "worktree-only",
-				worktreePath: ".worktrees/issue-42",
-				branch: "feature/issue-42",
-				environmentType: "host",
+				type: "host",
 			};
 
 			await manager.updateEnvironmentState(42, envInfo);
@@ -99,11 +94,9 @@ describe("EnvironmentStateManager", () => {
 			const manager = new EnvironmentStateManager(config, labelManager, executor);
 
 			const envInfo: EnvironmentInfo = {
-				type: "hybrid",
+				type: "worktree",
 				worktreePath: ".worktrees/issue-42",
 				branch: "feature/issue-42",
-				environmentType: "container-use",
-				environmentId: "abc-123",
 			};
 
 			await manager.updateEnvironmentState(42, envInfo);
@@ -122,11 +115,9 @@ describe("EnvironmentStateManager", () => {
 			const manager = new EnvironmentStateManager(defaultConfig, labelManager, executor);
 
 			const envInfo: EnvironmentInfo = {
-				type: "hybrid",
+				type: "worktree",
 				worktreePath: ".worktrees/issue-42",
 				branch: "feature/issue-42",
-				environmentType: "container-use",
-				environmentId: "abc-123",
 			};
 
 			await expect(manager.updateEnvironmentState(42, envInfo)).rejects.toThrow("環境状態更新失敗");
@@ -136,11 +127,9 @@ describe("EnvironmentStateManager", () => {
 	describe("getEnvironmentState", () => {
 		test("存在する環境状態を取得できる", async () => {
 			const metadata: EnvironmentMetadata = {
-				type: "hybrid",
+				type: "worktree",
 				worktreePath: ".worktrees/issue-42",
 				branch: "feature/issue-42",
-				environmentType: "container-use",
-				environmentId: "abc-123",
 				createdAt: "2026-01-26T10:00:00Z",
 				updatedAt: "2026-01-26T10:00:00Z",
 			};
@@ -162,8 +151,8 @@ describe("EnvironmentStateManager", () => {
 			const result = await manager.getEnvironmentState(42);
 
 			expect(result).not.toBeNull();
-			expect(result?.type).toBe("hybrid");
-			expect(result?.environmentId).toBe("abc-123");
+			expect(result?.type).toBe("worktree");
+			expect(result?.worktreePath).toBe(".worktrees/issue-42");
 		});
 
 		test("存在しない場合はnullを返す", async () => {
@@ -217,11 +206,9 @@ describe("EnvironmentStateManager", () => {
 	describe("clearEnvironmentState", () => {
 		test("環境状態をクリアできる", async () => {
 			const metadata: EnvironmentMetadata = {
-				type: "hybrid",
+				type: "worktree",
 				worktreePath: ".worktrees/issue-42",
 				branch: "feature/issue-42",
-				environmentType: "container-use",
-				environmentId: "abc-123",
 				createdAt: "2026-01-26T10:00:00Z",
 				updatedAt: "2026-01-26T10:00:00Z",
 			};
@@ -296,11 +283,9 @@ describe("EnvironmentStateManager", () => {
 			const manager = new EnvironmentStateManager(config, labelManager, executor);
 
 			const envInfo: EnvironmentInfo = {
-				type: "hybrid",
+				type: "worktree",
 				worktreePath: ".worktrees/issue-42",
 				branch: "feature/issue-42",
-				environmentType: "container-use",
-				environmentId: "abc-123",
 			};
 
 			await manager.updateEnvironmentState(42, envInfo);

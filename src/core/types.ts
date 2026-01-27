@@ -355,55 +355,6 @@ export const HatSchema = z.object({
 	backend: BackendConfigSchema.optional(),
 });
 
-export const ContainerConfigSchema = z
-	.object({
-		enabled: z.boolean().default(false),
-		image: z.string().default("node:20"),
-		env_id: z.string().optional(),
-	})
-	.optional();
-
-/**
- * サンドボックス設定のzodスキーマ
- */
-export const SandboxConfigSchema = z.object({
-	/**
-	 * サンドボックスタイプ
-	 * - docker: Dockerコンテナ
-	 * - host: ホスト環境（隔離なし）
-	 */
-	type: z.enum(["docker", "host"]).default("docker"),
-
-	/**
-	 * フォールバック先のサンドボックスタイプ
-	 * プライマリが利用できない場合に使用
-	 */
-	fallback: z.enum(["docker", "host"]).optional(),
-
-	/**
-	 * Docker設定
-	 */
-	docker: z
-		.object({
-			image: z.string().default("node:20-alpine"),
-			network: z.enum(["none", "bridge", "host"]).optional(),
-			timeout: z.number().default(300),
-		})
-		.optional(),
-
-	/**
-	 * ホスト環境設定
-	 */
-	host: z
-		.object({
-			timeout: z.number().default(300),
-			warn_on_start: z.boolean().default(true),
-		})
-		.optional(),
-});
-
-export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
-
 /**
  * 改善Issue自動作成設定のzodスキーマ
  */
@@ -735,13 +686,9 @@ export interface WorktreesData {
 export const ConfigSchema = z.object({
 	version: z.string().default("1.0"),
 	backend: z.object({
-		type: z.enum(["claude", "opencode", "gemini", "container"]).default("claude"),
+		type: z.enum(["claude", "opencode", "gemini"]).default("claude"),
 		model: z.string().optional(),
 	}),
-	container: ContainerConfigSchema,
-
-	// 新規: sandbox設定
-	sandbox: SandboxConfigSchema.optional(),
 
 	loop: z.object({
 		max_iterations: z.number().default(100),
@@ -811,7 +758,6 @@ export interface LoopContext {
 	autoMode: boolean;
 	createPR: boolean;
 	draftPR: boolean;
-	useContainer: boolean;
 	generateReport: boolean;
 	reportPath: string;
 	preset?: string;

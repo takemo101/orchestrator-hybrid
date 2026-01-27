@@ -76,7 +76,6 @@ describe("report", () => {
 					backend: "claude",
 					maxIterations: 100,
 					completionPromise: "LOOP_COMPLETE",
-					useContainer: false,
 					preset: "tdd",
 				},
 			};
@@ -122,7 +121,6 @@ describe("report", () => {
 					backend: "opencode",
 					maxIterations: 100,
 					completionPromise: "LOOP_COMPLETE",
-					useContainer: true,
 				},
 			};
 
@@ -132,7 +130,6 @@ describe("report", () => {
 			const markdown = readFileSync(outputPath, "utf-8");
 			expect(markdown).toContain("❌ Failed");
 			expect(markdown).toContain("Maximum iterations reached");
-			expect(markdown).toContain("Container | Yes");
 		});
 
 		it("should include PR info when created", () => {
@@ -155,7 +152,6 @@ describe("report", () => {
 					backend: "claude",
 					maxIterations: 100,
 					completionPromise: "LOOP_COMPLETE",
-					useContainer: false,
 				},
 				prCreated: {
 					url: "https://github.com/org/repo/pull/123",

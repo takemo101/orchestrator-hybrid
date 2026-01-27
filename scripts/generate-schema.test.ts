@@ -109,21 +109,6 @@ describe("generate-schema.ts", () => {
 		expect(properties.loop).toBeDefined();
 	});
 
-	it("生成されたスキーマにsandboxプロパティが含まれる", async () => {
-		// スクリプトを実行
-		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {
-			cwd: process.cwd(),
-		});
-		await proc.exited;
-
-		const content = await Bun.file(SCHEMA_PATH).text();
-		const schema = JSON.parse(content);
-		const properties = getSchemaProperties(schema);
-
-		// Issue #13で追加されたsandbox設定
-		expect(properties.sandbox).toBeDefined();
-	});
-
 	it("生成されたスキーマにautoIssueプロパティが含まれる", async () => {
 		// スクリプトを実行
 		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {

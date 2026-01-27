@@ -27,14 +27,7 @@ import { createTaskLogger, logger } from "./logger.js";
 import { initScratchpad } from "./scratchpad.js";
 import { SessionRecorder } from "./session-recorder.js";
 import type { TaskManager, TaskStateCallback } from "./task-manager.js";
-import type {
-	Config,
-	Issue,
-	LoopContext,
-	PRConfig,
-	SandboxConfig,
-	WorktreeConfig,
-} from "./types.js";
+import type { Config, Issue, LoopContext, PRConfig, WorktreeConfig } from "./types.js";
 
 export interface LoopOptions {
 	issueNumber: number;
@@ -43,7 +36,6 @@ export interface LoopOptions {
 	maxIterations?: number;
 	createPR?: boolean;
 	draftPR?: boolean;
-	useContainer?: boolean;
 	generateReport?: boolean;
 	reportPath?: string;
 	preset?: string;
@@ -56,8 +48,6 @@ export interface LoopOptions {
 	signal?: AbortSignal;
 	/** worktree設定（v2.0.0） */
 	worktreeConfig?: WorktreeConfig;
-	/** sandbox設定（v2.0.0） */
-	sandboxConfig?: SandboxConfig;
 }
 
 export interface MultiLoopOptions {
@@ -67,14 +57,12 @@ export interface MultiLoopOptions {
 	maxIterations?: number;
 	createPR?: boolean;
 	draftPR?: boolean;
-	useContainer?: boolean;
 	generateReport?: boolean;
 	preset?: string;
 	prConfig?: PRConfig;
 	resolveDeps?: boolean;
 	ignoreDeps?: boolean;
 	worktreeConfig?: WorktreeConfig;
-	sandboxConfig?: SandboxConfig;
 }
 
 export async function runLoop(options: LoopOptions): Promise<void> {
@@ -108,11 +96,7 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 	}
 
 	const context = buildLoopContext(issue, loopConfig, options);
-	const backend = createLoopBackend(
-		config,
-		loopConfig.containerEnabled,
-		environmentInfo?.workingDirectory,
-	);
+	const backend = createLoopBackend(config, environmentInfo?.workingDirectory);
 	const collector = loopConfig.shouldGenerateReport ? createReportCollector() : null;
 
 	const logWriter = new LogWriter({
@@ -157,20 +141,17 @@ interface LoopConfig {
 	scratchpadPath: string;
 	promptPath: string;
 	useHats: boolean;
-	containerEnabled: boolean;
 	shouldGenerateReport: boolean;
 	reportPath: string;
 }
 
 function buildLoopConfig(options: LoopOptions, config: Config): LoopConfig {
-	const containerEnabled = options.useContainer || config.container?.enabled || false;
 	return {
 		maxIter: options.maxIterations ?? config.loop.max_iterations,
 		completionPromise: config.loop.completion_promise,
 		scratchpadPath: config.state?.scratchpad_path ?? ".agent/scratchpad.md",
 		promptPath: options.taskId ? `.agent/${options.taskId}/PROMPT.md` : ".agent/PROMPT.md",
 		useHats: !!(config.hats && Object.keys(config.hats).length > 0),
-		containerEnabled,
 		shouldGenerateReport: options.generateReport ?? false,
 		reportPath: options.reportPath ?? ".agent/report.md",
 	};
@@ -179,12 +160,8 @@ function buildLoopConfig(options: LoopOptions, config: Config): LoopConfig {
 function logLoopStart(taskLogger: typeof logger, issueNumber: number, config: LoopConfig): void {
 	taskLogger.info(`Starting orchestration loop for issue #${issueNumber}`);
 	taskLogger.info(`Max iterations: ${config.maxIter}`);
-	taskLogger.info(`Backend: ${config.containerEnabled ? "container" : "claude"}`);
 	taskLogger.info(`Completion promise: ${config.completionPromise}`);
 	taskLogger.info(`Hat mode: ${config.useHats ? "enabled" : "disabled"}`);
-	if (config.containerEnabled) {
-		taskLogger.info("Container mode: enabled (isolated environment)");
-	}
 }
 
 async function initializeLoopEnvironment(
@@ -216,7 +193,6 @@ function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions
 		autoMode: options.autoMode,
 		createPR: options.createPR ?? false,
 		draftPR: options.draftPR ?? false,
-		useContainer: config.containerEnabled,
 		generateReport: config.shouldGenerateReport,
 		reportPath: config.reportPath,
 		preset: options.preset,
@@ -226,16 +202,9 @@ function buildLoopContext(issue: Issue, config: LoopConfig, options: LoopOptions
 	};
 }
 
-function createLoopBackend(config: Config, containerEnabled: boolean, workdir?: string): Backend {
-	const backendType = containerEnabled
-		? "container"
-		: (config.backend.type as "claude" | "opencode");
-	return createBackend(backendType, {
-		container: config.container
-			? { image: config.container.image, envId: config.container.env_id }
-			: undefined,
-		workdir,
-	});
+function createLoopBackend(config: Config, workdir?: string): Backend {
+	const backendType = config.backend.type as "claude" | "opencode" | "gemini";
+	return createBackend(backendType, { workdir });
 }
 
 async function executeLoop(
@@ -298,12 +267,10 @@ export async function runMultipleLoops(
 		maxIterations,
 		createPR: shouldCreatePR = false,
 		draftPR = false,
-		useContainer = false,
 		generateReport: shouldGenerateReport = false,
 		preset,
 		prConfig,
 		worktreeConfig,
-		sandboxConfig,
 	} = options;
 
 	const issues: Issue[] = [];
@@ -328,14 +295,12 @@ export async function runMultipleLoops(
 				maxIterations: maxIter,
 				createPR: shouldCreatePR,
 				draftPR,
-				useContainer,
 				generateReport: shouldGenerateReport,
 				reportPath: taskId ? `.agent/${taskId}/report.md` : `.agent/report-${issue.number}.md`,
 				preset,
 				taskId,
 				prConfig,
 				worktreeConfig,
-				sandboxConfig,
 				onStateChange,
 				signal,
 			});
@@ -1009,7 +974,6 @@ async function finalizeReport(
 			backend: config.backend.type,
 			maxIterations: context.maxIterations,
 			completionPromise: context.completionPromise,
-			useContainer: context.useContainer,
 			preset: context.preset,
 		},
 		prCreated: prResult,
@@ -1026,12 +990,8 @@ async function buildHybridEnvironment(
 	taskLogger: typeof logger,
 ): Promise<EnvironmentInfo | null> {
 	const worktreeConfig = options.worktreeConfig ?? options.config.worktree;
-	const sandboxConfig = options.sandboxConfig ?? options.config.sandbox;
 
-	const worktreeDisabled = !worktreeConfig?.enabled;
-	const sandboxIsHost = !sandboxConfig || sandboxConfig.type === "host";
-
-	if (worktreeDisabled && sandboxIsHost) {
+	if (!worktreeConfig?.enabled) {
 		return null;
 	}
 
@@ -1042,16 +1002,11 @@ async function buildHybridEnvironment(
 		auto_cleanup: true,
 		copy_env_files: [".env", ".envrc", ".env.local"],
 	};
-	const effectiveSandboxConfig = sandboxConfig ?? {
-		type: "host" as const,
-	};
 
 	const worktreeManager = new WorktreeManager(effectiveWorktreeConfig, projectRoot);
 	const builder = new HybridEnvironmentBuilder(
 		{
 			worktree: effectiveWorktreeConfig,
-			sandbox: effectiveSandboxConfig,
-			container: options.config.container,
 		},
 		worktreeManager,
 		projectRoot,
@@ -1062,9 +1017,6 @@ async function buildHybridEnvironment(
 	try {
 		const envInfo = await builder.buildEnvironment(issueNumber);
 		taskLogger.info(`Environment created: ${envInfo.type} (${envInfo.workingDirectory})`);
-		if (envInfo.environmentId) {
-			taskLogger.info(`Environment ID: ${envInfo.environmentId}`);
-		}
 		return envInfo;
 	} catch (error) {
 		taskLogger.warn(
@@ -1075,7 +1027,7 @@ async function buildHybridEnvironment(
 }
 
 async function cleanupHybridEnvironment(
-	options: LoopOptions,
+	_options: LoopOptions,
 	issueNumber: number,
 	taskLogger: typeof logger,
 ): Promise<void> {
