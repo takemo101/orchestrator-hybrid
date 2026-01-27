@@ -21,7 +21,10 @@
  *     ├── SessionRecordError (v1.4.0)
  *     ├── WorktreeError (v1.4.0)
  *     ├── BackendSelectionError (v1.4.0)
- *     └── GlobPatternError (v1.4.0)
+ *     ├── GlobPatternError (v1.4.0)
+ *     ├── HybridEnvironmentError (v2.0.0)
+ *     ├── EnvironmentStateError (v2.0.0)
+ *     └── AutoCleanupError (v2.0.0)
  */
 
 /**
