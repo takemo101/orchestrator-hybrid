@@ -1,9 +1,9 @@
-import { describe, expect, it, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { WorktreeManager } from "./worktree-manager";
-import type { WorktreeConfig, WorktreeInfo } from "../core/types";
 import { WorktreeError } from "../core/errors";
+import type { WorktreeConfig } from "../core/types";
+import { WorktreeManager } from "./worktree-manager";
 
 /**
  * WorktreeManager テスト (F-201)
