@@ -33,7 +33,9 @@ function createMockStateManager(metadata: EnvironmentMetadata | null) {
 }
 
 // Mock HybridEnvironmentBuilder
-function createMockBuilder(destroyResult: { success: boolean; error?: string } = { success: true }) {
+function createMockBuilder(
+	destroyResult: { success: boolean; error?: string } = { success: true },
+) {
 	return {
 		destroyEnvironment: mock(() => {
 			if (destroyResult.success) {

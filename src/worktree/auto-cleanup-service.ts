@@ -212,7 +212,12 @@ export class AutoCleanupService {
 	 * worktreeを削除
 	 */
 	private async removeWorktree(worktreePath: string): Promise<void> {
-		const result = await this.executor.spawn("git", ["worktree", "remove", worktreePath, "--force"]);
+		const result = await this.executor.spawn("git", [
+			"worktree",
+			"remove",
+			worktreePath,
+			"--force",
+		]);
 
 		if (result.exitCode !== 0) {
 			throw new Error(`worktree削除失敗: ${result.stderr}`);
