@@ -54,10 +54,18 @@ export interface StatusCommandOptions {
 }
 
 /**
+ * ログソース種別
+ *
+ * v2.0.0 F-104: logsコマンド拡張
+ */
+export type LogSource = "task" | "backend";
+
+/**
  * logsコマンドオプション
  */
 export interface LogsCommandOptions {
 	task?: string;
+	source?: LogSource;
 	follow?: boolean;
 	lines?: number;
 	table?: boolean;
