@@ -127,9 +127,7 @@ describe("BackendOutputStreamer", () => {
 
 			const content = readFileSync(TEST_LOG_PATH, "utf-8");
 			// ISO 8601形式: [2026-01-26T10:00:00.123Z]
-			expect(content).toMatch(
-				/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/,
-			);
+			expect(content).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/);
 		});
 
 		it("includeTimestamp: false（デフォルト）でタイムスタンプを付与しない", () => {
@@ -142,9 +140,7 @@ describe("BackendOutputStreamer", () => {
 			streamer.close();
 
 			const content = readFileSync(TEST_LOG_PATH, "utf-8");
-			expect(content).not.toMatch(
-				/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/,
-			);
+			expect(content).not.toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/);
 		});
 
 		it("デフォルトでタイムスタンプを付与する", () => {
@@ -157,9 +153,7 @@ describe("BackendOutputStreamer", () => {
 
 			const content = readFileSync(TEST_LOG_PATH, "utf-8");
 			// デフォルトはtrue
-			expect(content).toMatch(
-				/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/,
-			);
+			expect(content).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\]/);
 		});
 	});
 
@@ -255,7 +249,10 @@ describe("BackendOutputStreamer", () => {
 			streamer.close();
 
 			const content = readFileSync(TEST_LOG_PATH, "utf-8");
-			const lines = content.trim().split("\n").filter((l) => l);
+			const lines = content
+				.trim()
+				.split("\n")
+				.filter((l) => l);
 			expect(lines.length).toBe(1);
 			expect(lines[0]).toContain("[stdout] Valid");
 		});

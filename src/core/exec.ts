@@ -65,9 +65,7 @@ export async function exec(
 
 		if (reject && exitCode !== 0) {
 			const stderr = Buffer.concat(stderrChunks).toString("utf-8");
-			throw new Error(
-				`Command failed with exit code ${exitCode}: ${stderr || stdout}`,
-			);
+			throw new Error(`Command failed with exit code ${exitCode}: ${stderr || stdout}`);
 		}
 
 		return { stdout, exitCode };
@@ -79,9 +77,7 @@ export async function exec(
 
 	if (reject && exitCode !== 0) {
 		const stderr = await new Response(proc.stderr).text();
-		throw new Error(
-			`Command failed with exit code ${exitCode}: ${stderr || stdout}`,
-		);
+		throw new Error(`Command failed with exit code ${exitCode}: ${stderr || stdout}`);
 	}
 
 	return { stdout, exitCode };
