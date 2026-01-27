@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Config } from "../../core/types.js";
+import type { Config, SandboxConfig, WorktreeConfig } from "../../core/types.js";
 
 describe("RunCommand", () => {
 	describe("run config merge logic", () => {
@@ -11,6 +11,15 @@ describe("RunCommand", () => {
 				autoMode: options.auto ?? config.run?.auto_mode ?? false,
 				createPR: options.createPr ?? config.run?.create_pr ?? false,
 				draftPR: options.draft ?? config.run?.draft_pr ?? false,
+			};
+		};
+
+		const buildEnvironmentConfig = (
+			config: Partial<Config>,
+		): { worktreeConfig?: WorktreeConfig; sandboxConfig?: SandboxConfig } => {
+			return {
+				worktreeConfig: config.worktree,
+				sandboxConfig: config.sandbox,
 			};
 		};
 
@@ -75,6 +84,79 @@ describe("RunCommand", () => {
 			expect(result.autoMode).toBe(true);
 			expect(result.createPR).toBe(false);
 			expect(result.draftPR).toBe(false);
+		});
+	});
+
+	describe("worktree/sandbox config propagation (UT-F106-001)", () => {
+		const buildEnvironmentConfig = (
+			config: Partial<Config>,
+		): { worktreeConfig?: WorktreeConfig; sandboxConfig?: SandboxConfig } => {
+			return {
+				worktreeConfig: config.worktree,
+				sandboxConfig: config.sandbox,
+			};
+		};
+
+		it("should pass worktree config to LoopOptions when enabled", () => {
+			const config: Partial<Config> = {
+				worktree: {
+					enabled: true,
+					base_dir: ".worktrees",
+					auto_cleanup: true,
+					copy_env_files: [".env"],
+				},
+			};
+
+			const result = buildEnvironmentConfig(config);
+
+			expect(result.worktreeConfig).toBeDefined();
+			expect(result.worktreeConfig?.enabled).toBe(true);
+			expect(result.worktreeConfig?.base_dir).toBe(".worktrees");
+			expect(result.worktreeConfig?.auto_cleanup).toBe(true);
+		});
+
+		it("should pass sandbox config to LoopOptions when container-use type", () => {
+			const config: Partial<Config> = {
+				sandbox: {
+					type: "container-use",
+					container_use: {
+						image: "node:20",
+					},
+				},
+			};
+
+			const result = buildEnvironmentConfig(config);
+
+			expect(result.sandboxConfig).toBeDefined();
+			expect(result.sandboxConfig?.type).toBe("container-use");
+		});
+
+		it("should pass both configs when hybrid mode enabled", () => {
+			const config: Partial<Config> = {
+				worktree: {
+					enabled: true,
+					base_dir: ".worktrees",
+					auto_cleanup: true,
+					copy_env_files: [".env"],
+				},
+				sandbox: {
+					type: "container-use",
+				},
+			};
+
+			const result = buildEnvironmentConfig(config);
+
+			expect(result.worktreeConfig?.enabled).toBe(true);
+			expect(result.sandboxConfig?.type).toBe("container-use");
+		});
+
+		it("should return undefined configs when not configured", () => {
+			const config: Partial<Config> = {};
+
+			const result = buildEnvironmentConfig(config);
+
+			expect(result.worktreeConfig).toBeUndefined();
+			expect(result.sandboxConfig).toBeUndefined();
 		});
 	});
 });

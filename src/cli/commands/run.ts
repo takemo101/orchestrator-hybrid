@@ -132,6 +132,8 @@ export class RunCommand implements CommandHandler {
 				prConfig,
 				resolveDeps: depConfig.resolveDeps,
 				ignoreDeps: depConfig.ignoreDeps,
+				worktreeConfig: config.worktree,
+				sandboxConfig: config.sandbox,
 			},
 			taskManager,
 		);
@@ -171,6 +173,8 @@ export class RunCommand implements CommandHandler {
 				resolveDeps: depConfig.resolveDeps,
 				ignoreDeps: depConfig.ignoreDeps,
 				recordSessionPath: options.recordSession,
+				worktreeConfig: config.worktree,
+				sandboxConfig: config.sandbox,
 				onStateChange,
 				signal,
 			});
