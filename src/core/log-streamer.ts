@@ -77,7 +77,8 @@ export class LogStreamer {
 
 	constructor(config: LogStreamerConfig) {
 		this.taskId = config.taskId;
-		this.logPath = join(config.baseDir ?? ".agent", config.taskId, "output.log");
+		const logFileName = config.logFileName ?? "task.log";
+		this.logPath = join(config.baseDir ?? ".agent", config.taskId, logFileName);
 		this.follow = config.follow ?? false;
 		this.pollInterval = config.pollInterval ?? 100;
 		this.lines = config.lines;
