@@ -47,6 +47,7 @@ describe("WorktreeManager", () => {
 
 		test("既存ブランチがある場合、そのブランチでworktreeを作成する", async () => {
 			const execFn = mockExec([
+				{ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 }, // list (for exists check) - no issue-42
 				{ stdout: "abc123", stderr: "", exitCode: 0 }, // rev-parse: branch exists
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree add
 			]);
