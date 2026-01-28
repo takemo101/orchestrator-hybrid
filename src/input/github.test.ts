@@ -142,9 +142,7 @@ describe("fetchIssue", () => {
 			throw new Error("spawn failed: gh not found");
 		}) as ExecFn;
 
-		await expect(fetchIssue(42, { exec: failingExec })).rejects.toThrow(
-			GitHubError,
-		);
+		await expect(fetchIssue(42, { exec: failingExec })).rejects.toThrow(GitHubError);
 	});
 });
 

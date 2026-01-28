@@ -70,14 +70,7 @@ export async function fetchIssue(
 ): Promise<IssueInfo> {
 	const exec = options.exec ?? defaultExec;
 
-	const args = [
-		"gh",
-		"issue",
-		"view",
-		String(issueNumber),
-		"--json",
-		"title,body,labels",
-	];
+	const args = ["gh", "issue", "view", String(issueNumber), "--json", "title,body,labels"];
 	if (options.repository) {
 		args.push("--repo", options.repository);
 	}
@@ -86,10 +79,9 @@ export async function fetchIssue(
 	try {
 		result = await exec(args);
 	} catch (error) {
-		throw new GitHubError(
-			`Failed to execute gh command for Issue #${issueNumber}`,
-			{ cause: error },
-		);
+		throw new GitHubError(`Failed to execute gh command for Issue #${issueNumber}`, {
+			cause: error,
+		});
 	}
 
 	if (result.exitCode !== 0) {
@@ -103,10 +95,7 @@ export async function fetchIssue(
 		const json: unknown = JSON.parse(result.stdout);
 		parsed = GhIssueResponseSchema.parse(json);
 	} catch (error) {
-		throw new GitHubError(
-			`Failed to parse response for Issue #${issueNumber}`,
-			{ cause: error },
-		);
+		throw new GitHubError(`Failed to parse response for Issue #${issueNumber}`, { cause: error });
 	}
 
 	return IssueInfoSchema.parse({
