@@ -70,7 +70,8 @@ describe("PresetLoader", () => {
 			const loader = new PresetLoader();
 			const description = loader.getPresetDescription("tdd");
 			expect(description).toBeTruthy();
-			expect(description.toLowerCase()).toContain("tdd");
+			// 日本語説明「テスト駆動開発」を含むことを確認
+			expect(description).toContain("テスト駆動開発");
 		});
 
 		test("存在しないプリセットでPresetErrorをスローする", () => {
