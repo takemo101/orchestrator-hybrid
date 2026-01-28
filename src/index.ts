@@ -46,3 +46,10 @@ export {
 // Input
 export { type ExecFn, type FetchIssueOptions, fetchIssue } from "./input/github.js";
 export { type HatContext, PromptGenerator } from "./input/prompt.js";
+// Output
+export {
+	PRCreateError,
+	PRCreator,
+	type PRCreateOptions,
+	type PRCreateResult,
+} from "./output/pr.js";
