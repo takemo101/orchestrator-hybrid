@@ -99,10 +99,11 @@ describe("BUILTIN_PRESETS", () => {
 	test("tddプリセットは3つのHatを含む", () => {
 		const hats = BUILTIN_PRESETS.tdd.config.hats;
 		expect(hats).toBeDefined();
-		expect(Object.keys(hats!).length).toBe(3);
-		expect(hats!.tester).toBeDefined();
-		expect(hats!.implementer).toBeDefined();
-		expect(hats!.refactorer).toBeDefined();
+		if (!hats) throw new Error("hats should be defined");
+		expect(Object.keys(hats).length).toBe(3);
+		expect(hats.tester).toBeDefined();
+		expect(hats.implementer).toBeDefined();
+		expect(hats.refactorer).toBeDefined();
 	});
 
 	test("各プリセットは必須フィールドを持つ", () => {
