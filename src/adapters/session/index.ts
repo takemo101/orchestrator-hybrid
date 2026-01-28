@@ -4,8 +4,7 @@
  * @module adapters/session
  */
 
-// インターフェース
-export type { ISessionManager, Session, SessionManagerType } from "./interface";
+export type { SessionManagerOptions } from "./factory";
 
 // ファクトリー関数
 export {
@@ -13,7 +12,8 @@ export {
 	detectAvailableSessionManagers,
 	SessionManagerFactory,
 } from "./factory";
-export type { SessionManagerOptions } from "./factory";
+// インターフェース
+export type { ISessionManager, Session, SessionManagerType } from "./interface";
 
 // 実装
 export { NativeSessionManager } from "./native";
