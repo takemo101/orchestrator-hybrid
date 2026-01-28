@@ -100,7 +100,7 @@ export class TmuxSessionManager implements ISessionManager {
 			if (!id) continue; // 自分のプレフィックスでないセッションは無視
 
 			const createdDate = createdTimestamp
-				? new Date(Number.parseInt(createdTimestamp) * 1000)
+				? new Date(Number.parseInt(createdTimestamp, 10) * 1000)
 				: new Date();
 
 			sessions.push({
