@@ -421,6 +421,98 @@ orch kill 42
 
 ---
 
+### 3.3 F-008: ログ監視（logs コマンド）
+
+#### 概要
+
+`orch logs` コマンドで、実行中のセッション（OpenCode/Claude Code）の出力をリアルタイムでストリーミング表示。
+
+ISessionManagerの `streamOutput(id)` を使用して、バックエンドに依存しない統一的なログ表示を実現。
+
+#### CLI
+
+```bash
+# 最新のセッションログを表示
+orch logs
+
+# 特定Issueのログを表示
+orch logs 42
+
+# リアルタイムストリーミング（follow）
+orch logs --follow
+orch logs 42 --follow
+```
+
+#### 実装
+
+各SessionManagerの `streamOutput(id)` を使用:
+
+| マネージャー | 実装方法 |
+|-------------|---------|
+| **native** | `tail -f .agent/sessions/{id}/combined.log` |
+| **tmux** | `tmux capture-pane` をポーリング（500ms間隔） |
+| **zellij** | `zellij action dump-screen` をポーリング（500ms間隔） |
+
+#### ビジネスルール
+
+- BR-008-1: `--follow` 指定時は Ctrl+C まで継続
+- BR-008-2: セッションが終了したら自動的に停止
+- BR-008-3: 複数セッション実行中は選択プロンプト表示（またはエラー）
+- BR-008-4: セッションが存在しない場合はエラーメッセージを表示
+
+---
+
+### 3.4 F-009: ステータスラベル
+
+#### 概要
+
+GitHub Issueにステータスラベルを自動付与し、タスクの進行状態を可視化。
+
+#### ステータス一覧
+
+| ステータス | ラベル | 色 | 説明 |
+|-----------|--------|-----|------|
+| `queued` | `orch:queued` | 🟢 薄緑 (#c2e0c6) | 実行待ち |
+| `running` | `orch:running` | 🟢 緑 (#0e8a16) | 実行中 |
+| `completed` | `orch:completed` | 🔵 青 (#0075ca) | 正常完了 |
+| `failed` | `orch:failed` | 🔴 赤 (#d73a4a) | 失敗 |
+| `blocked` | `orch:blocked` | 🟡 黄 (#fbca04) | ブロック中（依存待ち） |
+| `pr-created` | `orch:pr-created` | 🟣 紫 (#6f42c1) | PR作成済み |
+| `merged` | `orch:merged` | 🔵 濃青 (#1d76db) | マージ完了 |
+
+#### 状態遷移
+
+```
+queued → running → completed → pr-created → merged
+                 ↘ failed
+         blocked ↗
+```
+
+#### CLI
+
+```bash
+# リポジトリにステータスラベルを作成
+orch init --labels
+```
+
+#### 設定
+
+```yaml
+labels:
+  enabled: true        # ラベル機能を有効化（デフォルト: true）
+  prefix: "orch"       # ラベルの接頭辞（デフォルト: "orch"）
+```
+
+#### ビジネスルール
+
+- BR-009-1: 実行開始時に `orch:running` を付与、他のステータスラベルを削除
+- BR-009-2: 完了時に `orch:completed` を付与、`orch:running` を削除
+- BR-009-3: PR作成時に `orch:pr-created` を付与
+- BR-009-4: ラベルが存在しない場合は自動作成
+- BR-009-5: `prefix` 設定でラベル名をカスタマイズ可能（例: `myapp:running`）
+
+---
+
 ## 4. 設定ファイル
 
 ### 4.1 v3.0.0 設定（シンプル版）
