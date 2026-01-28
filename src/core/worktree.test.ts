@@ -104,6 +104,7 @@ describe("WorktreeManager", () => {
 			const readFile = mock(() => Promise.resolve(""));
 
 			const execFn = mockExec([
+				{ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 }, // list (for exists check)
 				{ stdout: "", stderr: "", exitCode: 1 }, // rev-parse
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree add
 			]);
