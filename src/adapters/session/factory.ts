@@ -7,6 +7,7 @@
 import type { ISessionManager, SessionManagerType } from "./interface";
 import { NativeSessionManager } from "./native";
 import { isTmuxAvailable, TmuxSessionManager } from "./tmux";
+import { isZellijAvailable, ZellijSessionManager } from "./zellij";
 
 /**
  * コマンドが実行可能かチェック
@@ -58,8 +59,10 @@ export async function createSessionManager(
 		return new TmuxSessionManager(prefix);
 	}
 	if (type === "zellij") {
-		// Zellij は Issue #126 で実装予定
-		throw new Error("zellij session manager is not implemented yet");
+		if (!(await isZellijAvailable())) {
+			throw new Error("zellij is not available on this system");
+		}
+		return new ZellijSessionManager(prefix);
 	}
 
 	// 自動検出
@@ -67,10 +70,8 @@ export async function createSessionManager(
 		return new TmuxSessionManager(prefix);
 	}
 
-	// zellijチェック（将来対応）
-	if (await canRun("zellij")) {
-		// Zellij は Issue #126 で実装予定
-		// return new ZellijSessionManager(prefix);
+	if (await isZellijAvailable()) {
+		return new ZellijSessionManager(prefix);
 	}
 
 	// フォールバック: Native
