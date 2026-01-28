@@ -53,7 +53,7 @@ export interface DependencyResolverOptions {
  *
  * 対象キーワード:
  * - Blocked by #XX
- * - Depends on #XX
+ * - Depends on #XX, #YY
  * - Needs #XX
  * - 前提Issue: #XX
  *
@@ -61,12 +61,18 @@ export interface DependencyResolverOptions {
  * @returns 依存Issue番号の配列（重複排除済み）
  */
 export function parseDependencies(body: string): number[] {
-	const regex = /(?:Blocked by|Depends on|Needs|前提Issue)[:\s]*#(\d+)/gi;
+	// まずキーワードに続く部分を抽出
+	const keywordRegex = /(?:Blocked by|Depends on|Needs|前提Issue)[:\s]*([^\n]+)/gi;
 	const ids = new Set<number>();
 
-	let match: RegExpExecArray | null;
-	while ((match = regex.exec(body)) !== null) {
-		ids.add(Number.parseInt(match[1], 10));
+	let keywordMatch: RegExpExecArray | null;
+	while ((keywordMatch = keywordRegex.exec(body)) !== null) {
+		// その部分から#数字を全て抽出
+		const issueRegex = /#(\d+)/g;
+		let issueMatch: RegExpExecArray | null;
+		while ((issueMatch = issueRegex.exec(keywordMatch[1])) !== null) {
+			ids.add(Number.parseInt(issueMatch[1], 10));
+		}
 	}
 
 	return Array.from(ids);
