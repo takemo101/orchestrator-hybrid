@@ -52,8 +52,6 @@ export interface CommandExecutor {
  * GitHub CLIを使用してIssueのステータスラベルを管理する。
  */
 export class StatusLabelManager {
-	private labelCache: Set<string> | null = null;
-
 	constructor(
 		private readonly executor: CommandExecutor,
 		private readonly prefix: string = "orch",

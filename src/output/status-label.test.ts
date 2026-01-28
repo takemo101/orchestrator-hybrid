@@ -1,10 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	type CommandExecutor,
-	type IssueStatus,
-	STATUS_COLORS,
-	StatusLabelManager,
-} from "./status-label.js";
+import { describe, expect, it, vi } from "vitest";
+import { type CommandExecutor, STATUS_COLORS, StatusLabelManager } from "./status-label.js";
 
 /**
  * モックCommandExecutor
@@ -170,7 +165,7 @@ describe("StatusLabelManager", () => {
 			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 			const executor = createMockExecutor();
 			(executor.exec as ReturnType<typeof vi.fn>).mockImplementation(
-				async (command: string, args: string[]) => {
+				async (_command: string, args: string[]) => {
 					if (args.includes("create")) {
 						return { exitCode: 1, stdout: "", stderr: "Permission denied" };
 					}
@@ -189,7 +184,7 @@ describe("StatusLabelManager", () => {
 			const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 			const executor = createMockExecutor();
 			(executor.exec as ReturnType<typeof vi.fn>).mockImplementation(
-				async (command: string, args: string[]) => {
+				async (_command: string, args: string[]) => {
 					if (args.includes("--add-label")) {
 						return { exitCode: 1, stdout: "", stderr: "Issue not found" };
 					}
