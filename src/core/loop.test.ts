@@ -1,11 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
-import { EventBus } from "./event";
-import {
-	LoopEngine,
-	LoopError,
-	MaxIterationsReachedError,
-} from "./loop";
 import type { EventEntry } from "./event";
+import { EventBus } from "./event";
+import { LoopEngine, LoopError, MaxIterationsReachedError } from "./loop";
 
 // ============================================================
 // EventBus テスト
@@ -73,8 +69,12 @@ describe("EventBus", () => {
 			let count1 = 0;
 			let count2 = 0;
 
-			bus.on("multi", () => { count1++; });
-			bus.on("multi", () => { count2++; });
+			bus.on("multi", () => {
+				count1++;
+			});
+			bus.on("multi", () => {
+				count2++;
+			});
 			bus.emit("multi", "Source");
 
 			expect(count1).toBe(1);
@@ -161,7 +161,9 @@ describe("EventBus", () => {
 		test("ハンドラをクリアする", () => {
 			const bus = new EventBus();
 			let called = false;
-			bus.on("test", () => { called = true; });
+			bus.on("test", () => {
+				called = true;
+			});
 
 			bus.clear();
 			bus.emit("test", "Source");
@@ -204,9 +206,9 @@ describe("LoopEngine", () => {
 			const engine = new LoopEngine();
 			const runner = mock(() => Promise.resolve("Still working..."));
 
-			await expect(
-				engine.run(runner, { maxIterations: 3 }),
-			).rejects.toThrow(MaxIterationsReachedError);
+			await expect(engine.run(runner, { maxIterations: 3 })).rejects.toThrow(
+				MaxIterationsReachedError,
+			);
 		});
 
 		test("MaxIterationsReachedErrorに反復回数情報が含まれる", async () => {
@@ -228,9 +230,7 @@ describe("LoopEngine", () => {
 			const engine = new LoopEngine();
 			const runner = mock(() => Promise.reject(new Error("Backend crashed")));
 
-			await expect(
-				engine.run(runner, { maxIterations: 10 }),
-			).rejects.toThrow(LoopError);
+			await expect(engine.run(runner, { maxIterations: 10 })).rejects.toThrow(LoopError);
 		});
 
 		test("LoopErrorにcauseが設定される", async () => {

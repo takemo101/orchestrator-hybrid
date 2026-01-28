@@ -19,9 +19,7 @@ export class MaxIterationsReachedError extends LoopError {
 	readonly maxIterations: number;
 
 	constructor(iterations: number, maxIterations: number) {
-		super(
-			`Maximum iterations reached: ${iterations}/${maxIterations}`,
-		);
+		super(`Maximum iterations reached: ${iterations}/${maxIterations}`);
 		this.name = "MaxIterationsReachedError";
 		this.iterations = iterations;
 		this.maxIterations = maxIterations;
