@@ -49,7 +49,7 @@ export { type HatContext, PromptGenerator } from "./input/prompt.js";
 // Output
 export {
 	PRCreateError,
-	PRCreator,
 	type PRCreateOptions,
 	type PRCreateResult,
+	PRCreator,
 } from "./output/pr.js";
