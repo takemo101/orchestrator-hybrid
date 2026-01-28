@@ -6,6 +6,7 @@ import { describe, expect, it } from "bun:test";
 import { SessionManagerFactory } from "./factory";
 import { NativeSessionManager } from "./native";
 import { isTmuxAvailable, TmuxSessionManager } from "./tmux";
+import { isZellijAvailable, ZellijSessionManager } from "./zellij";
 
 describe("SessionManagerFactory", () => {
 	describe("create", () => {
@@ -25,8 +26,15 @@ describe("SessionManagerFactory", () => {
 			expect(manager).toBeInstanceOf(TmuxSessionManager);
 		});
 
-		it("type='zellij'でエラーをスローする（未実装）", async () => {
-			await expect(SessionManagerFactory.create("zellij")).rejects.toThrow(/not implemented/);
+		it("type='zellij'でZellijSessionManagerを生成する（zellijが利用可能な場合）", async () => {
+			const available = await isZellijAvailable();
+			if (!available) {
+				await expect(SessionManagerFactory.create("zellij")).rejects.toThrow(/not available/);
+				return;
+			}
+
+			const manager = await SessionManagerFactory.create("zellij");
+			expect(manager).toBeInstanceOf(ZellijSessionManager);
 		});
 
 		it("type='auto'で自動検出される", async () => {
@@ -72,6 +80,15 @@ describe("SessionManagerFactory", () => {
 
 			if (tmuxAvailable) {
 				expect(available).toContain("tmux");
+			}
+		});
+
+		it("zellijが利用可能な環境ではzellijも含まれる", async () => {
+			const zellijAvailable = await isZellijAvailable();
+			const available = await SessionManagerFactory.detectAvailable();
+
+			if (zellijAvailable) {
+				expect(available).toContain("zellij");
 			}
 		});
 	});
