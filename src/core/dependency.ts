@@ -144,7 +144,7 @@ export class DependencyResolver {
 		let issue: IssueInfo;
 		try {
 			issue = await this.fetchIssue(issueId);
-		} catch (error) {
+		} catch {
 			// 存在しないIssueは警告してスキップ
 			console.warn(`Warning: Dependency issue #${issueId} not found. Skipping.`);
 			return;
