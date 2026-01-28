@@ -2,35 +2,33 @@
  * orchestrator-hybrid v3.0.0 ライブラリエクスポート
  */
 
-// Core types
-export {
-	OrchestratorConfigSchema,
-	type OrchestratorConfig,
-	IssueInfoSchema,
-	type IssueInfo,
-	SessionMetaSchema,
-	type SessionMeta,
-	HatDefinitionSchema,
-	type HatDefinition,
-	WorktreeConfigSchema,
-	type WorktreeConfig,
-	SessionConfigSchema,
-	type SessionConfig,
-	SessionStatusSchema,
-	type SessionStatus,
-} from "./core/types.js";
-
 // Config
 export {
+	ConfigValidationError,
 	loadConfig,
 	validateConfig,
-	ConfigValidationError,
 } from "./core/config.js";
-
 // Errors
 export {
-	OrchestratorError,
 	ConfigError,
 	GitHubError,
+	OrchestratorError,
 	SessionError,
 } from "./core/errors.js";
+// Core types
+export {
+	type HatDefinition,
+	HatDefinitionSchema,
+	type IssueInfo,
+	IssueInfoSchema,
+	type OrchestratorConfig,
+	OrchestratorConfigSchema,
+	type SessionConfig,
+	SessionConfigSchema,
+	type SessionMeta,
+	SessionMetaSchema,
+	type SessionStatus,
+	SessionStatusSchema,
+	type WorktreeConfig,
+	WorktreeConfigSchema,
+} from "./core/types.js";
