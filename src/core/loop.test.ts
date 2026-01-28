@@ -146,17 +146,26 @@ describe("EventBus", () => {
 	});
 
 	describe("clear", () => {
-		test("履歴とハンドラをクリアする", () => {
+		test("履歴をクリアする", () => {
+			const bus = new EventBus();
+			bus.emit("test", "Source");
+			bus.emit("test", "Source");
+
+			expect(bus.getHistory()).toHaveLength(2);
+
+			bus.clear();
+
+			expect(bus.getHistory()).toHaveLength(0);
+		});
+
+		test("ハンドラをクリアする", () => {
 			const bus = new EventBus();
 			let called = false;
 			bus.on("test", () => { called = true; });
-			bus.emit("test", "Source");
 
 			bus.clear();
-			called = false;
 			bus.emit("test", "Source");
 
-			expect(bus.getHistory()).toHaveLength(0);
 			expect(called).toBe(false);
 		});
 	});
