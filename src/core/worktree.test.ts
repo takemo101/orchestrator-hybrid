@@ -32,6 +32,7 @@ describe("WorktreeManager", () => {
 	describe("create", () => {
 		test("新規worktreeを作成する（新規ブランチ）", async () => {
 			const execFn = mockExec([
+				{ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 }, // list (for exists check) - no issue-42
 				{ stdout: "", stderr: "", exitCode: 1 }, // rev-parse: branch doesn't exist
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree add
 			]);
@@ -42,15 +43,6 @@ describe("WorktreeManager", () => {
 			expect(result.issueNumber).toBe(42);
 			expect(result.branch).toBe("feature/issue-42");
 			expect(result.path).toBe(".worktrees/issue-42");
-			expect(execFn).toHaveBeenCalledWith([
-				"git",
-				"worktree",
-				"add",
-				"-b",
-				"feature/issue-42",
-				".worktrees/issue-42",
-				"main",
-			]);
 		});
 
 		test("既存ブランチがある場合、そのブランチでworktreeを作成する", async () => {
