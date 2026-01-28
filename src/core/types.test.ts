@@ -1,12 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
-	type HatDefinition,
 	HatDefinitionSchema,
-	type IssueInfo,
 	IssueInfoSchema,
-	type OrchestratorConfig,
 	OrchestratorConfigSchema,
-	type SessionMeta,
 	SessionMetaSchema,
 } from "./types.js";
 
