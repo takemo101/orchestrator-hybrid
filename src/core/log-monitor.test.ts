@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, mock, test } from "bun:test";
 import { type ISessionManager, LogMonitor } from "./log-monitor.js";
 
 /**
@@ -6,11 +6,11 @@ import { type ISessionManager, LogMonitor } from "./log-monitor.js";
  */
 function createMockSessionManager(overrides: Partial<ISessionManager> = {}): ISessionManager {
 	return {
-		getOutput: vi.fn().mockResolvedValue(""),
-		streamOutput: vi.fn().mockImplementation(async function* () {
+		getOutput: mock(() => Promise.resolve("")),
+		streamOutput: mock(async function* () {
 			// デフォルトは空のストリーム
 		}),
-		isRunning: vi.fn().mockResolvedValue(true),
+		isRunning: mock(() => Promise.resolve(true)),
 		...overrides,
 	};
 }
@@ -31,23 +31,24 @@ function createMockWriter() {
 
 describe("LogMonitor", () => {
 	describe("showLogs", () => {
-		it("過去のログを表示する（follow: false）", async () => {
+		test("過去のログを表示する（follow: false）", async () => {
 			const mockOutput = "line 1\nline 2\nline 3\n";
+			const getOutputMock = mock(() => Promise.resolve(mockOutput));
 			const sessionManager = createMockSessionManager({
-				getOutput: vi.fn().mockResolvedValue(mockOutput),
+				getOutput: getOutputMock,
 			});
 			const writer = createMockWriter();
 			const monitor = new LogMonitor(sessionManager, writer);
 
 			await monitor.showLogs("orch-42", { follow: false, lines: 100 });
 
-			expect(sessionManager.getOutput).toHaveBeenCalledWith("orch-42", 100);
+			expect(getOutputMock).toHaveBeenCalledWith("orch-42", 100);
 			expect(writer.getOutput()).toBe(mockOutput);
 		});
 
-		it("空の出力でもエラーにならない", async () => {
+		test("空の出力でもエラーにならない", async () => {
 			const sessionManager = createMockSessionManager({
-				getOutput: vi.fn().mockResolvedValue(""),
+				getOutput: mock(() => Promise.resolve("")),
 			});
 			const writer = createMockWriter();
 			const monitor = new LogMonitor(sessionManager, writer);
@@ -57,17 +58,20 @@ describe("LogMonitor", () => {
 			expect(writer.getOutput()).toBe("");
 		});
 
-		it("linesオプションに従って行数を指定する", async () => {
-			const sessionManager = createMockSessionManager();
+		test("linesオプションに従って行数を指定する", async () => {
+			const getOutputMock = mock(() => Promise.resolve(""));
+			const sessionManager = createMockSessionManager({
+				getOutput: getOutputMock,
+			});
 			const writer = createMockWriter();
 			const monitor = new LogMonitor(sessionManager, writer);
 
 			await monitor.showLogs("orch-42", { follow: false, lines: 50 });
 
-			expect(sessionManager.getOutput).toHaveBeenCalledWith("orch-42", 50);
+			expect(getOutputMock).toHaveBeenCalledWith("orch-42", 50);
 		});
 
-		it("follow: trueで過去ログを表示後、ストリーミングを開始する", async () => {
+		test("follow: trueで過去ログを表示後、ストリーミングを開始する", async () => {
 			const pastLogs = "past log\n";
 			const streamChunks = ["chunk1\n", "chunk2\n"];
 
@@ -78,8 +82,8 @@ describe("LogMonitor", () => {
 			}
 
 			const sessionManager = createMockSessionManager({
-				getOutput: vi.fn().mockResolvedValue(pastLogs),
-				streamOutput: vi.fn().mockImplementation(mockStream),
+				getOutput: mock(() => Promise.resolve(pastLogs)),
+				streamOutput: mockStream,
 			});
 			const writer = createMockWriter();
 			const monitor = new LogMonitor(sessionManager, writer);
@@ -91,7 +95,7 @@ describe("LogMonitor", () => {
 	});
 
 	describe("stop", () => {
-		it("ストリーミングを中断できる", async () => {
+		test("ストリーミングを中断できる", async () => {
 			let yieldCount = 0;
 
 			async function* infiniteStream() {
@@ -104,8 +108,8 @@ describe("LogMonitor", () => {
 			}
 
 			const sessionManager = createMockSessionManager({
-				getOutput: vi.fn().mockResolvedValue(""),
-				streamOutput: vi.fn().mockImplementation(infiniteStream),
+				getOutput: mock(() => Promise.resolve("")),
+				streamOutput: infiniteStream,
 			});
 			const writer = createMockWriter();
 			const monitor = new LogMonitor(sessionManager, writer);
@@ -125,7 +129,7 @@ describe("LogMonitor", () => {
 			expect(yieldCount).toBeLessThan(100);
 		});
 
-		it("stopを複数回呼んでもエラーにならない", () => {
+		test("stopを複数回呼んでもエラーにならない", () => {
 			const sessionManager = createMockSessionManager();
 			const monitor = new LogMonitor(sessionManager);
 
@@ -137,9 +141,9 @@ describe("LogMonitor", () => {
 	});
 
 	describe("エラーハンドリング", () => {
-		it("getOutputがエラーをスローした場合、例外が伝播する", async () => {
+		test("getOutputがエラーをスローした場合、例外が伝播する", async () => {
 			const sessionManager = createMockSessionManager({
-				getOutput: vi.fn().mockRejectedValue(new Error("Session not found")),
+				getOutput: mock(() => Promise.reject(new Error("Session not found"))),
 			});
 			const monitor = new LogMonitor(sessionManager);
 
@@ -148,15 +152,15 @@ describe("LogMonitor", () => {
 			);
 		});
 
-		it("streamOutputがエラーをスローした場合、例外が伝播する", async () => {
+		test("streamOutputがエラーをスローした場合、例外が伝播する", async () => {
 			async function* errorStream() {
 				yield "first chunk\n";
 				throw new Error("Stream error");
 			}
 
 			const sessionManager = createMockSessionManager({
-				getOutput: vi.fn().mockResolvedValue(""),
-				streamOutput: vi.fn().mockImplementation(errorStream),
+				getOutput: mock(() => Promise.resolve("")),
+				streamOutput: errorStream,
 			});
 			const writer = createMockWriter();
 			const monitor = new LogMonitor(sessionManager, writer);
