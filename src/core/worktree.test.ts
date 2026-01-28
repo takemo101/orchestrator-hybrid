@@ -121,12 +121,20 @@ describe("WorktreeManager", () => {
 		});
 
 		test("git worktree addが失敗した場合WorktreeCreateErrorをスローする", async () => {
-			const execFn = mockExec([
-				{ stdout: "", stderr: "", exitCode: 1 }, // rev-parse
-				{ stdout: "", stderr: "fatal: worktree already exists", exitCode: 128 }, // worktree add fails
-			]);
+			const failingExec = mock((args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> => {
+				if (args.includes("list")) {
+					return Promise.resolve({ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 });
+				}
+				if (args.includes("rev-parse")) {
+					return Promise.resolve({ stdout: "", stderr: "", exitCode: 1 });
+				}
+				if (args.includes("worktree") && args.includes("add")) {
+					return Promise.reject(new Error("fatal: worktree already exists"));
+				}
+				return Promise.resolve({ stdout: "", stderr: "", exitCode: 0 });
+			});
 
-			const manager = createManager({ exec: execFn });
+			const manager = createManager({ exec: failingExec });
 
 			await expect(manager.create(42)).rejects.toThrow(WorktreeCreateError);
 		});
