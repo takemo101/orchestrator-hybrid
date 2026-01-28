@@ -11,7 +11,9 @@ import type { ISessionManager, Session } from "./interface";
 /**
  * tmuxコマンドを実行するユーティリティ
  */
-async function runTmux(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+async function runTmux(
+	args: string[],
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
 	const proc = Bun.spawn(["tmux", ...args], {
 		stdout: "pipe",
 		stderr: "pipe",
@@ -97,7 +99,9 @@ export class TmuxSessionManager implements ISessionManager {
 			const id = this.extractId(name);
 			if (!id) continue; // 自分のプレフィックスでないセッションは無視
 
-			const createdDate = createdTimestamp ? new Date(Number.parseInt(createdTimestamp) * 1000) : new Date();
+			const createdDate = createdTimestamp
+				? new Date(Number.parseInt(createdTimestamp) * 1000)
+				: new Date();
 
 			sessions.push({
 				id,

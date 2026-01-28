@@ -5,7 +5,7 @@
 import { describe, expect, it } from "bun:test";
 import { SessionManagerFactory } from "./factory";
 import { NativeSessionManager } from "./native";
-import { TmuxSessionManager, isTmuxAvailable } from "./tmux";
+import { isTmuxAvailable, TmuxSessionManager } from "./tmux";
 
 describe("SessionManagerFactory", () => {
 	describe("create", () => {
@@ -42,7 +42,9 @@ describe("SessionManagerFactory", () => {
 		});
 
 		it("オプションでbaseDirを指定できる", async () => {
-			const manager = (await SessionManagerFactory.create("native", { baseDir: ".custom-sessions" })) as NativeSessionManager;
+			const manager = (await SessionManagerFactory.create("native", {
+				baseDir: ".custom-sessions",
+			})) as NativeSessionManager;
 			expect(manager).toBeInstanceOf(NativeSessionManager);
 		});
 

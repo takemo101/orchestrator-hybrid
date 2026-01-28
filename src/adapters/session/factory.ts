@@ -6,7 +6,7 @@
 
 import type { ISessionManager, SessionManagerType } from "./interface";
 import { NativeSessionManager } from "./native";
-import { TmuxSessionManager, isTmuxAvailable } from "./tmux";
+import { isTmuxAvailable, TmuxSessionManager } from "./tmux";
 
 /**
  * コマンドが実行可能かチェック

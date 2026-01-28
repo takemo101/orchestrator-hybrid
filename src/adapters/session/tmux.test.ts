@@ -4,7 +4,7 @@
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { SessionError } from "../../core/errors";
-import { TmuxSessionManager, isTmuxAvailable } from "./tmux";
+import { isTmuxAvailable, TmuxSessionManager } from "./tmux";
 
 describe("TmuxSessionManager", () => {
 	let manager: TmuxSessionManager;
@@ -107,10 +107,13 @@ describe("TmuxSessionManager", () => {
 			}
 
 			// 別のプレフィックスでセッション作成
-			const proc = Bun.spawn(["tmux", "new-session", "-d", "-s", "other-prefix-test", "sleep", "100"], {
-				stdout: "pipe",
-				stderr: "pipe",
-			});
+			const proc = Bun.spawn(
+				["tmux", "new-session", "-d", "-s", "other-prefix-test", "sleep", "100"],
+				{
+					stdout: "pipe",
+					stderr: "pipe",
+				},
+			);
 			await proc.exited;
 
 			const sessions = await manager.list();
@@ -132,7 +135,16 @@ describe("TmuxSessionManager", () => {
 			// 直接tmuxを使ってテスト（確実に出力がキャプチャされることを確認）
 			const sessionName = "test-orch-output-1";
 			const createProc = Bun.spawn(
-				["tmux", "new-session", "-d", "-s", sessionName, "sh", "-c", "echo 'hello tmux output'; sleep 100"],
+				[
+					"tmux",
+					"new-session",
+					"-d",
+					"-s",
+					sessionName,
+					"sh",
+					"-c",
+					"echo 'hello tmux output'; sleep 100",
+				],
 				{ stdout: "pipe", stderr: "pipe" },
 			);
 			await createProc.exited;

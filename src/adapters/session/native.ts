@@ -31,7 +31,8 @@ interface SessionMetadata {
  */
 export class NativeSessionManager implements ISessionManager {
 	private readonly baseDir: string;
-	private processes: Map<string, { proc: ReturnType<typeof Bun.spawn>; meta: SessionMetadata }> = new Map();
+	private processes: Map<string, { proc: ReturnType<typeof Bun.spawn>; meta: SessionMetadata }> =
+		new Map();
 
 	constructor(baseDir = ".agent/sessions") {
 		this.baseDir = baseDir;
@@ -259,9 +260,12 @@ export class NativeSessionManager implements ISessionManager {
 
 	async attach(_id: string): Promise<void> {
 		// Nativeモードでは対話的アタッチは非サポート
-		throw new SessionError("Interactive attach is not supported in native mode. Use tmux or zellij.", {
-			sessionId: _id,
-		});
+		throw new SessionError(
+			"Interactive attach is not supported in native mode. Use tmux or zellij.",
+			{
+				sessionId: _id,
+			},
+		);
 	}
 
 	async isRunning(id: string): Promise<boolean> {
