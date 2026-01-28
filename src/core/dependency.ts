@@ -61,13 +61,11 @@ export interface DependencyResolverOptions {
  * @returns 依存Issue番号の配列（重複排除済み）
  */
 export function parseDependencies(body: string): number[] {
-	// まずキーワードに続く部分を抽出
 	const keywordRegex = /(?:Blocked by|Depends on|Needs|前提Issue)[:\s]*([^\n]+)/gi;
 	const ids = new Set<number>();
 
 	const keywordMatches = body.matchAll(keywordRegex);
 	for (const keywordMatch of keywordMatches) {
-		// その部分から#数字を全て抽出
 		const issueRegex = /#(\d+)/g;
 		const issueMatches = keywordMatch[1].matchAll(issueRegex);
 		for (const issueMatch of issueMatches) {
@@ -80,10 +78,6 @@ export function parseDependencies(body: string): number[] {
 
 /**
  * Issue間の依存関係を解析し、実行順序を決定するリゾルバー
- *
- * - Issue本文から依存関係を抽出
- * - トポロジカルソートで実行順序を決定
- * - 循環依存を検出してエラーを報告
  */
 export class DependencyResolver {
 	private fetchIssue: FetchIssueFn;
@@ -94,61 +88,41 @@ export class DependencyResolver {
 
 	/**
 	 * 指定されたIssueの依存関係を解決し、実行順序を返す
-	 *
-	 * @param rootIssueId 起点となるIssue番号
-	 * @returns トポロジカルソートされたIssue番号の配列
-	 * @throws CircularDependencyError 循環依存が検出された場合
 	 */
 	async resolveOrder(rootIssueId: number): Promise<number[]> {
 		const graph = await this.buildGraph(rootIssueId);
-
-		// 完了済みIssueを除外
-		for (const [id, node] of graph) {
-			if (node.state === "closed") {
-				graph.delete(id);
-			}
-		}
-
-		// トポロジカルソート
+		this.removeCompletedIssues(graph);
 		return this.topologicalSort(graph, rootIssueId);
 	}
 
 	/**
 	 * 依存グラフを構築する
-	 *
-	 * @param rootId 起点となるIssue番号
-	 * @returns 依存グラフ（Map<Issue番号, ノード>）
 	 */
 	async buildGraph(rootId: number): Promise<Map<number, DependencyNode>> {
 		const graph = new Map<number, DependencyNode>();
 		const visited = new Set<number>();
-
 		await this.buildGraphRecursive(rootId, graph, visited);
-
 		return graph;
 	}
 
-	/**
-	 * 再帰的に依存グラフを構築する
-	 */
+	private removeCompletedIssues(graph: Map<number, DependencyNode>): void {
+		for (const [id, node] of graph) {
+			if (node.state === "closed") {
+				graph.delete(id);
+			}
+		}
+	}
+
 	private async buildGraphRecursive(
 		issueId: number,
 		graph: Map<number, DependencyNode>,
 		visited: Set<number>,
 	): Promise<void> {
-		if (visited.has(issueId)) {
-			return;
-		}
+		if (visited.has(issueId)) return;
 		visited.add(issueId);
 
-		let issue: IssueInfo;
-		try {
-			issue = await this.fetchIssue(issueId);
-		} catch {
-			// 存在しないIssueは警告してスキップ
-			console.warn(`Warning: Dependency issue #${issueId} not found. Skipping.`);
-			return;
-		}
+		const issue = await this.fetchIssueOrWarn(issueId);
+		if (!issue) return;
 
 		const dependencies = parseDependencies(issue.body);
 		const isCompleted = issue.labels.includes("orch:completed");
@@ -159,29 +133,38 @@ export class DependencyResolver {
 			state: isCompleted ? "closed" : "open",
 		});
 
-		// 依存先を再帰的に取得
 		for (const depId of dependencies) {
 			await this.buildGraphRecursive(depId, graph, visited);
 		}
 	}
 
-	/**
-	 * トポロジカルソートを実行
-	 *
-	 * Kahnのアルゴリズムを使用
-	 */
+	private async fetchIssueOrWarn(issueId: number): Promise<IssueInfo | null> {
+		try {
+			return await this.fetchIssue(issueId);
+		} catch {
+			console.warn(`Warning: Dependency issue #${issueId} not found. Skipping.`);
+			return null;
+		}
+	}
+
 	private topologicalSort(graph: Map<number, DependencyNode>, rootId: number): number[] {
-		// グラフにルートのみの場合
-		if (!graph.has(rootId)) {
-			return [rootId];
+		if (!graph.has(rootId)) return [rootId];
+
+		const inDegree = this.calculateInDegrees(graph);
+		const result = this.processQueue(graph, inDegree);
+
+		if (result.length !== graph.size) {
+			throw new CircularDependencyError(this.findCycle(graph));
 		}
 
-		// 入次数を計算
+		return result;
+	}
+
+	private calculateInDegrees(graph: Map<number, DependencyNode>): Map<number, number> {
 		const inDegree = new Map<number, number>();
 		for (const id of graph.keys()) {
 			inDegree.set(id, 0);
 		}
-
 		for (const node of graph.values()) {
 			for (const dep of node.dependencies) {
 				if (graph.has(dep)) {
@@ -189,91 +172,98 @@ export class DependencyResolver {
 				}
 			}
 		}
+		return inDegree;
+	}
 
-		// 入次数0のノードをキューに追加
-		const queue: number[] = [];
-		for (const [id, degree] of inDegree) {
-			if (degree === 0) {
-				queue.push(id);
-			}
-		}
-
+	private processQueue(
+		graph: Map<number, DependencyNode>,
+		inDegree: Map<number, number>,
+	): number[] {
+		const queue = this.initializeQueue(inDegree);
 		const result: number[] = [];
 		const visited = new Set<number>();
 
 		while (queue.length > 0) {
-			const current = queue.shift()!;
-			if (visited.has(current)) {
-				continue;
-			}
+			const current = queue.shift() as number;
+			if (visited.has(current)) continue;
+
 			visited.add(current);
 			result.push(current);
-
-			// 依存元の入次数を減らす
-			for (const [id, node] of graph) {
-				if (node.dependencies.includes(current)) {
-					const newDegree = (inDegree.get(id) ?? 0) - 1;
-					inDegree.set(id, newDegree);
-					if (newDegree === 0 && !visited.has(id)) {
-						queue.push(id);
-					}
-				}
-			}
-		}
-
-		// 循環依存チェック
-		if (result.length !== graph.size) {
-			// 循環依存のパスを検出
-			const cycle = this.findCycle(graph);
-			throw new CircularDependencyError(cycle);
+			this.decrementDependents(graph, inDegree, current, queue, visited);
 		}
 
 		return result;
 	}
 
-	/**
-	 * 循環依存のパスを検出する
-	 */
+	private initializeQueue(inDegree: Map<number, number>): number[] {
+		const queue: number[] = [];
+		for (const [id, degree] of inDegree) {
+			if (degree === 0) queue.push(id);
+		}
+		return queue;
+	}
+
+	private decrementDependents(
+		graph: Map<number, DependencyNode>,
+		inDegree: Map<number, number>,
+		current: number,
+		queue: number[],
+		visited: Set<number>,
+	): void {
+		for (const [id, node] of graph) {
+			if (!node.dependencies.includes(current)) continue;
+
+			const newDegree = (inDegree.get(id) ?? 0) - 1;
+			inDegree.set(id, newDegree);
+			if (newDegree === 0 && !visited.has(id)) {
+				queue.push(id);
+			}
+		}
+	}
+
 	private findCycle(graph: Map<number, DependencyNode>): number[] {
 		const visited = new Set<number>();
 		const recStack = new Set<number>();
 		const path: number[] = [];
 
-		const dfs = (id: number): boolean => {
-			visited.add(id);
-			recStack.add(id);
-			path.push(id);
-
-			const node = graph.get(id);
-			if (node) {
-				for (const dep of node.dependencies) {
-					if (graph.has(dep)) {
-						if (!visited.has(dep)) {
-							if (dfs(dep)) return true;
-						} else if (recStack.has(dep)) {
-							path.push(dep);
-							return true;
-						}
-					}
-				}
-			}
-
-			recStack.delete(id);
-			path.pop();
-			return false;
-		};
-
 		for (const id of graph.keys()) {
-			if (!visited.has(id)) {
-				if (dfs(id)) {
-					// サイクルの開始点を見つける
-					const cycleStart = path[path.length - 1];
-					const cycleStartIdx = path.indexOf(cycleStart);
+			if (visited.has(id)) continue;
+			const cycle = this.dfsForCycle(graph, id, visited, recStack, path);
+			if (cycle.length > 0) return cycle;
+		}
+
+		return [];
+	}
+
+	private dfsForCycle(
+		graph: Map<number, DependencyNode>,
+		id: number,
+		visited: Set<number>,
+		recStack: Set<number>,
+		path: number[],
+	): number[] {
+		visited.add(id);
+		recStack.add(id);
+		path.push(id);
+
+		const node = graph.get(id);
+		if (node) {
+			for (const dep of node.dependencies) {
+				if (!graph.has(dep)) continue;
+
+				if (!visited.has(dep)) {
+					const cycle = this.dfsForCycle(graph, dep, visited, recStack, path);
+					if (cycle.length > 0) return cycle;
+				} else if (recStack.has(dep)) {
+					path.push(dep);
+					const cycleStartIdx = path.indexOf(dep);
 					return path.slice(cycleStartIdx);
 				}
 			}
 		}
 
+		recStack.delete(id);
+		path.pop();
 		return [];
 	}
 }
