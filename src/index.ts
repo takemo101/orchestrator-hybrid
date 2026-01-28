@@ -43,9 +43,6 @@ export {
 	type WorktreeConfig,
 	WorktreeConfigSchema,
 } from "./core/types.js";
-// Input
-export { type ExecFn, type FetchIssueOptions, fetchIssue } from "./input/github.js";
-export { type HatContext, PromptGenerator } from "./input/prompt.js";
 // Gates
 export {
 	ApprovalGate,
@@ -54,3 +51,6 @@ export {
 	type ApprovalResult,
 	type GateType,
 } from "./gates/approval.js";
+// Input
+export { type ExecFn, type FetchIssueOptions, fetchIssue } from "./input/github.js";
+export { type HatContext, PromptGenerator } from "./input/prompt.js";
