@@ -8,7 +8,9 @@ export class WorktreeCreateError extends OrchestratorError {
 	readonly issueNumber: number;
 
 	constructor(issueNumber: number, cause?: Error) {
-		super(`Failed to create worktree for issue #${issueNumber}${cause ? `: ${cause.message}` : ""}`);
+		super(
+			`Failed to create worktree for issue #${issueNumber}${cause ? `: ${cause.message}` : ""}`,
+		);
 		this.name = "WorktreeCreateError";
 		this.issueNumber = issueNumber;
 		this.cause = cause;

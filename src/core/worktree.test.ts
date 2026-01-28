@@ -32,7 +32,11 @@ describe("WorktreeManager", () => {
 	describe("create", () => {
 		test("新規worktreeを作成する（新規ブランチ）", async () => {
 			const execFn = mockExec([
-				{ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 }, // list (for exists check) - no issue-42
+				{
+					stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n",
+					stderr: "",
+					exitCode: 0,
+				}, // list (for exists check) - no issue-42
 				{ stdout: "", stderr: "", exitCode: 1 }, // rev-parse: branch doesn't exist
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree add
 			]);
@@ -47,7 +51,11 @@ describe("WorktreeManager", () => {
 
 		test("既存ブランチがある場合、そのブランチでworktreeを作成する", async () => {
 			const execFn = mockExec([
-				{ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 }, // list (for exists check) - no issue-42
+				{
+					stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n",
+					stderr: "",
+					exitCode: 0,
+				}, // list (for exists check) - no issue-42
 				{ stdout: "abc123", stderr: "", exitCode: 0 }, // rev-parse: branch exists
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree add
 			]);
@@ -83,7 +91,11 @@ describe("WorktreeManager", () => {
 			const readFile = mock(() => Promise.resolve("content"));
 
 			const execFn = mockExec([
-				{ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 }, // list (for exists check)
+				{
+					stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n",
+					stderr: "",
+					exitCode: 0,
+				}, // list (for exists check)
 				{ stdout: "", stderr: "", exitCode: 1 }, // rev-parse
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree add
 			]);
@@ -105,7 +117,11 @@ describe("WorktreeManager", () => {
 			const readFile = mock(() => Promise.resolve(""));
 
 			const execFn = mockExec([
-				{ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 }, // list (for exists check)
+				{
+					stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n",
+					stderr: "",
+					exitCode: 0,
+				}, // list (for exists check)
 				{ stdout: "", stderr: "", exitCode: 1 }, // rev-parse
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree add
 			]);
@@ -122,18 +138,24 @@ describe("WorktreeManager", () => {
 		});
 
 		test("git worktree addが失敗した場合WorktreeCreateErrorをスローする", async () => {
-			const failingExec = mock((args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> => {
-				if (args.includes("list")) {
-					return Promise.resolve({ stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n", stderr: "", exitCode: 0 });
-				}
-				if (args.includes("rev-parse")) {
-					return Promise.resolve({ stdout: "", stderr: "", exitCode: 1 });
-				}
-				if (args.includes("worktree") && args.includes("add")) {
-					return Promise.reject(new Error("fatal: worktree already exists"));
-				}
-				return Promise.resolve({ stdout: "", stderr: "", exitCode: 0 });
-			});
+			const failingExec = mock(
+				(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> => {
+					if (args.includes("list")) {
+						return Promise.resolve({
+							stdout: "worktree /path/to/repo\nHEAD abc\nbranch refs/heads/main\n",
+							stderr: "",
+							exitCode: 0,
+						});
+					}
+					if (args.includes("rev-parse")) {
+						return Promise.resolve({ stdout: "", stderr: "", exitCode: 1 });
+					}
+					if (args.includes("worktree") && args.includes("add")) {
+						return Promise.reject(new Error("fatal: worktree already exists"));
+					}
+					return Promise.resolve({ stdout: "", stderr: "", exitCode: 0 });
+				},
+			);
 
 			const manager = createManager({ exec: failingExec });
 
@@ -204,9 +226,7 @@ branch refs/heads/main
 		});
 
 		test("WorktreeRunningErrorにIssue番号が含まれる", async () => {
-			const execFn = mockExec([
-				{ stdout: "orch:running", stderr: "", exitCode: 0 },
-			]);
+			const execFn = mockExec([{ stdout: "orch:running", stderr: "", exitCode: 0 }]);
 
 			const manager = createManager({ exec: execFn });
 
