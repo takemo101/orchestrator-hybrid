@@ -276,7 +276,7 @@ export class NativeSessionManager implements ISessionManager {
 
 		// ディスクからメタデータを確認
 		const meta = this.loadMeta(id);
-		return meta?.status === "running" ?? false;
+		return meta?.status === "running" || false;
 	}
 
 	async kill(id: string): Promise<void> {
