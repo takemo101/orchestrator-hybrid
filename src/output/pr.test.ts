@@ -203,10 +203,13 @@ describe("PRCreator", () => {
 			]);
 
 			const creator = new PRCreator({ exec: execFn });
-			await expect(creator.create(42, "feature/issue-42", "Title")).rejects.toThrow(PRCreateError);
-			await expect(creator.create(42, "feature/issue-42", "Title")).rejects.toThrow(
-				"No changes to create PR",
-			);
+			try {
+				await creator.create(42, "feature/issue-42", "Title");
+				expect.unreachable("Should have thrown");
+			} catch (e) {
+				expect(e).toBeInstanceOf(PRCreateError);
+				expect((e as PRCreateError).message).toBe("No changes to create PR");
+			}
 		});
 
 		test("git statusが失敗した場合PRCreateErrorをスローする", async () => {
