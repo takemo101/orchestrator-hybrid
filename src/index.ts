@@ -46,3 +46,11 @@ export {
 // Input
 export { type ExecFn, type FetchIssueOptions, fetchIssue } from "./input/github.js";
 export { type HatContext, PromptGenerator } from "./input/prompt.js";
+// Gates
+export {
+	ApprovalGate,
+	ApprovalGateError,
+	type ApprovalGateOptions,
+	type ApprovalResult,
+	type GateType,
+} from "./gates/approval.js";
