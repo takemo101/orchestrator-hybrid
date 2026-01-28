@@ -198,7 +198,8 @@ describe("StatusLabelManager", () => {
 			);
 			const manager = new StatusLabelManager(executor);
 
-			await expect(manager.syncStatus(999, "running")).resolves.not.toThrow();
+			// エラーなく完了することを確認
+			await manager.syncStatus(999, "running");
 			expect(warnSpy).toHaveBeenCalled();
 			warnSpy.mockRestore();
 		});
