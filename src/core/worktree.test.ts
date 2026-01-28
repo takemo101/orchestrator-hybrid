@@ -67,6 +67,7 @@ describe("WorktreeManager", () => {
 		test("worktreeが既に存在する場合、既存情報を返す", async () => {
 			const execFn = mockExec([
 				{ stdout: PORCELAIN_OUTPUT, stderr: "", exitCode: 0 }, // list (for exists check)
+				{ stdout: PORCELAIN_OUTPUT, stderr: "", exitCode: 0 }, // list (for getWorktreeInfo)
 			]);
 
 			const manager = createManager({ exec: execFn });
