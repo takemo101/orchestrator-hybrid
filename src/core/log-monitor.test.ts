@@ -52,9 +52,9 @@ describe("LogMonitor", () => {
 			const writer = createMockWriter();
 			const monitor = new LogMonitor(sessionManager, writer);
 
-			await expect(
-				monitor.showLogs("orch-42", { follow: false, lines: 100 }),
-			).resolves.not.toThrow();
+			// エラーなく完了することを確認
+			await monitor.showLogs("orch-42", { follow: false, lines: 100 });
+			expect(writer.getOutput()).toBe("");
 		});
 
 		it("linesオプションに従って行数を指定する", async () => {
