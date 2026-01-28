@@ -13,10 +13,29 @@ describe("NativeSessionManager", () => {
 	let manager: NativeSessionManager;
 
 	beforeEach(() => {
+		// テストディレクトリをクリーンアップ
+		if (fs.existsSync(testBaseDir)) {
+			fs.rmSync(testBaseDir, { recursive: true });
+		}
 		manager = new NativeSessionManager(testBaseDir);
 	});
 
-	afterEach(() => {
+	afterEach(async () => {
+		// 実行中のセッションを停止
+		const sessions = await manager.list();
+		for (const session of sessions) {
+			try {
+				if (session.status === "running") {
+					await manager.kill(session.id);
+				}
+			} catch {
+				// 無視
+			}
+		}
+
+		// 少し待ってからクリーンアップ（非同期処理の完了を待つ）
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
 		// テストディレクトリをクリーンアップ
 		if (fs.existsSync(testBaseDir)) {
 			fs.rmSync(testBaseDir, { recursive: true });
@@ -91,7 +110,7 @@ describe("NativeSessionManager", () => {
 			await manager.create("output-1", "echo", ["hello world"]);
 
 			// プロセス終了を待つ
-			await new Promise((resolve) => setTimeout(resolve, 200));
+			await new Promise((resolve) => setTimeout(resolve, 300));
 
 			const output = await manager.getOutput("output-1");
 			expect(output).toContain("hello world");
@@ -106,7 +125,7 @@ describe("NativeSessionManager", () => {
 			await manager.create("output-2", "sh", ["-c", "echo line1; echo line2; echo line3"]);
 
 			// プロセス終了を待つ
-			await new Promise((resolve) => setTimeout(resolve, 200));
+			await new Promise((resolve) => setTimeout(resolve, 300));
 
 			const output = await manager.getOutput("output-2", 2);
 			const lines = output.split("\n").filter((l) => l);
@@ -157,7 +176,7 @@ describe("NativeSessionManager", () => {
 			await manager.create("running-2", "echo", ["done"]);
 
 			// プロセス終了を待つ
-			await new Promise((resolve) => setTimeout(resolve, 200));
+			await new Promise((resolve) => setTimeout(resolve, 300));
 
 			const running = await manager.isRunning("running-2");
 			expect(running).toBe(false);
