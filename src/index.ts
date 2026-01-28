@@ -1,48 +1,34 @@
-export { type Backend, createBackend } from "./adapters/index.js";
-export { BunProcessExecutor } from "./core/bun-process-executor.js";
-export { loadConfig } from "./core/config.js";
+/**
+ * orchestrator-hybrid v3.0.0 ライブラリエクスポート
+ */
+
+// Config
 export {
-	EventBus,
-	findMatchingHatsForEvent,
-	globalEventBus,
-	type OrchEvent,
-} from "./core/event.js";
-export { GlobMatcher } from "./core/glob-matcher.js";
+	ConfigValidationError,
+	loadConfig,
+	validateConfig,
+} from "./core/config.js";
+// Errors
 export {
-	buildHatPrompt,
-	extractPublishedEvent,
-	globalHatRegistry,
+	ConfigError,
+	GitHubError,
+	OrchestratorError,
+	SessionError,
+} from "./core/errors.js";
+// Core types
+export {
 	type HatDefinition,
-	HatRegistry,
-} from "./core/hat.js";
-export { createTaskLogger, logger, setVerbose } from "./core/logger.js";
-export { runLoop, runMultipleLoops } from "./core/loop.js";
-export type {
-	ProcessExecutor,
-	ProcessResult,
-	SpawnOptions,
-} from "./core/process-executor.js";
-export {
-	createTaskState,
-	generateTaskId,
-	TaskManager,
-	type TaskState,
-	type TaskStateCallback,
-	type TaskStatus,
-	TaskStore,
-} from "./core/task-manager.js";
-export type { Config, Hat, Issue, LoopContext } from "./core/types.js";
-export { requestApproval } from "./gates/approval.js";
-export {
-	addIssueComment,
-	fetchIssue,
-	updateIssueLabel,
-} from "./input/github.js";
-export { generatePrompt } from "./input/prompt.js";
-export {
-	type CreatePROptions,
-	checkForUncommittedChanges,
-	createPR,
-	getCurrentBranch,
-	type PRResult,
-} from "./output/pr.js";
+	HatDefinitionSchema,
+	type IssueInfo,
+	IssueInfoSchema,
+	type OrchestratorConfig,
+	OrchestratorConfigSchema,
+	type SessionConfig,
+	SessionConfigSchema,
+	type SessionMeta,
+	SessionMetaSchema,
+	type SessionStatus,
+	SessionStatusSchema,
+	type WorktreeConfig,
+	WorktreeConfigSchema,
+} from "./core/types.js";

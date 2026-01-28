@@ -2,7 +2,7 @@
 /**
  * JSON Schema生成スクリプト
  *
- * ConfigSchemaからJSON Schemaを自動生成し、schemas/orch.schema.jsonに出力する。
+ * OrchestratorConfigSchemaからJSON Schemaを自動生成し、schemas/orch.schema.jsonに出力する。
  * 生成されたスキーマはVSCodeなどのエディタで設定ファイルの補完に使用できる。
  *
  * @example
@@ -18,7 +18,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { ConfigSchema } from "../src/core/types.js";
+import { OrchestratorConfigSchema } from "../src/core/types.js";
 
 const OUTPUT_PATH = "schemas/orch.schema.json";
 
@@ -27,7 +27,7 @@ const OUTPUT_PATH = "schemas/orch.schema.json";
  */
 async function main(): Promise<void> {
 	// zodスキーマからJSON Schemaを生成
-	const jsonSchema = zodToJsonSchema(ConfigSchema, {
+	const jsonSchema = zodToJsonSchema(OrchestratorConfigSchema, {
 		name: "OrchConfig",
 		$refStrategy: "none", // $refを使用せずインライン展開
 	});

@@ -1,257 +1,119 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { ConfigValidationError, loadConfig, validateConfig } from "./config.js";
 
-describe("config", () => {
-	const testDir = ".test-config";
-	const testConfigPath = `${testDir}/orch.yml`;
+const TEST_DIR = "/tmp/orch-config-test";
 
+describe("config", () => {
 	beforeEach(() => {
-		mkdirSync(testDir, { recursive: true });
+		if (existsSync(TEST_DIR)) {
+			rmSync(TEST_DIR, { recursive: true });
+		}
+		mkdirSync(TEST_DIR, { recursive: true });
 	});
 
 	afterEach(() => {
-		if (existsSync(testDir)) {
-			rmSync(testDir, { recursive: true });
+		if (existsSync(TEST_DIR)) {
+			rmSync(TEST_DIR, { recursive: true });
 		}
 	});
 
-	describe("loadConfig", () => {
-		it("should return default config when no config path provided and no config file exists", () => {
-			const originalCwd = process.cwd();
-			process.chdir(testDir);
+	describe("validateConfig", () => {
+		test("should validate minimal config", () => {
+			const config = validateConfig({});
+			expect(config.backend).toBe("claude");
+			expect(config.auto).toBe(false);
+			expect(config.max_iterations).toBe(100);
+		});
 
+		test("should validate full config", () => {
+			const config = validateConfig({
+				backend: "opencode",
+				auto: true,
+				create_pr: true,
+				max_iterations: 50,
+				preset: "tdd",
+				worktree: {
+					enabled: false,
+					base_dir: ".wt",
+					copy_files: [],
+				},
+				session: {
+					manager: "tmux",
+					prefix: "test",
+					capture_interval: 200,
+				},
+			});
+			expect(config.backend).toBe("opencode");
+			expect(config.auto).toBe(true);
+			expect(config.worktree.enabled).toBe(false);
+			expect(config.session.manager).toBe("tmux");
+		});
+
+		test("should throw ConfigValidationError for invalid config", () => {
+			expect(() => validateConfig({ backend: "invalid" })).toThrow(ConfigValidationError);
+		});
+
+		test("should include configPath in error", () => {
 			try {
-				const config = loadConfig();
-
-				expect(config.version).toBe("1.0");
-				expect(config.backend.type).toBe("claude");
-				expect(config.loop.max_iterations).toBe(100);
-				expect(config.loop.completion_promise).toBe("LOOP_COMPLETE");
-			} finally {
-				process.chdir(originalCwd);
+				validateConfig({ backend: "invalid" }, "orch.yml");
+				expect(true).toBe(false); // should not reach
+			} catch (error) {
+				expect(error).toBeInstanceOf(ConfigValidationError);
+				if (error instanceof ConfigValidationError) {
+					expect(error.configPath).toBe("orch.yml");
+					expect(error.errors.length).toBeGreaterThan(0);
+				}
 			}
-		});
-
-		it("should load config from specified path", () => {
-			const configContent = `
-version: "2.0"
-backend:
-  type: opencode
-loop:
-  max_iterations: 50
-  completion_promise: DONE
-`;
-			writeFileSync(testConfigPath, configContent);
-
-			const config = loadConfig(testConfigPath);
-
-			expect(config.version).toBe("2.0");
-			expect(config.backend.type).toBe("opencode");
-			expect(config.loop.max_iterations).toBe(50);
-			expect(config.loop.completion_promise).toBe("DONE");
-		});
-
-		it("should parse hats configuration", () => {
-			const configContent = `
-version: "1.0"
-backend:
-  type: claude
-loop:
-  max_iterations: 100
-  completion_promise: LOOP_COMPLETE
-hats:
-  tester:
-    name: "🧪 Tester"
-    triggers:
-      - task.start
-      - impl.done
-    publishes:
-      - test.done
-    instructions: "Write tests first"
-`;
-			writeFileSync(testConfigPath, configContent);
-
-			const config = loadConfig(testConfigPath);
-
-			expect(config.hats).toBeDefined();
-			expect(config.hats?.tester).toBeDefined();
-			expect(config.hats?.tester.name).toBe("🧪 Tester");
-			expect(config.hats?.tester.triggers).toEqual(["task.start", "impl.done"]);
-			expect(config.hats?.tester.publishes).toEqual(["test.done"]);
-		});
-
-		it("should parse gates configuration", () => {
-			const configContent = `
-version: "1.0"
-backend:
-  type: claude
-loop:
-  max_iterations: 100
-  completion_promise: LOOP_COMPLETE
-gates:
-  after_plan: false
-  after_implementation: true
-  before_pr: true
-`;
-			writeFileSync(testConfigPath, configContent);
-
-			const config = loadConfig(testConfigPath);
-
-			expect(config.gates?.after_plan).toBe(false);
-			expect(config.gates?.after_implementation).toBe(true);
-			expect(config.gates?.before_pr).toBe(true);
-		});
-
-		it("should throw ConfigValidationError for invalid backend type", () => {
-			const configContent = `
-version: "1.0"
-backend:
-  type: invalid-backend
-loop:
-  max_iterations: 100
-`;
-			writeFileSync(testConfigPath, configContent);
-
-			expect(() => loadConfig(testConfigPath)).toThrow(ConfigValidationError);
-		});
-
-		it("should throw ConfigValidationError for invalid max_iterations type", () => {
-			const configContent = `
-version: "1.0"
-backend:
-  type: claude
-loop:
-  max_iterations: "not-a-number"
-`;
-			writeFileSync(testConfigPath, configContent);
-
-			expect(() => loadConfig(testConfigPath)).toThrow(ConfigValidationError);
 		});
 	});
 
-	describe("validateConfig", () => {
-		it("should return valid config for correct input", () => {
-			const input = {
-				version: "1.0",
-				backend: { type: "claude" },
-				loop: {
-					max_iterations: 100,
-					completion_promise: "LOOP_COMPLETE",
-				},
-			};
-
-			const result = validateConfig(input);
-
-			expect(result.version).toBe("1.0");
-			expect(result.backend.type).toBe("claude");
-			expect(result.loop.max_iterations).toBe(100);
+	describe("loadConfig", () => {
+		test("should return defaults when no config file", () => {
+			const config = loadConfig(`${TEST_DIR}/nonexistent.yml`);
+			expect(config.backend).toBe("claude");
+			expect(config.auto).toBe(false);
 		});
 
-		it("should throw ConfigValidationError with formatted message for invalid input", () => {
-			const input = {
-				version: "1.0",
-				backend: { type: "invalid" },
-				loop: {
-					max_iterations: "not-a-number",
-				},
-			};
-
-			try {
-				validateConfig(input);
-				expect(true).toBe(false); // Should not reach here
-			} catch (error) {
-				expect(error).toBeInstanceOf(ConfigValidationError);
-				const validationError = error as ConfigValidationError;
-				expect(validationError.message).toContain("設定ファイルエラー");
-				expect(validationError.message).toContain("backend.type");
-			}
+		test("should load config from yaml file", () => {
+			const configPath = `${TEST_DIR}/orch.yml`;
+			writeFileSync(
+				configPath,
+				`backend: opencode
+auto: true
+max_iterations: 30
+`,
+			);
+			const config = loadConfig(configPath);
+			expect(config.backend).toBe("opencode");
+			expect(config.auto).toBe(true);
+			expect(config.max_iterations).toBe(30);
 		});
 
-		it("should include file path in error message when provided", () => {
-			const input = {
-				backend: { type: "invalid" },
-			};
-
-			try {
-				validateConfig(input, "custom-config.yml");
-				expect(true).toBe(false);
-			} catch (error) {
-				expect(error).toBeInstanceOf(ConfigValidationError);
-				const validationError = error as ConfigValidationError;
-				expect(validationError.message).toContain("custom-config.yml");
-			}
-		});
-
-		it("should validate auto_issue configuration", () => {
-			const validInput = {
-				version: "1.0",
-				backend: { type: "claude" },
-				loop: { max_iterations: 100 },
-				auto_issue: {
-					enabled: true,
-					min_priority: "high",
-					labels: ["auto", "improvement"],
-				},
-			};
-
-			const result = validateConfig(validInput);
-
-			expect(result.auto_issue?.enabled).toBe(true);
-			expect(result.auto_issue?.min_priority).toBe("high");
-			expect(result.auto_issue?.labels).toEqual(["auto", "improvement"]);
-		});
-
-		it("should format multiple errors in message", () => {
-			const input = {
-				backend: { type: 123 }, // Invalid type (number instead of string enum)
-				loop: {
-					max_iterations: "invalid", // Invalid type
-					idle_timeout_secs: "also-invalid", // Invalid type
-				},
-			};
-
-			try {
-				validateConfig(input);
-				expect(true).toBe(false);
-			} catch (error) {
-				expect(error).toBeInstanceOf(ConfigValidationError);
-				const validationError = error as ConfigValidationError;
-				// Should contain multiple error lines
-				const lines = validationError.message.split("\n");
-				expect(lines.length).toBeGreaterThan(2);
-			}
+		test("should throw for invalid yaml config", () => {
+			const configPath = `${TEST_DIR}/bad.yml`;
+			writeFileSync(configPath, "backend: invalid\n");
+			expect(() => loadConfig(configPath)).toThrow(ConfigValidationError);
 		});
 	});
 
 	describe("ConfigValidationError", () => {
-		it("should expose errors array", () => {
-			const input = {
-				backend: { type: "invalid" },
-			};
-
+		test("should expose errors array", () => {
 			try {
-				validateConfig(input);
+				validateConfig({ backend: "bad", max_iterations: -5 });
 			} catch (error) {
-				expect(error).toBeInstanceOf(ConfigValidationError);
-				const validationError = error as ConfigValidationError;
-				expect(validationError.errors).toBeDefined();
-				expect(validationError.errors.length).toBeGreaterThan(0);
+				if (error instanceof ConfigValidationError) {
+					expect(error.errors.length).toBeGreaterThan(0);
+					expect(error.errors[0]).toHaveProperty("path");
+					expect(error.errors[0]).toHaveProperty("message");
+				}
 			}
 		});
 
-		it("should have configPath property when provided", () => {
-			const input = {
-				backend: { type: "invalid" },
-			};
-
-			try {
-				validateConfig(input, "my-config.yml");
-			} catch (error) {
-				expect(error).toBeInstanceOf(ConfigValidationError);
-				const validationError = error as ConfigValidationError;
-				expect(validationError.configPath).toBe("my-config.yml");
-			}
+		test("should be instanceof Error", () => {
+			const err = new ConfigValidationError([{ path: "backend", message: "invalid" }]);
+			expect(err).toBeInstanceOf(Error);
+			expect(err.name).toBe("ConfigValidationError");
 		});
 	});
 });

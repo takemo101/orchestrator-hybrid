@@ -1,824 +1,116 @@
 import { z } from "zod";
 
 // ================================
-// v1.4.0 新規型定義
+// v3.0.0 型定義
 // ================================
 
 /**
- * Per-Hat Model Selectionのモデル指定 (v1.4.0)
- *
- * Claude Code CLIのエイリアス（opus/sonnet/haiku）または
- * フルモデル名をサポートします。
- */
-export const ModelAliasSchema = z.union([
-	z.enum(["opus", "sonnet", "haiku"]),
-	z.string().regex(/^claude-[a-z0-9-]+$/),
-]);
-
-export type ModelAlias = z.infer<typeof ModelAliasSchema>;
-
-/**
- * Per-Hat Backend Configurationのバックエンド指定 (v1.4.0)
- *
- * - 文字列: 標準バックエンド名（claude/opencode/gemini）
- * - オブジェクト: Kiro agentまたはカスタムバックエンド
- */
-export const HatBackendSchema = z.union([
-	z.enum(["claude", "opencode", "gemini"]),
-	z.object({
-		type: z.literal("kiro"),
-		agent: z.string().min(1),
-	}),
-	z.object({
-		command: z.string().min(1),
-		args: z.array(z.string()).optional(),
-		prompt_mode: z.enum(["arg", "stdin"]).default("arg"),
-		prompt_flag: z.string().optional(),
-	}),
-]);
-
-export type HatBackend = z.infer<typeof HatBackendSchema>;
-
-/**
- * 単一Memoryエントリ (v1.4.0)
- */
-export interface MemoryEntry {
-	/**
-	 * 一意のID（自動生成）
-	 * @example "mem-001"
-	 */
-	id: string;
-
-	/**
-	 * Memory種別
-	 * - pattern: 発見したパターン
-	 * - architecture: アーキテクチャ決定
-	 * - solution: 問題の解決策
-	 * - lesson: 学んだ教訓
-	 */
-	type: "pattern" | "architecture" | "solution" | "lesson";
-
-	/**
-	 * Memory内容
-	 */
-	content: string;
-
-	/**
-	 * タグ（検索用）
-	 * @example ["error-handling", "async"]
-	 */
-	tags: string[];
-
-	/**
-	 * 作成日時
-	 */
-	createdAt: string;
-}
-
-/**
- * Task状態 (v1.4.0)
- */
-export const TaskStatusSchema = z.enum(["open", "in-progress", "closed"]);
-
-export type TaskStatus = z.infer<typeof TaskStatusSchema>;
-
-/**
- * 単一Taskエントリ (v1.4.0)
- */
-export interface TaskEntry {
-	/**
-	 * 一意のID（自動生成）
-	 * @example "task-001"
-	 */
-	id: string;
-
-	/**
-	 * タスクタイトル
-	 * @example "Add authentication"
-	 */
-	title: string;
-
-	/**
-	 * 優先度（1が最高、5が最低）
-	 * @default 3
-	 */
-	priority: 1 | 2 | 3 | 4 | 5;
-
-	/**
-	 * タスク状態
-	 */
-	status: TaskStatus;
-
-	/**
-	 * 依存タスクIDリスト
-	 * @example ["task-001", "task-002"]
-	 */
-	blocked_by: string[];
-
-	/**
-	 * 作成日時
-	 */
-	createdAt: string;
-
-	/**
-	 * 完了日時（closed時のみ）
-	 */
-	closedAt?: string;
-}
-
-/**
- * セッション記録エントリ (v1.4.0)
- */
-export interface SessionRecordEntry {
-	/**
-	 * イテレーション番号
-	 */
-	iteration: number;
-
-	/**
-	 * 実行したHat名
-	 * @example "planner"
-	 */
-	hat: string;
-
-	/**
-	 * 入力プロンプト
-	 */
-	prompt: string;
-
-	/**
-	 * AIエージェントの出力
-	 */
-	output: string;
-
-	/**
-	 * 発行されたイベント
-	 * @example ["plan.ready"]
-	 */
-	events: string[];
-
-	/**
-	 * 使用したモデル
-	 * @example "opus"
-	 */
-	model?: string;
-
-	/**
-	 * 使用したバックエンド
-	 * @example "claude"
-	 */
-	backend?: string;
-
-	/**
-	 * 実行時間（ミリ秒）
-	 */
-	durationMs: number;
-
-	/**
-	 * 記録日時
-	 */
-	timestamp: string;
-}
-
-/**
- * ループレジストリエントリ (v1.4.0)
- */
-export interface LoopEntry {
-	/**
-	 * ループID（自動生成）
-	 * @example "orch-20260126-a3f2"
-	 */
-	id: string;
-
-	/**
-	 * Issue番号
-	 */
-	issueNumber: number;
-
-	/**
-	 * worktreeパス（セカンダリループのみ）
-	 * @example ".worktrees/orch-20260126-a3f2"
-	 */
-	worktreePath?: string;
-
-	/**
-	 * ブランチ名
-	 * @example "feature/issue-42"
-	 */
-	branch: string;
-
-	/**
-	 * ループ状態
-	 */
-	state: LoopState;
-
-	/**
-	 * プライマリループかどうか
-	 */
-	isPrimary: boolean;
-
-	/**
-	 * 開始日時
-	 */
-	startedAt: string;
-
-	/**
-	 * 完了日時
-	 */
-	completedAt?: string;
-
-	/**
-	 * PID（プロセスID）
-	 */
-	pid?: number;
-}
-
-/**
- * カスタムバックエンド設定のzodスキーマ (v1.4.0)
- */
-export const CustomBackendConfigSchema = z.object({
-	/**
-	 * バックエンドタイプ
-	 */
-	type: z.literal("custom"),
-
-	/**
-	 * 実行するCLIコマンド
-	 * @example "my-agent"
-	 */
-	command: z.string().min(1),
-
-	/**
-	 * プロンプト前に挿入される引数
-	 * @example ["--headless", "--auto-approve"]
-	 */
-	args: z.array(z.string()).default([]),
-
-	/**
-	 * プロンプトの渡し方
-	 * - arg: コマンドライン引数として渡す
-	 * - stdin: 標準入力として渡す
-	 * @default "arg"
-	 */
-	prompt_mode: z.enum(["arg", "stdin"]).default("arg"),
-
-	/**
-	 * プロンプト前のフラグ
-	 * @example "-p", "--prompt"
-	 */
-	prompt_flag: z.string().optional(),
-});
-
-export type CustomBackendConfig = z.infer<typeof CustomBackendConfigSchema>;
-
-/**
- * イベント発行リクエスト (v1.4.0)
- */
-export interface EventEmission {
-	/**
-	 * イベントトピック
-	 * @example "build.done"
-	 */
-	topic: string;
-
-	/**
-	 * メッセージまたはJSONペイロード
-	 */
-	message: string | Record<string, unknown>;
-
-	/**
-	 * ターゲットHat（明示的なハンドオフ）
-	 * @example "reviewer"
-	 */
-	target?: string;
-
-	/**
-	 * 発行日時
-	 */
-	timestamp: string;
-}
-
-/**
- * Globパターンマッチ結果 (v1.4.0)
- */
-export interface GlobMatchResult {
-	/**
-	 * マッチしたHat名
-	 */
-	hatName: string;
-
-	/**
-	 * マッチしたパターン
-	 */
-	matchedPattern: string;
-
-	/**
-	 * パターンの具体性スコア（高いほど具体的）
-	 */
-	specificityScore: number;
-}
-
-// ================================
-// 既存型定義
-// ================================
-
-export const BackendConfigSchema = z.union([
-	z.string(),
-	z.object({
-		type: z.literal("kiro"),
-		agent: z.string(),
-	}),
-	z.object({
-		command: z.string(),
-		args: z.array(z.string()).optional(),
-		prompt_mode: z.enum(["arg", "stdin"]).optional(),
-		prompt_flag: z.string().optional(),
-	}),
-]);
-
-export type BackendConfig = z.infer<typeof BackendConfigSchema>;
-
-export const HatSchema = z.object({
-	name: z.string().optional(),
-	triggers: z.array(z.string()),
-	publishes: z.array(z.string()),
-	instructions: z.string().optional(),
-	/**
-	 * このHat専用のモデル（v1.4.0追加）
-	 * 未指定の場合は backend.model を継承
-	 * @example "opus", "sonnet", "haiku", "claude-sonnet-4-5-20250929"
-	 */
-	model: z.string().optional(),
-	/**
-	 * Hat専用のバックエンド設定（v1.4.0追加）
-	 */
-	backend: BackendConfigSchema.optional(),
-});
-
-/**
- * 改善Issue自動作成設定のzodスキーマ
- */
-export const AutoIssueConfigSchema = z.object({
-	/**
-	 * Issue自動作成を有効にするか
-	 */
-	enabled: z.boolean().default(false),
-
-	/**
-	 * Issue作成する最低優先度
-	 * - high: 高優先度のみ
-	 * - medium: 中優先度以上
-	 * - low: すべて
-	 */
-	min_priority: z.enum(["high", "medium", "low"]).default("medium"),
-
-	/**
-	 * 自動作成されたIssueに付与するラベル
-	 */
-	labels: z.array(z.string()).default(["auto-generated", "improvement"]),
-
-	/**
-	 * リポジトリ（オプション）
-	 * 指定しない場合は現在のリポジトリ
-	 * @example "owner/repo"
-	 */
-	repository: z.string().optional(),
-});
-
-export type AutoIssueConfig = z.infer<typeof AutoIssueConfigSchema>;
-
-/**
- * PR設定のzodスキーマ
- *
- * PR自動マージ機能（F-009）の設定を定義します。
- */
-export const PRConfigSchema = z.object({
-	/**
-	 * PR自動マージを有効にするか
-	 * @default false
-	 */
-	auto_merge: z.boolean().default(false),
-
-	/**
-	 * マージ方式
-	 * - squash: コミットをまとめてマージ（推奨）
-	 * - merge: マージコミットを作成
-	 * - rebase: リベースしてマージ
-	 * @default "squash"
-	 */
-	merge_method: z.enum(["squash", "merge", "rebase"]).default("squash"),
-
-	/**
-	 * マージ後にブランチを削除するか
-	 * @default true
-	 */
-	delete_branch: z.boolean().default(true),
-
-	/**
-	 * CIタイムアウト（秒）
-	 * @default 600 (10分)
-	 */
-	ci_timeout_secs: z.number().min(60).max(3600).default(600),
-});
-
-export type PRConfig = z.infer<typeof PRConfigSchema>;
-
-/**
- * Issue依存関係設定のzodスキーマ（v1.3.0）
- *
- * Issue間の依存関係管理（F-011）の設定を定義します。
- */
-export const DependencyConfigSchema = z.object({
-	/**
-	 * 依存Issueを自動的に先に実行するか
-	 * trueの場合、依存Issueが未完了なら先に実行する
-	 * @default false
-	 */
-	resolve: z.boolean().default(false),
-
-	/**
-	 * 依存関係を無視するか
-	 * trueの場合、依存Issueが未完了でも実行を続行する
-	 * @default false
-	 */
-	ignore: z.boolean().default(false),
-});
-
-export type DependencyConfig = z.infer<typeof DependencyConfigSchema>;
-
-/**
- * 状態管理設定のzodスキーマ（v1.3.0拡張版）
- *
- * v1.3.0でlabel_prefixを追加。
- */
-export const StateConfigSchema = z.object({
-	/**
-	 * GitHub Issueラベルを使用するか
-	 * @default true
-	 */
-	use_github_labels: z.boolean().default(true),
-
-	/**
-	 * Scratchpadを使用するか
-	 * @default true
-	 */
-	use_scratchpad: z.boolean().default(true),
-
-	/**
-	 * Scratchpadのパス
-	 * @default ".agent/scratchpad.md"
-	 */
-	scratchpad_path: z.string().default(".agent/scratchpad.md"),
-
-	/**
-	 * ステータスラベルのプレフィックス
-	 * @default "orch"
-	 * @example "orch" -> ラベル名 "orch:running"
-	 */
-	label_prefix: z.string().min(1).max(20).default("orch"),
-});
-
-/**
- * Tasks設定のzodスキーマ（v1.4.0）
- *
- * タスクをJSONL形式で管理する機能（F-015）の設定を定義します。
- */
-export const TasksConfigSchema = z.object({
-	/**
-	 * Tasksを有効にするか
-	 * @default true
-	 */
-	enabled: z.boolean().default(true),
-});
-
-export type TasksConfig = z.infer<typeof TasksConfigSchema>;
-
-/**
- * Run設定のzodスキーマ (v2.0.0)
- *
- * CLIオプションのデフォルト値を設定ファイルで定義可能にします。
- */
-export const RunConfigSchema = z.object({
-	/**
-	 * 承認ゲートを自動承認するか
-	 * CLIの --auto オプションに対応
-	 * @default false
-	 */
-	auto_mode: z.boolean().default(false),
-
-	/**
-	 * 完了後にPRを自動作成するか
-	 * CLIの --create-pr オプションに対応
-	 * @default false
-	 */
-	create_pr: z.boolean().default(false),
-
-	/**
-	 * PRをドラフトとして作成するか
-	 * CLIの --draft オプションに対応
-	 * @default false
-	 */
-	draft_pr: z.boolean().default(false),
-});
-
-export type RunConfig = z.infer<typeof RunConfigSchema>;
-
-/**
- * Memories設定のzodスキーマ（v1.4.0）
- *
- * セッション間で学習内容を永続化する機能（F-014）の設定を定義します。
- */
-export const MemoriesConfigSchema = z.object({
-	/**
-	 * Memoriesを有効にするか
-	 * @default true
-	 */
-	enabled: z.boolean().default(true),
-
-	/**
-	 * プロンプトへの注入モード
-	 * - auto: 自動注入
-	 * - manual: エージェントが明示的に読み込む
-	 * - none: 注入しない
-	 * @default "auto"
-	 */
-	inject: z.enum(["auto", "manual", "none"]).default("auto"),
-});
-
-export type MemoriesConfig = z.infer<typeof MemoriesConfigSchema>;
-
-/**
- * LoopState - ループ状態 (v1.4.0)
- */
-export const LoopStateSchema = z.enum([
-	"running",
-	"queued",
-	"merging",
-	"merged",
-	"needs-review",
-	"crashed",
-	"orphan",
-	"discarded",
-]);
-export type LoopState = z.infer<typeof LoopStateSchema>;
-
-/**
- * Loop - ループ情報 (v1.4.0)
- */
-export const LoopSchema = z.object({
-	id: z.string(),
-	state: LoopStateSchema,
-	worktree_path: z.string().nullable(),
-	created_at: z.string(),
-	updated_at: z.string(),
-});
-export type Loop = z.infer<typeof LoopSchema>;
-
-// ================================
-// v2.0.0 Worktree関連型定義
-// ================================
-
-/**
- * Worktree設定のzodスキーマ (v2.0.0)
- *
- * git worktreeを使用した並列実行環境（F-201）の設定を定義します。
+ * Worktree設定スキーマ
  */
 export const WorktreeConfigSchema = z.object({
-	/**
-	 * worktree機能を有効にするか
-	 * @default false
-	 */
-	enabled: z.boolean().default(false),
-
-	/**
-	 * worktreeのベースディレクトリ
-	 * @default ".worktrees"
-	 */
+	/** Worktree機能の有効化 */
+	enabled: z.boolean().default(true),
+	/** 基準ディレクトリ */
 	base_dir: z.string().default(".worktrees"),
-
-	/**
-	 * 派生元ブランチ（指定しない場合は現在のHEAD）
-	 * @example "main", "develop"
-	 */
-	base_branch: z.string().optional(),
-
-	/**
-	 * マージ後に自動クリーンアップするか
-	 * @default true
-	 */
-	auto_cleanup: z.boolean().default(true),
-
-	/**
-	 * worktreeにコピーする環境ファイル
-	 * @default [".env", ".envrc", ".env.local"]
-	 */
-	copy_env_files: z.array(z.string()).default([".env", ".envrc", ".env.local"]),
+	/** Worktree作成時にコピーするファイル */
+	copy_files: z.array(z.string()).default([".env"]),
 });
 
 export type WorktreeConfig = z.infer<typeof WorktreeConfigSchema>;
 
 /**
- * Worktree環境タイプ (v2.0.0)
+ * セッション管理設定スキーマ
  */
-export const WorktreeEnvironmentTypeSchema = z.enum(["docker", "host"]);
-export type WorktreeEnvironmentType = z.infer<typeof WorktreeEnvironmentTypeSchema>;
-
-/**
- * Worktreeステータス (v2.0.0)
- */
-export const WorktreeStatusSchema = z.enum(["active", "merged", "abandoned"]);
-export type WorktreeStatus = z.infer<typeof WorktreeStatusSchema>;
-
-/**
- * Worktree情報 (v2.0.0)
- *
- * git worktreeの状態を表すインターフェースです。
- */
-export interface WorktreeInfo {
-	/**
-	 * Issue番号
-	 */
-	issueNumber: number;
-
-	/**
-	 * worktreeのパス
-	 * @example ".worktrees/issue-42"
-	 */
-	path: string;
-
-	/**
-	 * ブランチ名
-	 * @example "feature/issue-42"
-	 */
-	branch: string;
-
-	/**
-	 * 実行環境タイプ
-	 * - docker: Dockerコンテナ
-	 * - host: ホスト環境
-	 */
-	environmentType: WorktreeEnvironmentType;
-
-	/**
-	 * 環境ID（hostの場合はnull）
-	 * @example "container-xyz" (docker)
-	 */
-	environmentId: string | null;
-
-	/**
-	 * 作成日時（ISO 8601形式）
-	 */
-	createdAt: string;
-
-	/**
-	 * ステータス
-	 * - active: 使用中
-	 * - merged: マージ済み
-	 * - abandoned: 放棄
-	 */
-	status: WorktreeStatus;
-}
-
-/**
- * worktrees.jsonのデータ構造 (v2.0.0)
- */
-export interface WorktreesData {
-	worktrees: WorktreeInfo[];
-}
-
-/**
- * 設定ファイル全体のzodスキーマ（拡張版）
- */
-export const ConfigSchema = z.object({
-	version: z.string().default("1.0"),
-	backend: z.object({
-		type: z.enum(["claude", "opencode", "gemini"]).default("claude"),
-		model: z.string().optional(),
-	}),
-
-	loop: z.object({
-		max_iterations: z.number().default(100),
-		completion_promise: z.string().default("LOOP_COMPLETE"),
-		idle_timeout_secs: z.number().default(1800),
-	}),
-	hats: z.record(z.string(), HatSchema).optional(),
-	gates: z
-		.object({
-			after_plan: z.boolean().default(true),
-			after_implementation: z.boolean().default(false),
-			before_pr: z.boolean().default(true),
-		})
-		.optional(),
-	quality: z
-		.object({
-			min_score: z.number().default(8),
-			auto_approve_above: z.number().default(9),
-		})
-		.optional(),
-	state: StateConfigSchema.optional(),
-
-	// 新規: 改善Issue自動作成設定
-	auto_issue: AutoIssueConfigSchema.optional(),
-
-	// 新規: PR設定（v1.3.0）
-	pr: PRConfigSchema.optional(),
-
-	// 新規: 依存関係設定（v1.3.0）
-	dependency: DependencyConfigSchema.optional(),
-
-	// 新規: Memories設定（v1.4.0）
-	memories: MemoriesConfigSchema.optional(),
-
-	// 新規: Tasks設定（v1.4.0）
-	tasks: TasksConfigSchema.optional(),
-
-	// 新規: Run設定（v2.0.0）
-	run: RunConfigSchema.optional(),
-
-	// 新規: Worktree設定（v2.0.0）
-	worktree: WorktreeConfigSchema.optional(),
+export const SessionConfigSchema = z.object({
+	/** セッションマネージャー種別 */
+	manager: z.enum(["auto", "native", "tmux", "zellij"]).default("auto"),
+	/** セッション名プレフィックス */
+	prefix: z.string().default("orch"),
+	/** 出力キャプチャ間隔(ms) */
+	capture_interval: z.number().int().positive().default(500),
 });
 
-export type Config = z.infer<typeof ConfigSchema>;
-export type Hat = z.infer<typeof HatSchema>;
-
-export interface Issue {
-	number: number;
-	title: string;
-	body: string;
-	labels: string[];
-	state: string;
-}
+export type SessionConfig = z.infer<typeof SessionConfigSchema>;
 
 /**
- * ループ実行コンテキスト（拡張版）
+ * オーケストレーター設定スキーマ (orch.yml)
  */
-export interface LoopContext {
-	// 既存フィールド
-	issue: Issue;
-	iteration: number;
-	maxIterations: number;
-	scratchpadPath: string;
-	promptPath: string;
-	completionPromise: string;
-	autoMode: boolean;
-	createPR: boolean;
-	draftPR: boolean;
-	generateReport: boolean;
-	reportPath: string;
-	preset?: string;
+export const OrchestratorConfigSchema = z.object({
+	/** AIバックエンド */
+	backend: z.enum(["claude", "opencode"]).default("claude"),
+	/** 承認ゲート自動化 */
+	auto: z.boolean().default(false),
+	/** PR自動作成 */
+	create_pr: z.boolean().default(false),
+	/** 最大反復回数 */
+	max_iterations: z.number().int().positive().default(100),
+	/** プリセット名 */
+	preset: z.enum(["simple", "tdd"]).default("simple"),
+	/** Worktree設定 */
+	worktree: WorktreeConfigSchema.default({}),
+	/** セッション管理設定 */
+	session: SessionConfigSchema.default({}),
+});
 
-	// 新規: タスクID（並列実行対応）
-	/**
-	 * タスクID
-	 * 並列実行時に各タスクを一意に識別するためのID
-	 * @example "task-1737705600000-42"
-	 */
-	taskId?: string;
-
-	// 新規: ログディレクトリ
-	/**
-	 * ログディレクトリパス
-	 * @example ".agent/task-1737705600000-42"
-	 */
-	logDir?: string;
-
-	// 新規: PR設定（v1.3.0）
-	/**
-	 * PR自動マージ設定
-	 */
-	prConfig?: PRConfig;
-
-	// 新規: 依存関係オプション（v1.3.0）
-	/**
-	 * 依存Issueを先に実行するか
-	 */
-	resolveDeps?: boolean;
-
-	/**
-	 * 依存関係を無視するか
-	 */
-	ignoreDeps?: boolean;
-}
-
-export interface BackendResult {
-	output: string;
-	exitCode: number;
-}
-
-export type LogLevel = "debug" | "info" | "warn" | "error";
-
-export interface LoopEvent {
-	type: string;
-	timestamp: Date;
-	data?: Record<string, unknown>;
-}
+export type OrchestratorConfig = z.infer<typeof OrchestratorConfigSchema>;
 
 /**
- * Worktree - Worktree情報 (v1.4.0)
+ * GitHub Issue情報スキーマ
  */
-export interface Worktree {
-	loopId: string;
-	path: string;
-	branch: string;
-}
+export const IssueInfoSchema = z.object({
+	/** Issue番号 */
+	number: z.number().int().positive(),
+	/** タイトル */
+	title: z.string().min(1),
+	/** 本文 */
+	body: z.string(),
+	/** ラベル一覧 */
+	labels: z.array(z.string()),
+});
+
+export type IssueInfo = z.infer<typeof IssueInfoSchema>;
+
+/**
+ * セッション状態
+ */
+export const SessionStatusSchema = z.enum(["running", "completed", "failed"]);
+
+export type SessionStatus = z.infer<typeof SessionStatusSchema>;
+
+/**
+ * セッションメタデータスキーマ
+ */
+export const SessionMetaSchema = z.object({
+	/** Issue番号 */
+	id: z.string(),
+	/** 実行コマンド */
+	command: z.string(),
+	/** コマンド引数 */
+	args: z.array(z.string()),
+	/** 開始日時 (ISO 8601) */
+	startedAt: z.string(),
+	/** セッション状態 */
+	status: SessionStatusSchema,
+	/** 終了コード */
+	exitCode: z.number().int().nullable(),
+	/** プロセスID */
+	pid: z.number().int(),
+});
+
+export type SessionMeta = z.infer<typeof SessionMetaSchema>;
+
+/**
+ * Hat定義スキーマ
+ */
+export const HatDefinitionSchema = z.object({
+	/** Hat名 */
+	name: z.string().min(1),
+	/** トリガーイベント一覧 */
+	triggers: z.array(z.string()).min(1),
+	/** 発行イベント一覧 */
+	publishes: z.array(z.string()).min(1),
+	/** Hat指示 */
+	instructions: z.string(),
+});
+
+export type HatDefinition = z.infer<typeof HatDefinitionSchema>;

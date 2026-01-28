@@ -1,9 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { ZodError } from "zod";
-import { type Config, ConfigSchema } from "./types.js";
-
-const DEFAULT_CONFIG_NAME = "orch.yml";
+import { type OrchestratorConfig, OrchestratorConfigSchema } from "./types.js";
 
 /**
  * 設定ファイル検証エラー
@@ -11,21 +9,22 @@ const DEFAULT_CONFIG_NAME = "orch.yml";
  * zodスキーマ検証で発生したエラーを、ユーザーフレンドリーな形式で提供する。
  */
 export class ConfigValidationError extends Error {
-	/**
-	 * 個別のエラー情報
-	 */
+	/** 個別のエラー情報 */
 	readonly errors: Array<{ path: string; message: string }>;
-
-	/**
-	 * 設定ファイルのパス（指定された場合）
-	 */
+	/** 設定ファイルのパス */
 	readonly configPath?: string;
 
-	constructor(zodError: ZodError, configPath?: string) {
-		const errors = zodError.errors.map((err) => ({
-			path: err.path.join("."),
-			message: err.message,
-		}));
+	constructor(
+		errorsOrZodError: ZodError | Array<{ path: string; message: string }>,
+		configPath?: string,
+	) {
+		const errors =
+			errorsOrZodError instanceof ZodError
+				? errorsOrZodError.errors.map((err) => ({
+						path: err.path.join("."),
+						message: err.message,
+					}))
+				: errorsOrZodError;
 
 		const fileName = configPath ?? "設定";
 		const errorLines = errors.map((e) => `  - ${e.path}: ${e.message}`);
@@ -42,26 +41,13 @@ export class ConfigValidationError extends Error {
  * 設定オブジェクトを検証する
  *
  * @param rawConfig - 検証する生の設定オブジェクト
- * @param configPath - 設定ファイルのパス（エラーメッセージ用、オプション）
+ * @param configPath - 設定ファイルのパス（エラーメッセージ用）
  * @returns 検証済みの設定オブジェクト
- * @throws {ConfigValidationError} 検証エラーが発生した場合
- *
- * @example
- * ```ts
- * try {
- *   const config = validateConfig(rawConfig, "orch.yml");
- * } catch (error) {
- *   if (error instanceof ConfigValidationError) {
- *     console.error(error.message);
- *     // 設定ファイルエラー: orch.yml
- *     //   - backend.type: Invalid enum value...
- *   }
- * }
- * ```
+ * @throws {ConfigValidationError} 検証エラー
  */
-export function validateConfig(rawConfig: unknown, configPath?: string): Config {
+export function validateConfig(rawConfig: unknown, configPath?: string): OrchestratorConfig {
 	try {
-		return ConfigSchema.parse(rawConfig);
+		return OrchestratorConfigSchema.parse(rawConfig);
 	} catch (error) {
 		if (error instanceof ZodError) {
 			throw new ConfigValidationError(error, configPath);
@@ -73,11 +59,15 @@ export function validateConfig(rawConfig: unknown, configPath?: string): Config 
 /**
  * 設定ファイルを読み込む
  *
- * @param configPath - 設定ファイルのパス（オプション）
+ * @param configPath - 設定ファイルのパス
  * @returns 検証済みの設定オブジェクト
- * @throws {ConfigValidationError} 設定ファイルの検証エラー
+ * @throws {ConfigValidationError} 検証エラー
  */
-export function loadConfig(configPath?: string): Config {
+export function loadConfig(configPath?: string): OrchestratorConfig {
+	if (configPath && !existsSync(configPath)) {
+		return getDefaultConfig();
+	}
+
 	const path = configPath ?? findConfigFile();
 
 	if (!path) {
@@ -90,7 +80,7 @@ export function loadConfig(configPath?: string): Config {
 }
 
 function findConfigFile(): string | null {
-	const candidates = [DEFAULT_CONFIG_NAME, "orch.yaml", ".orch.yml"];
+	const candidates = ["orch.yml", "orch.yaml", ".orch.yml"];
 
 	for (const candidate of candidates) {
 		if (existsSync(candidate)) {
@@ -101,14 +91,6 @@ function findConfigFile(): string | null {
 	return null;
 }
 
-function getDefaultConfig(): Config {
-	return ConfigSchema.parse({
-		version: "1.0",
-		backend: { type: "claude" },
-		loop: {
-			max_iterations: 100,
-			completion_promise: "LOOP_COMPLETE",
-			idle_timeout_secs: 1800,
-		},
-	});
+function getDefaultConfig(): OrchestratorConfig {
+	return OrchestratorConfigSchema.parse({});
 }

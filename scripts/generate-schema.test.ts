@@ -25,31 +25,26 @@ describe("generate-schema.ts", () => {
 	});
 
 	it("スクリプトを実行するとスキーマファイルが生成される", async () => {
-		// スクリプトを実行
 		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {
 			cwd: process.cwd(),
 		});
 		await proc.exited;
 
-		// ファイルが生成されていることを確認
 		expect(existsSync(SCHEMA_PATH)).toBe(true);
 	});
 
 	it("生成されたスキーマが有効なJSONである", async () => {
-		// スクリプトを実行
 		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {
 			cwd: process.cwd(),
 		});
 		await proc.exited;
 
-		// JSONとしてパースできることを確認
 		const content = await Bun.file(SCHEMA_PATH).text();
 		const schema = JSON.parse(content);
 		expect(schema).toBeDefined();
 	});
 
 	it("生成されたスキーマにJSON Schema識別子が含まれる", async () => {
-		// スクリプトを実行
 		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {
 			cwd: process.cwd(),
 		});
@@ -58,30 +53,25 @@ describe("generate-schema.ts", () => {
 		const content = await Bun.file(SCHEMA_PATH).text();
 		const schema = JSON.parse(content);
 
-		// JSON Schema仕様の識別子を確認（$refまたは$schemaのいずれか）
 		expect(schema.$ref || schema.$schema).toBeDefined();
 	});
 
 	/**
 	 * スキーマのpropertiesを取得するヘルパー
-	 * zodToJsonSchemaは$refとdefinitionsを使用するため
 	 */
 	function getSchemaProperties(schema: {
 		$ref?: string;
 		definitions?: Record<string, { properties?: Record<string, unknown> }>;
 		properties?: Record<string, unknown>;
 	}): Record<string, unknown> {
-		// $refを使用している場合はdefinitionsから取得
 		if (schema.$ref && schema.definitions) {
 			const refName = schema.$ref.replace("#/definitions/", "");
 			return schema.definitions[refName]?.properties ?? {};
 		}
-		// 直接propertiesがある場合
 		return schema.properties ?? {};
 	}
 
 	it("生成されたスキーマにbackendプロパティが含まれる", async () => {
-		// スクリプトを実行
 		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {
 			cwd: process.cwd(),
 		});
@@ -91,12 +81,10 @@ describe("generate-schema.ts", () => {
 		const schema = JSON.parse(content);
 		const properties = getSchemaProperties(schema);
 
-		// ConfigSchemaの主要プロパティを確認
 		expect(properties.backend).toBeDefined();
 	});
 
-	it("生成されたスキーマにloopプロパティが含まれる", async () => {
-		// スクリプトを実行
+	it("生成されたスキーマにworktreeプロパティが含まれる", async () => {
 		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {
 			cwd: process.cwd(),
 		});
@@ -106,11 +94,10 @@ describe("generate-schema.ts", () => {
 		const schema = JSON.parse(content);
 		const properties = getSchemaProperties(schema);
 
-		expect(properties.loop).toBeDefined();
+		expect(properties.worktree).toBeDefined();
 	});
 
-	it("生成されたスキーマにautoIssueプロパティが含まれる", async () => {
-		// スクリプトを実行
+	it("生成されたスキーマにsessionプロパティが含まれる", async () => {
 		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {
 			cwd: process.cwd(),
 		});
@@ -120,8 +107,7 @@ describe("generate-schema.ts", () => {
 		const schema = JSON.parse(content);
 		const properties = getSchemaProperties(schema);
 
-		// Issue #13で追加されたauto_issue設定
-		expect(properties.auto_issue).toBeDefined();
+		expect(properties.session).toBeDefined();
 	});
 
 	it("スクリプトが正常終了する（exit code 0）", async () => {
@@ -134,7 +120,6 @@ describe("generate-schema.ts", () => {
 	});
 
 	it("生成されたスキーマが整形されたJSONである（pretty print）", async () => {
-		// スクリプトを実行
 		const proc = Bun.spawn(["bun", "run", "scripts/generate-schema.ts"], {
 			cwd: process.cwd(),
 		});
@@ -142,8 +127,7 @@ describe("generate-schema.ts", () => {
 
 		const content = await Bun.file(SCHEMA_PATH).text();
 
-		// 整形されたJSONは改行とインデントを含む
 		expect(content).toContain("\n");
-		expect(content).toContain("  "); // 2スペースインデント
+		expect(content).toContain("  ");
 	});
 });
