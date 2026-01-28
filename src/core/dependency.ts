@@ -65,12 +65,12 @@ export function parseDependencies(body: string): number[] {
 	const keywordRegex = /(?:Blocked by|Depends on|Needs|前提Issue)[:\s]*([^\n]+)/gi;
 	const ids = new Set<number>();
 
-	let keywordMatch: RegExpExecArray | null;
-	while ((keywordMatch = keywordRegex.exec(body)) !== null) {
+	const keywordMatches = body.matchAll(keywordRegex);
+	for (const keywordMatch of keywordMatches) {
 		// その部分から#数字を全て抽出
 		const issueRegex = /#(\d+)/g;
-		let issueMatch: RegExpExecArray | null;
-		while ((issueMatch = issueRegex.exec(keywordMatch[1])) !== null) {
+		const issueMatches = keywordMatch[1].matchAll(issueRegex);
+		for (const issueMatch of issueMatches) {
 			ids.add(Number.parseInt(issueMatch[1], 10));
 		}
 	}
