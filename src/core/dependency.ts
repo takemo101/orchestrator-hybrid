@@ -249,21 +249,39 @@ export class DependencyResolver {
 		const node = graph.get(id);
 		if (node) {
 			for (const dep of node.dependencies) {
-				if (!graph.has(dep)) continue;
-
-				if (!visited.has(dep)) {
-					const cycle = this.dfsForCycle(graph, dep, visited, recStack, path);
-					if (cycle.length > 0) return cycle;
-				} else if (recStack.has(dep)) {
-					path.push(dep);
-					const cycleStartIdx = path.indexOf(dep);
-					return path.slice(cycleStartIdx);
-				}
+				const cycle = this.checkDependencyForCycle(graph, dep, visited, recStack, path);
+				if (cycle.length > 0) return cycle;
 			}
 		}
 
 		recStack.delete(id);
 		path.pop();
 		return [];
+	}
+
+	private checkDependencyForCycle(
+		graph: Map<number, DependencyNode>,
+		dep: number,
+		visited: Set<number>,
+		recStack: Set<number>,
+		path: number[],
+	): number[] {
+		if (!graph.has(dep)) return [];
+
+		if (!visited.has(dep)) {
+			return this.dfsForCycle(graph, dep, visited, recStack, path);
+		}
+
+		if (recStack.has(dep)) {
+			return this.extractCycle(path, dep);
+		}
+
+		return [];
+	}
+
+	private extractCycle(path: number[], dep: number): number[] {
+		path.push(dep);
+		const cycleStartIdx = path.indexOf(dep);
+		return path.slice(cycleStartIdx);
 	}
 }
