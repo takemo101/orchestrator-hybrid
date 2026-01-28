@@ -244,7 +244,7 @@ describe("BUILTIN_HATS", () => {
 	});
 
 	test("各Hatがtriggersとpublishesを持つ", () => {
-		for (const [id, hat] of Object.entries(BUILTIN_HATS)) {
+		for (const [_id, hat] of Object.entries(BUILTIN_HATS)) {
 			expect(hat.triggers.length).toBeGreaterThan(0);
 			expect(hat.publishes.length).toBeGreaterThan(0);
 			expect(hat.instructions).toBeTruthy();
