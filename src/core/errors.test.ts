@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	OrchestratorError,
-	ConfigError,
-	GitHubError,
-	SessionError,
-} from "./errors.js";
+import { ConfigError, GitHubError, OrchestratorError, SessionError } from "./errors.js";
 
 describe("errors", () => {
 	describe("OrchestratorError", () => {

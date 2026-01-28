@@ -23,10 +23,7 @@ export class OrchestratorError extends Error {
 export class ConfigError extends OrchestratorError {
 	readonly configPath?: string;
 
-	constructor(
-		message: string,
-		options?: ErrorOptions & { configPath?: string },
-	) {
+	constructor(message: string, options?: ErrorOptions & { configPath?: string }) {
 		super(message, options);
 		this.name = "ConfigError";
 		this.configPath = options?.configPath;
@@ -39,10 +36,7 @@ export class ConfigError extends OrchestratorError {
 export class GitHubError extends OrchestratorError {
 	readonly statusCode?: number;
 
-	constructor(
-		message: string,
-		options?: ErrorOptions & { statusCode?: number },
-	) {
+	constructor(message: string, options?: ErrorOptions & { statusCode?: number }) {
 		super(message, options);
 		this.name = "GitHubError";
 		this.statusCode = options?.statusCode;
@@ -55,10 +49,7 @@ export class GitHubError extends OrchestratorError {
 export class SessionError extends OrchestratorError {
 	readonly sessionId?: string;
 
-	constructor(
-		message: string,
-		options?: ErrorOptions & { sessionId?: string },
-	) {
+	constructor(message: string, options?: ErrorOptions & { sessionId?: string }) {
 		super(message, options);
 		this.name = "SessionError";
 		this.sessionId = options?.sessionId;

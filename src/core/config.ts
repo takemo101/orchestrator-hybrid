@@ -15,9 +15,7 @@ export class ConfigValidationError extends Error {
 	readonly configPath?: string;
 
 	constructor(
-		errorsOrZodError:
-			| ZodError
-			| Array<{ path: string; message: string }>,
+		errorsOrZodError: ZodError | Array<{ path: string; message: string }>,
 		configPath?: string,
 	) {
 		const errors =
@@ -47,10 +45,7 @@ export class ConfigValidationError extends Error {
  * @returns 検証済みの設定オブジェクト
  * @throws {ConfigValidationError} 検証エラー
  */
-export function validateConfig(
-	rawConfig: unknown,
-	configPath?: string,
-): OrchestratorConfig {
+export function validateConfig(rawConfig: unknown, configPath?: string): OrchestratorConfig {
 	try {
 		return OrchestratorConfigSchema.parse(rawConfig);
 	} catch (error) {

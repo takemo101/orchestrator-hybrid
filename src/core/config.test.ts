@@ -1,6 +1,6 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { loadConfig, validateConfig, ConfigValidationError } from "./config.js";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { ConfigValidationError, loadConfig, validateConfig } from "./config.js";
 
 const TEST_DIR = "/tmp/orch-config-test";
 
@@ -51,9 +51,7 @@ describe("config", () => {
 		});
 
 		test("should throw ConfigValidationError for invalid config", () => {
-			expect(() => validateConfig({ backend: "invalid" })).toThrow(
-				ConfigValidationError,
-			);
+			expect(() => validateConfig({ backend: "invalid" })).toThrow(ConfigValidationError);
 		});
 
 		test("should include configPath in error", () => {
@@ -113,9 +111,7 @@ max_iterations: 30
 		});
 
 		test("should be instanceof Error", () => {
-			const err = new ConfigValidationError(
-				[{ path: "backend", message: "invalid" }],
-			);
+			const err = new ConfigValidationError([{ path: "backend", message: "invalid" }]);
 			expect(err).toBeInstanceOf(Error);
 			expect(err.name).toBe("ConfigValidationError");
 		});

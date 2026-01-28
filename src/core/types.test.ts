@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
-	type OrchestratorConfig,
-	OrchestratorConfigSchema,
-	type IssueInfo,
-	IssueInfoSchema,
-	type SessionMeta,
-	SessionMetaSchema,
 	type HatDefinition,
 	HatDefinitionSchema,
+	type IssueInfo,
+	IssueInfoSchema,
+	type OrchestratorConfig,
+	OrchestratorConfigSchema,
+	type SessionMeta,
+	SessionMetaSchema,
 } from "./types.js";
 
 describe("types", () => {
@@ -67,15 +67,11 @@ describe("types", () => {
 		});
 
 		test("should reject invalid backend", () => {
-			expect(() =>
-				OrchestratorConfigSchema.parse({ backend: "invalid" }),
-			).toThrow();
+			expect(() => OrchestratorConfigSchema.parse({ backend: "invalid" })).toThrow();
 		});
 
 		test("should reject invalid preset", () => {
-			expect(() =>
-				OrchestratorConfigSchema.parse({ preset: "unknown" }),
-			).toThrow();
+			expect(() => OrchestratorConfigSchema.parse({ preset: "unknown" })).toThrow();
 		});
 
 		test("should reject invalid session manager", () => {
@@ -87,9 +83,7 @@ describe("types", () => {
 		});
 
 		test("should reject negative max_iterations", () => {
-			expect(() =>
-				OrchestratorConfigSchema.parse({ max_iterations: -1 }),
-			).toThrow();
+			expect(() => OrchestratorConfigSchema.parse({ max_iterations: -1 })).toThrow();
 		});
 	});
 
