@@ -156,31 +156,18 @@ describe("TmuxSessionManager", () => {
 	});
 
 	describe("streamOutput", () => {
-		it("ストリーミング処理が動作する", async () => {
+		it("AsyncIterableを返す", async () => {
 			if (!tmuxAvailable) {
 				console.log("Skipping: tmux not available");
 				return;
 			}
 
-			// 長時間実行して出力を生成
-			await manager.create("stream-1", "sh", ["-c", "echo 'test'; sleep 100"]);
+			// 長時間実行
+			await manager.create("stream-1", "sleep", ["100"]);
 
-			// ストリームが開始できることを確認
-			let hasIterated = false;
-			const timeout = setTimeout(() => {}, 3000); // 3秒でタイムアウト
-
-			try {
-				for await (const _chunk of manager.streamOutput("stream-1")) {
-					hasIterated = true;
-					break; // 1回でも取得できれば成功
-				}
-			} catch {
-				// エラーは無視（タイミング問題の可能性）
-			}
-
-			clearTimeout(timeout);
-			// ストリームが開始できたことを確認（コンテナ環境ではスキップ可）
-			expect(true).toBe(true);
+			// streamOutputがAsyncIterableを返すことを確認
+			const stream = manager.streamOutput("stream-1");
+			expect(typeof stream[Symbol.asyncIterator]).toBe("function");
 		});
 	});
 
