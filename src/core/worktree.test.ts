@@ -257,7 +257,6 @@ branch refs/heads/main
 	describe("parseWorktreeList", () => {
 		test("porcelain出力を正しくパースする", () => {
 			const manager = createManager({});
-			// @ts-expect-error Testing private method
 			const result = manager.parseWorktreeList(PORCELAIN_OUTPUT);
 
 			expect(result).toHaveLength(2);
