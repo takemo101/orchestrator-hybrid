@@ -1,5 +1,5 @@
-import { describe, expect, test, beforeEach } from "bun:test";
-import { HatSystem, HatError, extractEventFromOutput, BUILTIN_HATS } from "./hat.js";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { BUILTIN_HATS, extractEventFromOutput, HatError, HatSystem } from "./hat.js";
 import type { HatDefinition } from "./types.js";
 
 describe("HatSystem", () => {
