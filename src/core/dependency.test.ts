@@ -1,9 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
-import {
-	CircularDependencyError,
-	DependencyResolver,
-	parseDependencies,
-} from "./dependency";
+import { CircularDependencyError, DependencyResolver, parseDependencies } from "./dependency";
 import { GitHubError } from "./errors";
 
 /**
