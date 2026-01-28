@@ -1,12 +1,10 @@
 import { describe, expect, mock, test } from "bun:test";
-import { GitHubError } from "./errors";
 import {
-	type DependencyNode,
-	DependencyResolver,
 	CircularDependencyError,
-	DependencyNotFoundError,
+	DependencyResolver,
 	parseDependencies,
 } from "./dependency";
+import { GitHubError } from "./errors";
 
 /**
  * DependencyResolver テスト
