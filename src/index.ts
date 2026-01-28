@@ -32,3 +32,5 @@ export {
 	type WorktreeConfig,
 	WorktreeConfigSchema,
 } from "./core/types.js";
+// Input
+export { type ExecFn, type FetchIssueOptions, fetchIssue } from "./input/github.js";
