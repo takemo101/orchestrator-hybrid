@@ -179,7 +179,8 @@ describe("StatusLabelManager", () => {
 			);
 			const manager = new StatusLabelManager(executor);
 
-			await expect(manager.ensureLabelsExist()).resolves.not.toThrow();
+			// エラーなく完了することを確認
+			await manager.ensureLabelsExist();
 			expect(warnSpy).toHaveBeenCalled();
 			warnSpy.mockRestore();
 		});
