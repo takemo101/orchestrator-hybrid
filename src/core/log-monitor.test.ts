@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type ISessionManager, LogMonitor, type LogOptions } from "./log-monitor.js";
+import { describe, expect, it, vi } from "vitest";
+import { type ISessionManager, LogMonitor } from "./log-monitor.js";
 
 /**
  * モックSessionManager
