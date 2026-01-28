@@ -8,9 +8,6 @@ import { PRCreateError, PRCreator } from "./pr";
  * ExecFnをモックして外部コマンド依存を排除する。
  */
 
-/** exec関数のモック型 */
-type MockExec = ReturnType<typeof createMockExec>;
-
 /** 呼び出し順を記録するexecモックを作成 */
 function createMockExec(responses: Array<{ stdout: string; stderr: string; exitCode: number }>) {
 	let callIndex = 0;
