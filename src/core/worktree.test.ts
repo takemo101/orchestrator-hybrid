@@ -1,12 +1,10 @@
-import { describe, expect, mock, test, beforeEach, afterEach, spyOn } from "bun:test";
-import {
-	type WorktreeInfo,
-	WorktreeManager,
-	WorktreeCreateError,
-	WorktreeRunningError,
-	WorktreeNotFoundError,
-} from "./worktree";
+import { describe, expect, mock, test } from "bun:test";
 import type { WorktreeConfig } from "./types";
+import {
+	WorktreeCreateError,
+	WorktreeManager,
+	WorktreeRunningError,
+} from "./worktree";
 
 /**
  * WorktreeManager テスト
