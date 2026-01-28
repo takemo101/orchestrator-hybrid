@@ -89,7 +89,8 @@ describe("DependencyResolver", () => {
 
 			const order = await resolver.resolveOrder(10);
 			// 5と6がどちらが先でも良いが、10は最後
-			expect(order.indexOf(10)).toBe(2);
+			expect(order.length).toBe(3);
+			expect(order[order.length - 1]).toBe(10); // 10 is always last
 			expect(order).toContain(5);
 			expect(order).toContain(6);
 		});
