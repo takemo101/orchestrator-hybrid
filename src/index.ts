@@ -15,6 +15,17 @@ export {
 	OrchestratorError,
 	SessionError,
 } from "./core/errors.js";
+// Event
+export { EventBus, type EventEntry, type EventHandler } from "./core/event.js";
+// Loop
+export {
+	type IterationRunner,
+	LoopEngine,
+	LoopError,
+	type LoopOptions,
+	type LoopResult,
+	MaxIterationsReachedError,
+} from "./core/loop.js";
 // Core types
 export {
 	type HatDefinition,
