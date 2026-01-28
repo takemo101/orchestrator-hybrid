@@ -454,29 +454,53 @@ GitHub IssueにステータスラベルをつけてIssueの進行状態を可視
 | `blocked` | `orch:blocked` | 🟡 黄 | ブロック中（依存待ち） |
 | `pr-created` | `orch:pr-created` | 🟣 紫 | PR作成済み |
 | `merged` | `orch:merged` | 🔵 濃青 | マージ完了 |
+| `session-active` | `orch:session-active` | ⚪️ 白 | セッション実行中（v3.0.0+） |
 
-### 使用方法
+---
 
-```bash
-# リポジトリにステータスラベルを作成
-bun run dev init --labels
-# または
-./orch init --labels
-```
+## セッション管理（v3.0.0+）
+
+セッション管理は、バックエンドプロセス（Claude Code, OpenCode等）の実行を抽象化するレイヤーです。これにより、単なるプロセス実行だけでなく、ターミナルマルチプレクサ（tmux, zellij）内での実行や、バックグラウンド実行を統一的に扱えます。
+
+### 実装の種類
+
+現在、3つの実装をサポートしています：
+
+- **native**: `Bun.spawn` を使用したネイティブ実行。追加の依存関係なし。ログはファイルに出力されます。
+- **tmux**: `tmux` を使用してセッション内で実行。対話的な操作や、後からのアタッチが可能です。
+- **zellij**: `zellij` を使用してセッション内で実行。
+
+### 自動検出
+
+デフォルトでは、以下の優先順位で利用可能なマネージャーを自動検出します：
+1. **tmux** (インストールされており、実行可能な場合)
+2. **zellij** (インストールされており、実行可能な場合)
+3. **native** (常に利用可能)
 
 ### 設定
 
-`orch.yml` でラベル機能を有効化・カスタマイズできます：
+`orch.yml` でセッション管理の挙動をカスタマイズできます：
 
 ```yaml
-state:
-  use_github_labels: true    # ラベル機能を有効化（デフォルト: true）
-  label_prefix: "orch"       # ラベルの接頭辞（デフォルト: "orch"）
+session:
+  type: auto  # auto | native | tmux | zellij
+  prefix: orch  # セッション名のプレフィックス
 ```
 
-ラベル接頭辞を変更すると、例えば `myapp:running` のようなラベルになります。
+### 使用例
+
+セッションタイプを指定して実行する例：
+
+```bash
+# 明示的にtmuxを使用して実行
+./orch run --issue 123 --session-type tmux
+
+# ネイティブ実行（デフォルトのフォールバック）
+./orch run --issue 123 --session-type native
+```
 
 ---
+
 
 ## トラブルシューティング
 
@@ -639,7 +663,13 @@ src/
 ├── adapters/
 │   ├── base.ts         # バックエンド抽象基底
 │   ├── claude.ts       # Claude Code アダプター
-│   └── opencode.ts     # OpenCode アダプター
+│   ├── opencode.ts     # OpenCode アダプター
+│   └── session/              # セッション管理（v3.0.0+）
+│       ├── interface.ts      # ISessionManager インターフェース
+│       ├── native.ts         # Native実装（Bun.spawn + ファイルログ）
+│       ├── tmux.ts           # Tmux実装
+│       ├── zellij.ts         # Zellij実装
+│       └── factory.ts        # ファクトリー（自動検出）
 ├── input/
 │   ├── github.ts       # GitHub Issue取得
 │   └── prompt.ts       # プロンプト生成

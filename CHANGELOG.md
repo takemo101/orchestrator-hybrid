@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-XX-XX (Unreleased)
+
+### Added
+
+#### Session Management (F-012)
+- **ISessionManager インターフェース**: バックエンド実行プロセスの抽象化レイヤー
+  - `create()`, `list()`, `getOutput()`, `streamOutput()`, `attach()`, `isRunning()`, `kill()` メソッド
+  - 統一されたセッション情報（Session型）
+- **NativeSessionManager**: Bun.spawn + ファイルログによる軽量実装
+  - `.agent/sessions/<id>/output.log` への出力保存
+  - `session.json` によるメタデータ永続化
+- **TmuxSessionManager**: tmuxコマンドラッパー
+  - `tmux new-session`, `capture-pane`, `attach-session`, `kill-session` 対応
+  - 永続性が高く、ターミナルから直接アタッチ可能
+- **ZellijSessionManager**: zellijコマンドラッパー
+  - `zellij --session`, `action dump-screen`, `attach`, `kill-session` 対応
+  - 現代的なターミナルマルチプレクサ対応
+- **SessionManagerFactory**: 自動検出ファクトリー
+  - 優先順位: tmux > zellij > native
+  - `detectAvailableSessionManagers()` で利用可能な実装を検出
+
+### Internal
+
+- 288テストケースで品質保証（セッション管理: 52テスト追加）
+- v3.0.0エラークラス追加:
+  - `SessionError`: セッション操作エラー
+
+---
+
 ## [2.0.0] - 2026-XX-XX (Unreleased)
 
 ### Added
