@@ -34,3 +34,4 @@ export {
 } from "./core/types.js";
 // Input
 export { type ExecFn, type FetchIssueOptions, fetchIssue } from "./input/github.js";
+export { type HatContext, PromptGenerator } from "./input/prompt.js";
