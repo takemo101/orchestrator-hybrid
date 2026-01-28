@@ -77,10 +77,7 @@ export class PromptGenerator {
 	private getTemplate(context?: HatContext): string {
 		const hasHat = context?.hatName != null && context.hatName.length > 0;
 
-		const sections: string[] = [
-			this.getSystemSection(),
-			this.getUserRequestSection(),
-		];
+		const sections: string[] = [this.getSystemSection(), this.getUserRequestSection()];
 
 		if (hasHat) {
 			sections.push(this.getHatInstructionSection());
@@ -125,10 +122,6 @@ export class PromptGenerator {
 	 * Hat指示セクション: 現在のHatの役割と指示
 	 */
 	private getHatInstructionSection(): string {
-		return [
-			"# Current Hat: {{hat_name}}",
-			"",
-			"{{hat_instructions}}",
-		].join("\n");
+		return ["# Current Hat: {{hat_name}}", "", "{{hat_instructions}}"].join("\n");
 	}
 }
