@@ -220,33 +220,21 @@ describe("PRCreator", () => {
 		});
 
 		test("git addが失敗した場合PRCreateErrorをスローする", async () => {
-			const execFn = createMockExec([
-				ok("M file.ts\n"),
-				fail("error: could not stage"),
-			]);
+			const execFn = createMockExec([ok("M file.ts\n"), fail("error: could not stage")]);
 
 			const creator = new PRCreator({ exec: execFn });
 			await expect(creator.create(42, "feature/issue-42", "Title")).rejects.toThrow(PRCreateError);
 		});
 
 		test("git commitが失敗した場合PRCreateErrorをスローする", async () => {
-			const execFn = createMockExec([
-				ok("M file.ts\n"),
-				ok(),
-				fail("error: could not commit"),
-			]);
+			const execFn = createMockExec([ok("M file.ts\n"), ok(), fail("error: could not commit")]);
 
 			const creator = new PRCreator({ exec: execFn });
 			await expect(creator.create(42, "feature/issue-42", "Title")).rejects.toThrow(PRCreateError);
 		});
 
 		test("git pushが失敗した場合PRCreateErrorをスローする", async () => {
-			const execFn = createMockExec([
-				ok("M file.ts\n"),
-				ok(),
-				ok(),
-				fail("error: failed to push"),
-			]);
+			const execFn = createMockExec([ok("M file.ts\n"), ok(), ok(), fail("error: failed to push")]);
 
 			const creator = new PRCreator({ exec: execFn });
 			await expect(creator.create(42, "feature/issue-42", "Title")).rejects.toThrow(PRCreateError);

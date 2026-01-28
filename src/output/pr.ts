@@ -178,7 +178,19 @@ export class PRCreator {
 		base: string,
 		draft: boolean,
 	): Promise<string> {
-		const args = ["gh", "pr", "create", "--title", title, "--body", body, "--head", head, "--base", base];
+		const args = [
+			"gh",
+			"pr",
+			"create",
+			"--title",
+			title,
+			"--body",
+			body,
+			"--head",
+			head,
+			"--base",
+			base,
+		];
 
 		if (draft) {
 			args.push("--draft");
