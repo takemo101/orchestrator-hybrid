@@ -59,11 +59,22 @@ export class NativeSessionManager implements ISessionManager {
 	}
 
 	/**
-	 * メタデータを保存
+	 * メタデータを保存（ディレクトリが存在する場合のみ）
 	 */
 	private saveMeta(meta: SessionMetadata): void {
 		const metaPath = this.getMetaPath(meta.id);
-		fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+		const sessionDir = this.getSessionDir(meta.id);
+
+		// ディレクトリが存在しない場合は何もしない（クリーンアップ後など）
+		if (!fs.existsSync(sessionDir)) {
+			return;
+		}
+
+		try {
+			fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+		} catch {
+			// 書き込み失敗は無視（競合状態でディレクトリが削除された場合など）
+		}
 	}
 
 	/**
@@ -140,7 +151,11 @@ export class NativeSessionManager implements ISessionManager {
 				entry.meta.exitCode = exitCode;
 				this.saveMeta(entry.meta);
 			}
-			outputWriter.end();
+			try {
+				outputWriter.end();
+			} catch {
+				// 既にクローズされている場合は無視
+			}
 		});
 
 		return {
@@ -216,6 +231,11 @@ export class NativeSessionManager implements ISessionManager {
 		const entry = this.processes.get(id);
 
 		while (true) {
+			// ファイルが存在するか確認
+			if (!fs.existsSync(outputPath)) {
+				break;
+			}
+
 			// ファイルの新規内容を読み取り
 			const stats = fs.statSync(outputPath);
 			if (stats.size > position) {
