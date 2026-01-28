@@ -70,7 +70,6 @@ export class StatusLabelManager {
 	async ensureLabelsExist(): Promise<void> {
 		// 既存ラベル一覧を取得
 		const existingLabels = await this.getExistingLabels();
-		this.labelCache = existingLabels;
 
 		// 全ステータスのラベルを確認・作成
 		for (const status of Object.keys(STATUS_COLORS) as IssueStatus[]) {
