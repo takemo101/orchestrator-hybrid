@@ -34,19 +34,16 @@ export const STATUS_COLORS: Record<IssueStatus, string> = {
 /**
  * 排他的ステータス（同時に1つのみ）
  */
-const EXCLUSIVE_STATUSES: IssueStatus[] = [
-	"queued",
-	"running",
-	"completed",
-	"failed",
-	"blocked",
-];
+const EXCLUSIVE_STATUSES: IssueStatus[] = ["queued", "running", "completed", "failed", "blocked"];
 
 /**
  * コマンド実行インターフェース
  */
 export interface CommandExecutor {
-	exec(command: string, args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }>;
+	exec(
+		command: string,
+		args: string[],
+	): Promise<{ exitCode: number; stdout: string; stderr: string }>;
 }
 
 /**
@@ -119,12 +116,7 @@ export class StatusLabelManager {
 	 * 既存のラベル一覧を取得する
 	 */
 	private async getExistingLabels(): Promise<Set<string>> {
-		const result = await this.executor.exec("gh", [
-			"label",
-			"list",
-			"--json",
-			"name",
-		]);
+		const result = await this.executor.exec("gh", ["label", "list", "--json", "name"]);
 
 		if (result.exitCode !== 0) {
 			throw new GitHubError(`Failed to list labels: ${result.stderr}`);
@@ -171,7 +163,9 @@ export class StatusLabelManager {
 		]);
 
 		if (result.exitCode !== 0) {
-			console.warn(`Warning: Failed to add label ${labelName} to issue #${issueNumber}: ${result.stderr}`);
+			console.warn(
+				`Warning: Failed to add label ${labelName} to issue #${issueNumber}: ${result.stderr}`,
+			);
 		}
 	}
 
@@ -189,14 +183,19 @@ export class StatusLabelManager {
 
 		// ラベルが存在しない場合のエラーは無視
 		if (result.exitCode !== 0 && !result.stderr.includes("not found")) {
-			console.warn(`Warning: Failed to remove label ${labelName} from issue #${issueNumber}: ${result.stderr}`);
+			console.warn(
+				`Warning: Failed to remove label ${labelName} from issue #${issueNumber}: ${result.stderr}`,
+			);
 		}
 	}
 
 	/**
 	 * 排他的ステータスラベルを削除する
 	 */
-	private async removeExclusiveLabels(issueNumber: number, exceptStatus: IssueStatus): Promise<void> {
+	private async removeExclusiveLabels(
+		issueNumber: number,
+		exceptStatus: IssueStatus,
+	): Promise<void> {
 		for (const status of EXCLUSIVE_STATUSES) {
 			if (status !== exceptStatus) {
 				const labelName = this.labelName(status);

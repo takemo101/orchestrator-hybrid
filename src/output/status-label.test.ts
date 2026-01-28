@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	StatusLabelManager,
-	STATUS_COLORS,
-	type IssueStatus,
 	type CommandExecutor,
+	type IssueStatus,
+	STATUS_COLORS,
+	StatusLabelManager,
 } from "./status-label.js";
 
 /**
