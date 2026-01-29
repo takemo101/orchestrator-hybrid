@@ -135,9 +135,10 @@ export class TmuxSessionManager implements ISessionManager {
 	async getOutput(id: string, lines?: number): Promise<string> {
 		const sessionName = this.getSessionName(id);
 
-		// capture-paneでペイン内容を取得
-		const args = ["capture-pane", "-t", sessionName, "-p"];
+		// -S - -E - : capture entire scrollback buffer (not just visible pane)
+		const args = ["capture-pane", "-t", sessionName, "-p", "-S", "-", "-E", "-"];
 		if (lines !== undefined) {
+			args.splice(4, 4);
 			args.push("-S", `-${lines}`);
 		}
 

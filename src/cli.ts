@@ -749,6 +749,44 @@ export function createProgram(): Command {
 		});
 
 	program
+		.command("cancel")
+		.description("Cancel running sessions")
+		.option("-t, --task <id>", "Cancel specific task by session ID")
+		.option("-a, --all", "Cancel all running sessions")
+		.action(async (cliOptions) => {
+			if (!cliOptions.task && !cliOptions.all) {
+				console.error("Error: Specify --task <id> or --all");
+				process.exit(1);
+			}
+
+			const sessionManager = await createSessionManager("auto");
+			const sessions = await sessionManager.list();
+			const runningSessions = sessions.filter((s) => s.status === "running");
+
+			if (runningSessions.length === 0) {
+				console.log("No running sessions found.");
+				return;
+			}
+
+			if (cliOptions.task) {
+				const session = runningSessions.find((s) => s.id === cliOptions.task);
+				if (!session) {
+					console.error(`Session ${cliOptions.task} not found or not running.`);
+					process.exit(1);
+				}
+				await sessionManager.kill(cliOptions.task);
+				console.log(`Session ${cliOptions.task} cancelled.`);
+			} else if (cliOptions.all) {
+				console.log(`Cancelling ${runningSessions.length} session(s)...`);
+				for (const session of runningSessions) {
+					await sessionManager.kill(session.id);
+					console.log(`  Cancelled: ${session.id}`);
+				}
+				console.log("All sessions cancelled.");
+			}
+		});
+
+	program
 		.command("worktrees")
 		.description("List all worktrees")
 		.action(async () => {

@@ -154,10 +154,8 @@ export class ZellijSessionManager implements ISessionManager {
 	async getOutput(id: string, lines?: number): Promise<string> {
 		const sessionName = this.getSessionName(id);
 
-		// zellijにはtmuxのcapture-paneに相当する直接的な機能がない
-		// zellij pipe または scroll buffer から取得を試みる
-		// zellij action dump-screen を使用
-		const result = await runZellij(["--session", sessionName, "action", "dump-screen"]);
+		// --full: include scrollback buffer (not just visible screen)
+		const result = await runZellij(["--session", sessionName, "action", "dump-screen", "--full"]);
 
 		if (result.exitCode !== 0) {
 			throw new SessionError(`Failed to dump zellij screen: ${result.stderr}`, {
@@ -167,7 +165,6 @@ export class ZellijSessionManager implements ISessionManager {
 
 		let output = result.stdout;
 
-		// 行数制限がある場合
 		if (lines !== undefined && lines > 0) {
 			const outputLines = output.split("\n");
 			output = outputLines.slice(-lines).join("\n");
