@@ -1,40 +1,16 @@
-version: "1.0"
+backend: opencode
+auto: false
+create_pr: false
+max_iterations: 100
+preset: simple
 
-backend:
-  type: claude
-  
-loop:
-  max_iterations: 100
-  completion_promise: "LOOP_COMPLETE"
-  idle_timeout_secs: 1800
+worktree:
+  enabled: true
+  base_dir: ".worktrees"
+  copy_files:
+    - ".env"
 
-hats:
-  planner:
-    triggers: ["task.start"]
-    publishes: ["plan.ready"]
-    
-  builder:
-    triggers: ["plan.ready", "tests.failing"]
-    publishes: ["code.written"]
-    
-  tester:
-    triggers: ["code.written"]
-    publishes: ["tests.passing", "tests.failing"]
-    
-  reviewer:
-    triggers: ["tests.passing"]
-    publishes: ["review.approved", "review.rejected"]
-
-gates:
-  after_plan: true
-  after_implementation: false
-  before_pr: true
-
-quality:
-  min_score: 8
-  auto_approve_above: 9
-
-state:
-  use_github_labels: true
-  use_scratchpad: true
-  scratchpad_path: ".agent/scratchpad.md"
+session:
+  manager: auto
+  prefix: orch
+  capture_interval: 500

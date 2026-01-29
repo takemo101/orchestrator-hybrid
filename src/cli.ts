@@ -7,8 +7,10 @@ import type { IBackendAdapter } from "./adapters/interface";
 import { OpenCodeAdapter } from "./adapters/opencode";
 import { createSessionManager, type SessionManagerType } from "./adapters/session";
 import type { Session } from "./adapters/session/interface";
+import { loadConfig } from "./core/config";
 import { LogMonitor } from "./core/log-monitor";
 import { LoopEngine, type LoopResult } from "./core/loop";
+import type { OrchestratorConfig } from "./core/types";
 import { fetchIssue } from "./input/github";
 import { PromptGenerator } from "./input/prompt";
 
@@ -17,6 +19,28 @@ function getBackendAdapter(backendType: string): IBackendAdapter {
 		return new OpenCodeAdapter();
 	}
 	return new ClaudeAdapter();
+}
+
+function mergeOptionsWithConfig(
+	cliOptions: Record<string, unknown>,
+	config: OrchestratorConfig,
+): {
+	backend: string;
+	auto: boolean;
+	createPr: boolean;
+	maxIterations: number;
+	preset: string;
+	sessionManager: SessionManagerType;
+} {
+	return {
+		backend: (cliOptions.backend as string | undefined) ?? config.backend,
+		auto: (cliOptions.auto as boolean | undefined) ?? config.auto,
+		createPr: (cliOptions.createPr as boolean | undefined) ?? config.create_pr,
+		maxIterations: (cliOptions.maxIterations as number | undefined) ?? config.max_iterations,
+		preset: (cliOptions.preset as string | undefined) ?? config.preset,
+		sessionManager: ((cliOptions.sessionManager as string | undefined) ??
+			config.session.manager) as SessionManagerType,
+	};
 }
 
 function formatSessionTable(sessions: Session[]): string {
@@ -49,17 +73,19 @@ export function createProgram(): Command {
 		.command("run")
 		.description("Execute an Issue with AI agent")
 		.requiredOption("-i, --issue <number>", "GitHub Issue number", Number.parseInt)
-		.option("-a, --auto", "Auto-approve all gates", false)
-		.option("--create-pr", "Create PR after completion", false)
-		.option("-p, --preset <name>", "Preset to use (simple, tdd)", "simple")
-		.option("-b, --backend <type>", "Backend type (claude, opencode)", "claude")
-		.option("-m, --max-iterations <number>", "Max loop iterations", Number.parseInt, 100)
+		.option("-c, --config <path>", "Config file path")
+		.option("-a, --auto", "Auto-approve all gates")
+		.option("--create-pr", "Create PR after completion")
+		.option("-p, --preset <name>", "Preset to use (simple, tdd)")
+		.option("-b, --backend <type>", "Backend type (claude, opencode)")
+		.option("-m, --max-iterations <number>", "Max loop iterations", Number.parseInt)
 		.option("--resolve-deps", "Resolve dependent issues first", false)
 		.option("--no-worktree", "Disable worktree isolation", false)
-		.option("--session-manager <type>", "Session manager (auto, native, tmux, zellij)", "auto")
-		.action(async (options) => {
-			const issueNumber = options.issue;
-			const sessionManagerType = options.sessionManager as SessionManagerType;
+		.option("--session-manager <type>", "Session manager (auto, native, tmux, zellij)")
+		.action(async (cliOptions) => {
+			const config = loadConfig(cliOptions.config);
+			const options = mergeOptionsWithConfig(cliOptions, config);
+			const issueNumber = cliOptions.issue;
 
 			console.log(`Fetching Issue #${issueNumber}...`);
 			const issue = await fetchIssue(issueNumber).catch((error) => {
@@ -76,11 +102,11 @@ export function createProgram(): Command {
 			writeFileSync(promptPath, prompt);
 
 			const backend = getBackendAdapter(options.backend);
-			const sessionManager = await createSessionManager(sessionManagerType);
+			const sessionManager = await createSessionManager(options.sessionManager);
 			const sessionId = String(issueNumber);
 
 			console.log(
-				`Starting session ${sessionId} with ${backend.getName()} backend (${sessionManagerType})...`,
+				`Starting session ${sessionId} with ${backend.getName()} backend (${options.sessionManager})...`,
 			);
 
 			const session = await sessionManager.create(
