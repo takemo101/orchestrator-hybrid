@@ -311,60 +311,28 @@ bun run dev run --issue 42 --preset spec-driven
 `orch.yml` で詳細な設定が可能です。
 
 ```yaml
-version: "1.0"
-
 # バックエンド設定
-backend:
-  type: claude                    # claude | opencode | pi
-  model: claude-sonnet-4-20250514 # オプション
+backend: claude                   # claude | opencode | pi
+model: claude-sonnet-4-20250514   # オプション: AIモデル名
 
-# ループ設定
-loop:
-  max_iterations: 100             # 最大反復回数
-  completion_promise: "LOOP_COMPLETE"  # 完了キーワード
-  idle_timeout_secs: 1800         # アイドルタイムアウト（秒）
+# 基本設定
+auto: false                       # 承認ゲート自動化
+create_pr: false                  # PR自動作成
+max_iterations: 100               # 最大反復回数
+preset: simple                    # プリセット名 (simple | tdd)
 
-# 承認ゲート
-gates:
-  after_plan: true                # 計画後に承認を要求
-  after_implementation: false     # 実装後は自動続行
-  before_pr: true                 # PR作成前に承認を要求
+# Worktree設定
+worktree:
+  enabled: true                   # Worktree機能の有効化
+  base_dir: ".worktrees"          # 基準ディレクトリ
+  copy_files:                     # Worktree作成時にコピーするファイル
+    - ".env"
 
-# 品質基準（将来の拡張用）
-quality:
-  min_score: 8                    # 最低品質スコア
-  auto_approve_above: 9           # このスコア以上で自動承認
-
-# 状態管理
-state:
-  use_github_labels: true         # GitHub Issueラベルを使用（v1.3.0+: ステータスラベル自動更新）
-  label_prefix: "orch"            # ラベル接頭辞（デフォルト: "orch"）→ orch:running 等
-  use_scratchpad: true            # Scratchpadを使用
-  scratchpad_path: ".agent/scratchpad.md"
-
-# 改善Issue自動作成（v1.2.0+）
-auto_issue:
-  enabled: true                   # 改善Issue自動作成を有効化
-  min_priority: medium            # 最低優先度（high | medium | low）
-  labels:                         # 自動付与するラベル
-    - auto-generated
-    - improvement
-  duplicate_check_enabled: true   # 重複チェックを有効化
-  repository: ""                  # 別リポジトリに作成（オプション）
-
-# Issue依存関係管理（v1.3.0+）
-dependency:
-  resolve: true                   # 依存Issueを自動的に先に実行（--resolve-deps相当）
-  ignore: false                   # 依存関係を無視（--ignore-deps相当）
-
-# カスタムHat定義
-hats:
-  my_custom_hat:
-    name: "🎯 My Hat"
-    triggers: ["some.event"]
-    publishes: ["another.event", "LOOP_COMPLETE"]
-    instructions: |
-      カスタムの指示をここに書く
+# セッション管理設定
+session:
+  manager: auto                   # セッションマネージャー (auto | native | tmux | zellij)
+  prefix: orch                    # セッション名プレフィックス
+  capture_interval: 500           # 出力キャプチャ間隔(ms)
 ```
 
 ---
