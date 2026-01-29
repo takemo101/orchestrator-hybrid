@@ -107,9 +107,16 @@ describe("CLI Commands", () => {
 
 			expect(worktreesCmd).toBeDefined();
 		});
+
+		it("should have description for listing worktrees", async () => {
+			const program = await createTestProgram();
+			const worktreesCmd = program.commands.find((cmd) => cmd.name() === "worktrees");
+
+			expect(worktreesCmd?.description()).toContain("worktree");
+		});
 	});
 
-	describe("orch worktree remove", () => {
+	describe("orch worktree", () => {
 		it("should register worktree command with remove subcommand", async () => {
 			const program = await createTestProgram();
 			const worktreeCmd = program.commands.find((cmd) => cmd.name() === "worktree");
@@ -118,6 +125,26 @@ describe("CLI Commands", () => {
 
 			const removeCmd = worktreeCmd?.commands.find((cmd) => cmd.name() === "remove");
 			expect(removeCmd).toBeDefined();
+		});
+
+		it("should have remove subcommand with --force option", async () => {
+			const program = await createTestProgram();
+			const worktreeCmd = program.commands.find((cmd) => cmd.name() === "worktree");
+			const removeCmd = worktreeCmd?.commands.find((cmd) => cmd.name() === "remove");
+
+			expect(removeCmd).toBeDefined();
+			const optionNames = removeCmd?.options.map((opt) => opt.long ?? opt.short) ?? [];
+			expect(optionNames).toContain("--force");
+		});
+
+		it("should have create subcommand", async () => {
+			const program = await createTestProgram();
+			const worktreeCmd = program.commands.find((cmd) => cmd.name() === "worktree");
+
+			expect(worktreeCmd).toBeDefined();
+
+			const createCmd = worktreeCmd?.commands.find((cmd) => cmd.name() === "create");
+			expect(createCmd).toBeDefined();
 		});
 	});
 

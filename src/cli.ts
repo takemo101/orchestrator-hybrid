@@ -13,7 +13,13 @@ import { EventBus } from "./core/event";
 import { HatSystem } from "./core/hat";
 import { LogMonitor } from "./core/log-monitor";
 import { type IterationContext, LoopEngine, type LoopResult } from "./core/loop";
-import type { HatDefinition, OrchestratorConfig } from "./core/types";
+import type { HatDefinition, OrchestratorConfig, WorktreeConfig } from "./core/types";
+import {
+	type WorktreeInfo,
+	WorktreeManager,
+	WorktreeNotFoundError,
+	WorktreeRunningError,
+} from "./core/worktree";
 import { ApprovalGate, ApprovalGateError } from "./gates/approval";
 import { fetchIssue } from "./input/github";
 import { type HatContext, PromptGenerator } from "./input/prompt";
@@ -106,6 +112,56 @@ function formatSessionTable(sessions: Session[]): string {
 	});
 
 	return [header, separator, ...rows].join("\n");
+}
+
+/**
+ * Worktree一覧をテーブル形式でフォーマットする
+ */
+function formatWorktreeTable(worktrees: WorktreeInfo[]): string {
+	const header = "Issue\tBranch\t\t\t\tPath\t\t\t\tStatus";
+	const separator = "-".repeat(80);
+	const rows = worktrees.map((wt) => {
+		return `#${wt.issueNumber}\t${wt.branch}\t\t${wt.path}\t\t${wt.status}`;
+	});
+
+	return [header, separator, ...rows].join("\n");
+}
+
+/**
+ * WorktreeManagerのインスタンスを作成する
+ */
+function createWorktreeManager(): WorktreeManager {
+	const config: WorktreeConfig = {
+		enabled: true,
+		base_dir: ".worktrees",
+		copy_files: [".env"],
+	};
+
+	const exec = async (
+		args: string[],
+	): Promise<{ stdout: string; stderr: string; exitCode: number }> => {
+		const proc = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
+		const [stdout, stderr] = await Promise.all([
+			new Response(proc.stdout).text(),
+			new Response(proc.stderr).text(),
+		]);
+		const exitCode = await proc.exited;
+		return { stdout, stderr, exitCode };
+	};
+
+	const fileOps = {
+		writeFile: async (path: string, content: string): Promise<void> => {
+			await Bun.write(path, content);
+		},
+		fileExists: async (path: string): Promise<boolean> => {
+			return Bun.file(path).exists();
+		},
+		readFile: async (path: string): Promise<string> => {
+			return Bun.file(path).text();
+		},
+	};
+
+	return new WorktreeManager(config, exec, fileOps);
 }
 
 /**
@@ -667,10 +723,38 @@ export function createProgram(): Command {
 		.command("worktrees")
 		.description("List all worktrees")
 		.action(async () => {
-			console.log("Worktrees:");
+			const worktreeManager = createWorktreeManager();
+			const worktrees = await worktreeManager.list();
+
+			if (worktrees.length === 0) {
+				console.log("No worktrees found.");
+				return;
+			}
+
+			console.log(formatWorktreeTable(worktrees));
 		});
 
 	const worktreeCommand = program.command("worktree").description("Worktree management");
+
+	worktreeCommand
+		.command("create")
+		.description("Create a worktree for an Issue")
+		.argument("<issue>", "Issue number", Number.parseInt)
+		.action(async (issue) => {
+			console.log(`Creating worktree for Issue #${issue}...`);
+
+			const worktreeManager = createWorktreeManager();
+			try {
+				const info = await worktreeManager.create(issue);
+				console.log(`Worktree created:`);
+				console.log(`  Issue:  #${info.issueNumber}`);
+				console.log(`  Branch: ${info.branch}`);
+				console.log(`  Path:   ${info.path}`);
+			} catch (error) {
+				console.error(`Failed to create worktree: ${error}`);
+				process.exit(1);
+			}
+		});
 
 	worktreeCommand
 		.command("remove")
@@ -679,6 +763,23 @@ export function createProgram(): Command {
 		.option("-f, --force", "Force removal even if not merged", false)
 		.action(async (issue, _options) => {
 			console.log(`Removing worktree for Issue #${issue}...`);
+
+			const worktreeManager = createWorktreeManager();
+			try {
+				await worktreeManager.remove(issue);
+				console.log(`Worktree for Issue #${issue} removed.`);
+			} catch (error) {
+				if (error instanceof WorktreeRunningError) {
+					console.error(`Error: Issue #${issue} is currently running. Stop it first.`);
+					process.exit(1);
+				}
+				if (error instanceof WorktreeNotFoundError) {
+					console.error(`Error: Worktree for Issue #${issue} not found.`);
+					process.exit(1);
+				}
+				console.error(`Failed to remove worktree: ${error}`);
+				process.exit(1);
+			}
 		});
 
 	program
