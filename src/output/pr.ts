@@ -22,6 +22,8 @@ export interface PRCreateOptions {
 	body?: string;
 	/** ベースブランチ（デフォルト: main） */
 	baseBranch?: string;
+	/** 作業ディレクトリ */
+	cwd?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export interface PRCreateResult {
  */
 export type ExecFn = (
 	args: string[],
+	cwd?: string,
 ) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
 
 /**
@@ -44,10 +47,12 @@ export type ExecFn = (
  */
 async function defaultExec(
 	args: string[],
+	cwd?: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
 	const proc = Bun.spawn(args, {
 		stdout: "pipe",
 		stderr: "pipe",
+		cwd,
 	});
 	const [stdout, stderr] = await Promise.all([
 		new Response(proc.stdout).text(),
@@ -109,74 +114,72 @@ export class PRCreator {
 		issueTitle: string,
 		options: PRCreateOptions = {},
 	): Promise<PRCreateResult> {
+		const cwd = options.cwd;
+
 		// 変更の有無を確認
-		const hasChanges = await this.hasChanges();
+		const hasChanges = await this.hasChanges(cwd);
 		if (!hasChanges) {
 			throw new PRCreateError("No changes to create PR");
 		}
 
 		// コミット
 		const commitMessage = `feat: ${issueTitle}\n\nCloses #${issueNumber}`;
-		await this.commitChanges(commitMessage);
+		await this.commitChanges(commitMessage, cwd);
 
 		// プッシュ
-		await this.pushBranch(branchName);
+		await this.pushBranch(branchName, cwd);
 
 		// PR作成
 		const title = options.title ?? generateTitle(issueNumber, issueTitle);
 		const body = options.body ?? generateBody(issueNumber);
 		const baseBranch = options.baseBranch ?? "main";
 
-		const url = await this.createPR(title, body, branchName, baseBranch, options.draft ?? false);
+		const url = await this.createPR(
+			title,
+			body,
+			branchName,
+			baseBranch,
+			options.draft ?? false,
+			cwd,
+		);
 
 		return { url };
 	}
 
-	/**
-	 * 変更の有無を確認する
-	 */
-	private async hasChanges(): Promise<boolean> {
-		const result = await this.exec(["git", "status", "--porcelain"]);
+	private async hasChanges(cwd?: string): Promise<boolean> {
+		const result = await this.exec(["git", "status", "--porcelain"], cwd);
 		if (result.exitCode !== 0) {
 			throw new PRCreateError(`Failed to check git status: ${result.stderr.trim()}`);
 		}
 		return result.stdout.trim().length > 0;
 	}
 
-	/**
-	 * 変更をコミットする
-	 */
-	private async commitChanges(message: string): Promise<void> {
-		const addResult = await this.exec(["git", "add", "-A"]);
+	private async commitChanges(message: string, cwd?: string): Promise<void> {
+		const addResult = await this.exec(["git", "add", "-A"], cwd);
 		if (addResult.exitCode !== 0) {
 			throw new PRCreateError(`Failed to stage changes: ${addResult.stderr.trim()}`);
 		}
 
-		const commitResult = await this.exec(["git", "commit", "-m", message]);
+		const commitResult = await this.exec(["git", "commit", "-m", message], cwd);
 		if (commitResult.exitCode !== 0) {
 			throw new PRCreateError(`Failed to commit changes: ${commitResult.stderr.trim()}`);
 		}
 	}
 
-	/**
-	 * ブランチをプッシュする
-	 */
-	private async pushBranch(branchName: string): Promise<void> {
-		const result = await this.exec(["git", "push", "-u", "origin", branchName]);
+	private async pushBranch(branchName: string, cwd?: string): Promise<void> {
+		const result = await this.exec(["git", "push", "-u", "origin", branchName], cwd);
 		if (result.exitCode !== 0) {
 			throw new PRCreateError(`Failed to push branch: ${result.stderr.trim()}`);
 		}
 	}
 
-	/**
-	 * gh pr createを実行する
-	 */
 	private async createPR(
 		title: string,
 		body: string,
 		head: string,
 		base: string,
 		draft: boolean,
+		cwd?: string,
 	): Promise<string> {
 		const args = [
 			"gh",
@@ -196,7 +199,7 @@ export class PRCreator {
 			args.push("--draft");
 		}
 
-		const result = await this.exec(args);
+		const result = await this.exec(args, cwd);
 		if (result.exitCode !== 0) {
 			throw new PRCreateError(`Failed to create PR: ${result.stderr.trim()}`);
 		}

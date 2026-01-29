@@ -177,13 +177,15 @@ function createWorktreeManager(worktreeConfig?: WorktreeConfig): WorktreeManager
 
 /**
  * 現在のGitブランチ名を取得する
+ * @param cwd 作業ディレクトリ（省略時はprocess.cwd()）
  * @returns ブランチ名。取得失敗時はundefined
  */
-async function getCurrentBranch(): Promise<string | undefined> {
+async function getCurrentBranch(cwd?: string): Promise<string | undefined> {
 	try {
 		const proc = Bun.spawn(["git", "rev-parse", "--abbrev-ref", "HEAD"], {
 			stdout: "pipe",
 			stderr: "pipe",
+			cwd,
 		});
 		const stdout = await new Response(proc.stdout).text();
 		const exitCode = await proc.exited;
@@ -622,7 +624,7 @@ export function createProgram(): Command {
 
 					// PR自動作成
 					if (options.createPr) {
-						const branchName = await getCurrentBranch();
+						const branchName = await getCurrentBranch(workingDir);
 
 						if (!branchName) {
 							console.error("Failed to get current branch name. Skipping PR creation.");
@@ -652,6 +654,7 @@ export function createProgram(): Command {
 								const prCreator = new PRCreator();
 								const prResult = await prCreator.create(issueNumber, branchName, issue.title, {
 									draft: options.draft,
+									cwd: workingDir,
 								});
 								console.log(`PR created: ${prResult.url}`);
 								await safeUpdateStatus(statusLabelManager, issueNumber, "pr-created");
