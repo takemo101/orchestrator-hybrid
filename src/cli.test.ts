@@ -30,6 +30,26 @@ describe("CLI Commands", () => {
 			expect(optionNames).toContain("--backend");
 			expect(optionNames).toContain("--preset");
 		});
+
+		it("should have --resolve-deps option for dependency resolution", async () => {
+			const program = await createTestProgram();
+			const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+
+			expect(runCmd).toBeDefined();
+
+			const optionNames = runCmd?.options.map((opt) => opt.long ?? opt.short) ?? [];
+			expect(optionNames).toContain("--resolve-deps");
+		});
+
+		it("should have --ignore-deps option for ignoring dependencies", async () => {
+			const program = await createTestProgram();
+			const runCmd = program.commands.find((cmd) => cmd.name() === "run");
+
+			expect(runCmd).toBeDefined();
+
+			const optionNames = runCmd?.options.map((opt) => opt.long ?? opt.short) ?? [];
+			expect(optionNames).toContain("--ignore-deps");
+		});
 	});
 
 	describe("orch status", () => {
