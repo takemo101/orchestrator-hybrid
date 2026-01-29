@@ -11,14 +11,19 @@ import {
 const TEST_DIR = "/tmp/orch-config-test";
 
 describe("config", () => {
+	const originalCwd = process.cwd();
+
 	beforeEach(() => {
 		if (existsSync(TEST_DIR)) {
 			rmSync(TEST_DIR, { recursive: true });
 		}
 		mkdirSync(TEST_DIR, { recursive: true });
+		// テストディレクトリに移動してorch.ymlを検索させない
+		process.chdir(TEST_DIR);
 	});
 
 	afterEach(() => {
+		process.chdir(originalCwd);
 		if (existsSync(TEST_DIR)) {
 			rmSync(TEST_DIR, { recursive: true });
 		}
@@ -76,7 +81,8 @@ describe("config", () => {
 
 	describe("loadConfig", () => {
 		test("should return defaults when no config file", () => {
-			const config = loadConfig(`${TEST_DIR}/nonexistent.yml`);
+			// TEST_DIR内でorch.ymlがないことを確認
+			const config = loadConfig();
 			expect(config.backend).toBe("claude");
 			expect(config.auto).toBe(false);
 		});
@@ -104,6 +110,11 @@ max_iterations: 30
 	});
 
 	describe("loadPreset", () => {
+		beforeEach(() => {
+			// プリセットを検索するためにオリジナルディレクトリに戻る
+			process.chdir(originalCwd);
+		});
+
 		test("should load simple preset", () => {
 			const preset = loadPreset("simple");
 			expect(preset).toBeDefined();
@@ -135,18 +146,25 @@ max_iterations: 30
 	});
 
 	describe("loadConfig with preset", () => {
+		beforeEach(() => {
+			// プリセットを検索するためにオリジナルディレクトリに戻る
+			process.chdir(originalCwd);
+		});
+
 		test("should apply preset when specified via argument", () => {
-			const config = loadConfig(undefined, "simple");
+			// 存在しない設定ファイルを指定してデフォルト + プリセットのみ適用
+			const config = loadConfig("/nonexistent/path/orch.yml", "simple");
 			expect(config.preset).toBe("simple");
 		});
 
 		test("should apply tdd preset", () => {
-			const config = loadConfig(undefined, "tdd");
+			// 存在しない設定ファイルを指定してデフォルト + プリセットのみ適用
+			const config = loadConfig("/nonexistent/path/orch.yml", "tdd");
 			expect(config.preset).toBe("tdd");
 		});
 
 		test("should merge user config with preset", () => {
-			const configPath = `${TEST_DIR}/orch.yml`;
+			const configPath = `${TEST_DIR}/orch-merge.yml`;
 			writeFileSync(
 				configPath,
 				`backend: opencode
