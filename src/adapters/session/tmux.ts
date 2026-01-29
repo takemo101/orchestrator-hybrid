@@ -67,8 +67,7 @@ export class TmuxSessionManager implements ISessionManager {
 			await this.kill(id);
 		}
 
-		// tmux new-session でセッション作成
-		// remain-on-exit: コマンド終了後もセッションを保持（出力取得のため）
+		// tmux new-session + set-option を同時実行（レースコンディション回避）
 		const result = await runTmux([
 			"new-session",
 			"-d",
@@ -78,14 +77,22 @@ export class TmuxSessionManager implements ISessionManager {
 			"200",
 			"-y",
 			"50",
+			";",
+			"set-option",
+			"-t",
+			sessionName,
+			"remain-on-exit",
+			"on",
+			";",
+			"send-keys",
+			"-t",
+			sessionName,
 			fullCommand,
+			"Enter",
 		]);
 		if (result.exitCode !== 0) {
 			throw new SessionError(`Failed to create tmux session: ${result.stderr}`, { sessionId: id });
 		}
-
-		// セッションにremain-on-exitを設定
-		await runTmux(["set-option", "-t", sessionName, "remain-on-exit", "on"]);
 
 		return {
 			id,
