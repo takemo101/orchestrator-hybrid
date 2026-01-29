@@ -12,6 +12,7 @@ import { CircularDependencyError, DependencyResolver } from "./core/dependency";
 import { LogMonitor } from "./core/log-monitor";
 import { LoopEngine, type LoopResult } from "./core/loop";
 import type { OrchestratorConfig } from "./core/types";
+import { ApprovalGate, ApprovalGateError } from "./gates/approval";
 import { fetchIssue } from "./input/github";
 import { PromptGenerator } from "./input/prompt";
 import { PRCreateError, PRCreator } from "./output/pr";
@@ -300,6 +301,10 @@ export function createProgram(): Command {
 			}
 
 			// 通常の単一Issue実行（依存解決なし）
+
+			// 承認ゲートを初期化
+			const approvalGate = new ApprovalGate({ auto: options.auto });
+
 			console.log(`Fetching Issue #${issueNumber}...`);
 			const issue = await fetchIssue(issueNumber).catch((error) => {
 				console.error(`Failed to fetch Issue #${issueNumber}: ${error}`);
@@ -317,6 +322,25 @@ export function createProgram(): Command {
 			mkdirSync(".agent", { recursive: true });
 			const promptPath = ".agent/PROMPT.md";
 			writeFileSync(promptPath, prompt);
+
+			// Pre-loop承認ゲート
+			try {
+				const preLoopContext = `Issue #${issueNumber}: ${issue.title}\n\nPrompt preview:\n${prompt.substring(0, 500)}${prompt.length > 500 ? "..." : ""}`;
+				const preLoopResult = await approvalGate.ask("pre-loop", preLoopContext);
+				if (!preLoopResult.approved) {
+					console.log("Pre-loop gate rejected. Aborting execution.");
+					process.exit(0);
+				}
+				if (!preLoopResult.auto) {
+					console.log("Pre-loop gate approved. Starting execution...");
+				}
+			} catch (error) {
+				if (error instanceof ApprovalGateError) {
+					console.error(`Approval gate error: ${error.message}`);
+					process.exit(1);
+				}
+				throw error;
+			}
 
 			const backend = getBackendAdapter(options.backend);
 			const sessionManager = await createSessionManager(options.sessionManager);
@@ -364,16 +388,58 @@ export function createProgram(): Command {
 				if (result.success) {
 					console.log(`\nCompleted after ${result.iterations} iterations.`);
 
+					// Post-completion承認ゲート
+					try {
+						const postCompletionContext = `Issue #${issueNumber}: ${issue.title}\n\nLoop completed successfully after ${result.iterations} iteration(s).`;
+						const postCompletionResult = await approvalGate.ask(
+							"post-completion",
+							postCompletionContext,
+						);
+						if (!postCompletionResult.approved) {
+							console.log("Post-completion gate rejected. Stopping without PR creation.");
+							return;
+						}
+						if (!postCompletionResult.auto) {
+							console.log("Post-completion gate approved.");
+						}
+					} catch (error) {
+						if (error instanceof ApprovalGateError) {
+							console.error(`Approval gate error: ${error.message}`);
+							return;
+						}
+						throw error;
+					}
+
 					// PR自動作成
 					if (options.createPr) {
-						console.log("\nCreating PR...");
-						const prCreator = new PRCreator();
 						const branchName = await getCurrentBranch();
 
 						if (!branchName) {
 							console.error("Failed to get current branch name. Skipping PR creation.");
 						} else {
+							// Before-PR承認ゲート
 							try {
+								const beforePrContext = `Issue #${issueNumber}: ${issue.title}\n\nBranch: ${branchName}\nDraft: ${options.draft ? "Yes" : "No"}`;
+								const beforePrResult = await approvalGate.ask("before-pr", beforePrContext);
+								if (!beforePrResult.approved) {
+									console.log("Before-PR gate rejected. Skipping PR creation.");
+									return;
+								}
+								if (!beforePrResult.auto) {
+									console.log("Before-PR gate approved. Creating PR...");
+								} else {
+									console.log("\nCreating PR...");
+								}
+							} catch (error) {
+								if (error instanceof ApprovalGateError) {
+									console.error(`Approval gate error: ${error.message}`);
+									return;
+								}
+								throw error;
+							}
+
+							try {
+								const prCreator = new PRCreator();
 								const prResult = await prCreator.create(issueNumber, branchName, issue.title, {
 									draft: options.draft,
 								});
