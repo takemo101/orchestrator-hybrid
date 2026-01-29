@@ -74,8 +74,9 @@ export class TmuxSessionManager implements ISessionManager {
 		const cdCommand = options?.cwd ? `cd ${JSON.stringify(options.cwd)} && ` : "";
 		const wrappedCommand = cdCommand + fullCommand;
 		const tmuxCommand = [
-			`tmux new-session -d -s ${sessionName} -x 200 -y 50 ${JSON.stringify(wrappedCommand)}`,
+			`tmux new-session -d -s ${sessionName} -x 200 -y 50`,
 			`tmux set-option -t ${sessionName} remain-on-exit on`,
+			`tmux send-keys -t ${sessionName} ${JSON.stringify(wrappedCommand + "; exit")} Enter`,
 		].join(" && ");
 
 		const proc = Bun.spawn(["sh", "-c", tmuxCommand], {
