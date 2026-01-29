@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ZodError } from "zod";
-import { type OrchestratorConfig, OrchestratorConfigSchema } from "./types.js";
+import { type HatDefinition, HatDefinitionSchema, type OrchestratorConfig, OrchestratorConfigSchema } from "./types.js";
 
 /**
  * 設定ファイル検証エラー
@@ -147,6 +147,41 @@ function mergeConfig(
 }
 
 /**
+ * 設定読み込み結果
+ */
+export interface LoadConfigResult {
+	/** 検証済み設定 */
+	config: OrchestratorConfig;
+	/** Hat定義（プリセットまたは設定ファイルから） */
+	hats: Record<string, HatDefinition>;
+}
+
+/**
+ * Hat定義をパースする
+ *
+ * @param rawHats - 生のHat定義オブジェクト
+ * @returns パース済みのHat定義
+ */
+function parseHats(rawHats: unknown): Record<string, HatDefinition> {
+	if (!rawHats || typeof rawHats !== "object" || Array.isArray(rawHats)) {
+		return {};
+	}
+
+	const result: Record<string, HatDefinition> = {};
+
+	for (const [id, hatDef] of Object.entries(rawHats as Record<string, unknown>)) {
+		try {
+			result[id] = HatDefinitionSchema.parse(hatDef);
+		} catch {
+			// 無効なHat定義は無視（警告を出すこともできる）
+			console.warn(`Invalid hat definition for "${id}", skipping`);
+		}
+	}
+
+	return result;
+}
+
+/**
  * 設定ファイルを読み込む
  *
  * @param configPath - 設定ファイルのパス（省略時はデフォルトを検索）
@@ -156,6 +191,19 @@ function mergeConfig(
  * @throws {PresetNotFoundError} プリセットが見つからない場合
  */
 export function loadConfig(configPath?: string, presetName?: string): OrchestratorConfig {
+	return loadConfigWithHats(configPath, presetName).config;
+}
+
+/**
+ * 設定ファイルとHat定義を読み込む
+ *
+ * @param configPath - 設定ファイルのパス（省略時はデフォルトを検索）
+ * @param presetName - プリセット名（CLI引数で指定。省略時は設定ファイルのpresetを使用）
+ * @returns 設定とHat定義
+ * @throws {ConfigValidationError} 検証エラー
+ * @throws {PresetNotFoundError} プリセットが見つからない場合
+ */
+export function loadConfigWithHats(configPath?: string, presetName?: string): LoadConfigResult {
 	// 設定ファイルの読み込み
 	let rawConfig: Record<string, unknown> = {};
 	const path = configPath && existsSync(configPath) ? configPath : findConfigFile();
@@ -180,7 +228,16 @@ export function loadConfig(configPath?: string, presetName?: string): Orchestrat
 		}
 	}
 
-	return validateConfig(rawConfig, path ?? undefined);
+	// Hat定義を抽出（設定検証前に行う）
+	const hats = parseHats(rawConfig.hats);
+
+	// 設定を検証（hatsはOrchestratorConfigSchemaに含まれないので除去）
+	const configWithoutHats = { ...rawConfig };
+	delete configWithoutHats.hats;
+
+	const config = validateConfig(configWithoutHats, path ?? undefined);
+
+	return { config, hats };
 }
 
 function findConfigFile(): string | null {
