@@ -6,7 +6,7 @@
  */
 
 import { SessionError } from "../../core/errors";
-import type { ISessionManager, Session } from "./interface";
+import type { ISessionManager, Session, SessionCreateOptions } from "./interface";
 
 /**
  * tmuxコマンドを実行するユーティリティ
@@ -57,22 +57,25 @@ export class TmuxSessionManager implements ISessionManager {
 		return sessionName.slice(this.prefix.length + 1);
 	}
 
-	async create(id: string, command: string, args: string[]): Promise<Session> {
+	async create(
+		id: string,
+		command: string,
+		args: string[],
+		options?: SessionCreateOptions,
+	): Promise<Session> {
 		const sessionName = this.getSessionName(id);
 		const fullCommand = [command, ...args].join(" ");
 
-		// 既存セッションがあれば停止（dead paneも含む）
 		const sessionExists = await this.sessionExists(id);
 		if (sessionExists) {
 			await this.kill(id);
 		}
 
-		// tmux new-session + set-option + send-keys を同時実行（レースコンディション回避）
-		// シェル経由で実行（Bun.spawnは';'を引数として渡すため）
+		const cdCommand = options?.cwd ? `cd ${JSON.stringify(options.cwd)} && ` : "";
 		const tmuxCommand = [
 			`tmux new-session -d -s ${sessionName} -x 200 -y 50`,
 			`tmux set-option -t ${sessionName} remain-on-exit on`,
-			`tmux send-keys -t ${sessionName} ${JSON.stringify(fullCommand)} Enter`,
+			`tmux send-keys -t ${sessionName} ${JSON.stringify(cdCommand + fullCommand)} Enter`,
 		].join(" && ");
 
 		const proc = Bun.spawn(["sh", "-c", tmuxCommand], {

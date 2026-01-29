@@ -6,7 +6,7 @@
  */
 
 import { SessionError } from "../../core/errors";
-import type { ISessionManager, Session } from "./interface";
+import type { ISessionManager, Session, SessionCreateOptions } from "./interface";
 
 /**
  * zellijコマンドを実行するユーティリティ
@@ -57,21 +57,23 @@ export class ZellijSessionManager implements ISessionManager {
 		return sessionName.slice(this.prefix.length + 1);
 	}
 
-	async create(id: string, command: string, args: string[]): Promise<Session> {
+	async create(
+		id: string,
+		command: string,
+		args: string[],
+		options?: SessionCreateOptions,
+	): Promise<Session> {
 		const sessionName = this.getSessionName(id);
 
-		// 既存セッションがあれば停止
 		const existing = await this.isRunning(id);
 		if (existing) {
 			await this.kill(id);
 		}
 
-		// zellij でセッション作成
-		// zellij --session <name> action new-pane -- <command> <args>
-		// または、新しいセッションを作成してコマンドを実行
-		const fullCommand = [command, ...args];
+		const fullCommand = options?.cwd
+			? ["sh", "-c", `cd ${JSON.stringify(options.cwd)} && ${command} ${args.join(" ")}`]
+			: [command, ...args];
 
-		// zellijはセッション内でコマンドを実行するため、新しいセッションを作成
 		const result = await runZellij([
 			"--session",
 			sessionName,
@@ -81,9 +83,7 @@ export class ZellijSessionManager implements ISessionManager {
 			...fullCommand,
 		]);
 
-		// もしセッションが存在しない場合は新規作成
 		if (result.exitCode !== 0 && result.stderr.includes("session")) {
-			// 新しいセッションとして起動（デタッチモード）
 			const proc = Bun.spawn(["zellij", "--session", sessionName, "--", ...fullCommand], {
 				stdout: "pipe",
 				stderr: "pipe",

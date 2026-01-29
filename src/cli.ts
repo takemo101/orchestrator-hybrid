@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { Command } from "commander";
 
 import { ClaudeAdapter } from "./adapters/claude";
@@ -15,6 +16,7 @@ import { LogMonitor } from "./core/log-monitor";
 import { type IterationContext, LoopEngine, type LoopResult } from "./core/loop";
 import type { HatDefinition, OrchestratorConfig, WorktreeConfig } from "./core/types";
 import {
+	WorktreeCreateError,
 	type WorktreeInfo,
 	WorktreeManager,
 	WorktreeNotFoundError,
@@ -82,7 +84,11 @@ function mergeOptionsWithConfig(
 	preset: string;
 	sessionManager: SessionManagerType;
 	resolveDeps: boolean;
+	useWorktree: boolean;
 } {
+	const worktreeCliOption = cliOptions.worktree as boolean | undefined;
+	const useWorktree = worktreeCliOption !== false && config.worktree.enabled;
+
 	return {
 		backend: (cliOptions.backend as string | undefined) ?? config.backend,
 		auto: (cliOptions.auto as boolean | undefined) ?? config.auto,
@@ -93,6 +99,7 @@ function mergeOptionsWithConfig(
 		sessionManager: ((cliOptions.sessionManager as string | undefined) ??
 			config.session.manager) as SessionManagerType,
 		resolveDeps: (cliOptions.resolveDeps as boolean | undefined) ?? false,
+		useWorktree,
 	};
 }
 
@@ -127,11 +134,8 @@ function formatWorktreeTable(worktrees: WorktreeInfo[]): string {
 	return [header, separator, ...rows].join("\n");
 }
 
-/**
- * WorktreeManagerのインスタンスを作成する
- */
-function createWorktreeManager(): WorktreeManager {
-	const config: WorktreeConfig = {
+function createWorktreeManager(worktreeConfig?: WorktreeConfig): WorktreeManager {
+	const config: WorktreeConfig = worktreeConfig ?? {
 		enabled: true,
 		base_dir: ".worktrees",
 		copy_files: [".env"],
@@ -345,8 +349,8 @@ export function createProgram(): Command {
 			"Ignore dependency resolution (mutually exclusive with --resolve-deps)",
 			false,
 		)
-		.option("--no-worktree", "Disable worktree isolation", false)
-		.option("--no-labels", "Disable status label updates", false)
+		.option("--no-worktree", "Disable worktree isolation")
+		.option("--no-labels", "Disable status label updates")
 		.option("--session-manager <type>", "Session manager (auto, native, tmux, zellij)")
 		.action(async (cliOptions) => {
 			// --resolve-deps と --ignore-deps の排他チェック
@@ -480,6 +484,23 @@ export function createProgram(): Command {
 			const sessionManager = await createSessionManager(options.sessionManager);
 			const sessionId = String(issueNumber);
 
+			let workingDir = process.cwd();
+			if (options.useWorktree) {
+				console.log(`Creating worktree for Issue #${issueNumber}...`);
+				const worktreeManager = createWorktreeManager(config.worktree);
+				try {
+					const worktreeInfo = await worktreeManager.create(issueNumber);
+					workingDir = worktreeInfo.path;
+					console.log(`Worktree created: ${worktreeInfo.path} (branch: ${worktreeInfo.branch})`);
+				} catch (error) {
+					if (error instanceof WorktreeCreateError) {
+						console.error(`Failed to create worktree: ${error.message}`);
+						process.exit(1);
+					}
+					throw error;
+				}
+			}
+
 			console.log(
 				`Starting session ${sessionId} with ${backend.getName()} backend (${options.sessionManager})...`,
 			);
@@ -500,7 +521,6 @@ export function createProgram(): Command {
 			};
 
 			const runner = async (ctx: IterationContext): Promise<string> => {
-				// Hat情報をプロンプトに反映
 				const hatContext: HatContext | undefined = ctx.activeHat
 					? {
 							hatName: ctx.activeHat.name,
@@ -509,19 +529,28 @@ export function createProgram(): Command {
 					: undefined;
 
 				const prompt = promptGenerator.generate(issue, hatContext);
-				mkdirSync(".agent", { recursive: true });
-				const promptPath = ".agent/PROMPT.md";
+				const agentDir = join(workingDir, ".agent");
+				mkdirSync(agentDir, { recursive: true });
+				const promptPath = join(agentDir, "PROMPT.md");
 				writeFileSync(promptPath, prompt);
+
+				const sessionOptions = { cwd: workingDir };
 
 				if (ctx.iteration > 1) {
 					const hatInfo = ctx.activeHat ? ` [${ctx.activeHat.name}]` : "";
 					console.log(`\nIteration ${ctx.iteration}${hatInfo}: Restarting session...`);
-					await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
+					await sessionManager.create(
+						sessionId,
+						backend.getCommand(),
+						backend.getArgs(promptPath),
+						sessionOptions,
+					);
 				} else {
 					const session = await sessionManager.create(
 						sessionId,
 						backend.getCommand(),
 						backend.getArgs(promptPath),
+						sessionOptions,
 					);
 					console.log(`Session created: ${session.id} (${session.type})`);
 				}

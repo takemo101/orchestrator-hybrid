@@ -8,7 +8,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { SessionError } from "../../core/errors";
-import type { ISessionManager, Session } from "./interface";
+import type { ISessionManager, Session, SessionCreateOptions } from "./interface";
 
 /**
  * セッションメタデータ (session.json)
@@ -90,26 +90,28 @@ export class NativeSessionManager implements ISessionManager {
 		return JSON.parse(content) as SessionMetadata;
 	}
 
-	async create(id: string, command: string, args: string[]): Promise<Session> {
-		// 既存セッションがあれば停止
+	async create(
+		id: string,
+		command: string,
+		args: string[],
+		options?: SessionCreateOptions,
+	): Promise<Session> {
 		if (this.processes.has(id)) {
 			await this.kill(id);
 		}
 
-		// セッションディレクトリ作成
 		const sessionDir = this.getSessionDir(id);
 		fs.mkdirSync(sessionDir, { recursive: true });
 
-		// 出力ファイルを準備
 		const outputPath = this.getOutputPath(id);
 		const outputFile = Bun.file(outputPath);
 		const outputWriter = outputFile.writer();
 
-		// プロセス起動
 		const proc = Bun.spawn([command, ...args], {
 			stdout: "pipe",
 			stderr: "pipe",
 			env: process.env,
+			cwd: options?.cwd,
 		});
 
 		// メタデータ作成

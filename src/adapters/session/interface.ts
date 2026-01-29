@@ -28,11 +28,20 @@ export interface Session {
  *
  * すべてのセッション実装が遵守すべきインターフェース。
  */
+export interface SessionCreateOptions {
+	cwd?: string;
+}
+
 export interface ISessionManager {
 	/**
 	 * 新しいセッションを作成し、コマンドを実行する
 	 */
-	create(id: string, command: string, args: string[]): Promise<Session>;
+	create(
+		id: string,
+		command: string,
+		args: string[],
+		options?: SessionCreateOptions,
+	): Promise<Session>;
 
 	/**
 	 * 現在管理下のセッション一覧を取得する
