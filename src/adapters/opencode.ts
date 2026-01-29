@@ -6,7 +6,7 @@ export class OpenCodeAdapter implements IBackendAdapter {
 	}
 
 	getArgs(promptPath: string): string[] {
-		return ["-p", promptPath];
+		return ["run", "--file", promptPath, "--", "Execute the task in the attached file"];
 	}
 
 	getName(): string {
