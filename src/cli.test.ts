@@ -131,5 +131,15 @@ describe("CLI Commands", () => {
 			const optionNames = initCmd?.options.map((opt) => opt.long ?? opt.short) ?? [];
 			expect(optionNames).toContain("--preset");
 		});
+
+		it("should have --labels option for creating status labels", async () => {
+			const program = await createTestProgram();
+			const initCmd = program.commands.find((cmd) => cmd.name() === "init");
+
+			expect(initCmd).toBeDefined();
+
+			const optionNames = initCmd?.options.map((opt) => opt.long ?? opt.short) ?? [];
+			expect(optionNames).toContain("--labels");
+		});
 	});
 });
