@@ -220,7 +220,11 @@ export function createProgram(): Command {
 		.option("-b, --backend <type>", "Backend type (claude, opencode)")
 		.option("-m, --max-iterations <number>", "Max loop iterations", Number.parseInt)
 		.option("--resolve-deps", "Resolve dependent issues first", false)
-		.option("--ignore-deps", "Ignore dependency resolution (mutually exclusive with --resolve-deps)", false)
+		.option(
+			"--ignore-deps",
+			"Ignore dependency resolution (mutually exclusive with --resolve-deps)",
+			false,
+		)
 		.option("--no-worktree", "Disable worktree isolation", false)
 		.option("--session-manager <type>", "Session manager (auto, native, tmux, zellij)")
 		.action(async (cliOptions) => {
