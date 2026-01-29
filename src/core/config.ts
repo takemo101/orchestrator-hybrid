@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ZodError } from "zod";
 import { type OrchestratorConfig, OrchestratorConfigSchema } from "./types.js";
@@ -38,6 +39,19 @@ export class ConfigValidationError extends Error {
 }
 
 /**
+ * プリセットが見つからないエラー
+ */
+export class PresetNotFoundError extends Error {
+	readonly presetName: string;
+
+	constructor(presetName: string) {
+		super(`Preset not found: ${presetName}`);
+		this.name = "PresetNotFoundError";
+		this.presetName = presetName;
+	}
+}
+
+/**
  * 設定オブジェクトを検証する
  *
  * @param rawConfig - 検証する生の設定オブジェクト
@@ -57,26 +71,110 @@ export function validateConfig(rawConfig: unknown, configPath?: string): Orchest
 }
 
 /**
+ * プリセットファイルのパスを解決する
+ *
+ * 以下の順序で検索:
+ * 1. プロジェクトルートの presets/<name>.yml
+ * 2. プロジェクトルートの presets/<name>.yaml
+ *
+ * @param presetName - プリセット名（simple, tdd等）
+ * @returns プリセットファイルのパス。見つからない場合はnull
+ */
+function findPresetPath(presetName: string): string | null {
+	const baseDir = resolve("presets");
+	const candidates = [`${presetName}.yml`, `${presetName}.yaml`];
+
+	for (const candidate of candidates) {
+		const fullPath = join(baseDir, candidate);
+		if (existsSync(fullPath)) {
+			return fullPath;
+		}
+	}
+
+	return null;
+}
+
+/**
+ * プリセット設定を読み込む
+ *
+ * @param presetName - プリセット名
+ * @returns プリセット設定（生のオブジェクト）
+ * @throws {PresetNotFoundError} プリセットが見つからない場合
+ */
+export function loadPreset(presetName: string): Record<string, unknown> {
+	const presetPath = findPresetPath(presetName);
+
+	if (!presetPath) {
+		throw new PresetNotFoundError(presetName);
+	}
+
+	const content = readFileSync(presetPath, "utf-8");
+	return parseYaml(content) as Record<string, unknown>;
+}
+
+/**
+ * 設定をマージする（プリセット → ベース設定）
+ *
+ * プリセットの値がベースになり、ユーザー設定で上書きされる。
+ *
+ * @param base - ベース設定（ユーザーのorch.yml）
+ * @param preset - プリセット設定
+ * @returns マージされた設定
+ */
+function mergeConfig(
+	base: Record<string, unknown>,
+	preset: Record<string, unknown>,
+): Record<string, unknown> {
+	// プリセットをベースに、ユーザー設定で上書き
+	const result: Record<string, unknown> = { ...preset };
+
+	for (const [key, value] of Object.entries(base)) {
+		if (value !== undefined && value !== null) {
+			if (typeof value === "object" && !Array.isArray(value) && typeof result[key] === "object") {
+				// ネストしたオブジェクトは再帰的にマージ
+				result[key] = mergeConfig(
+					value as Record<string, unknown>,
+					result[key] as Record<string, unknown>,
+				);
+			} else {
+				// プリミティブ値はユーザー設定で上書き
+				result[key] = value;
+			}
+		}
+	}
+
+	return result;
+}
+
+/**
  * 設定ファイルを読み込む
  *
- * @param configPath - 設定ファイルのパス
+ * @param configPath - 設定ファイルのパス（省略時はデフォルトを検索）
+ * @param presetName - プリセット名（省略時は設定ファイルのpresetを使用）
  * @returns 検証済みの設定オブジェクト
  * @throws {ConfigValidationError} 検証エラー
+ * @throws {PresetNotFoundError} プリセットが見つからない場合
  */
-export function loadConfig(configPath?: string): OrchestratorConfig {
-	if (configPath && !existsSync(configPath)) {
-		return getDefaultConfig();
+export function loadConfig(configPath?: string, presetName?: string): OrchestratorConfig {
+	// 設定ファイルの読み込み
+	let rawConfig: Record<string, unknown> = {};
+	const path = configPath && existsSync(configPath) ? configPath : findConfigFile();
+
+	if (path) {
+		const content = readFileSync(path, "utf-8");
+		rawConfig = (parseYaml(content) as Record<string, unknown>) ?? {};
 	}
 
-	const path = configPath ?? findConfigFile();
+	// プリセット名の決定（CLI引数 > 設定ファイル）
+	const effectivePresetName = presetName ?? (rawConfig.preset as string | undefined);
 
-	if (!path) {
-		return getDefaultConfig();
+	// プリセットが指定されている場合、読み込んでマージ
+	if (effectivePresetName) {
+		const presetConfig = loadPreset(effectivePresetName);
+		rawConfig = mergeConfig(rawConfig, presetConfig);
 	}
 
-	const content = readFileSync(path, "utf-8");
-	const raw = parseYaml(content);
-	return validateConfig(raw, path);
+	return validateConfig(rawConfig, path ?? undefined);
 }
 
 function findConfigFile(): string | null {
@@ -89,8 +187,4 @@ function findConfigFile(): string | null {
 	}
 
 	return null;
-}
-
-function getDefaultConfig(): OrchestratorConfig {
-	return OrchestratorConfigSchema.parse({});
 }
