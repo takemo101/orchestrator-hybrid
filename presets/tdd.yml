@@ -1,70 +1,49 @@
-version: "1.0"
+# TDD preset - テスト駆動開発 (Red -> Green -> Refactor)
+#
+# Hatシステムを使用して TDD サイクルを強制。
+# ワークフロー:
+# 1. Tester: テストを書く -> tests.failing
+# 2. Implementer: テストを通す実装 -> code.written
+# 3. Tester: テスト再実行 -> tests.passing
+# 4. Refactorer: リファクタリング -> LOOP_COMPLETE
 
-backend:
-  type: claude
+preset: tdd
 
-loop:
-  max_iterations: 50
-  completion_promise: "LOOP_COMPLETE"
-
+# Hat定義
 hats:
   tester:
-    name: "🧪 Tester"
-    triggers: ["task.start", "code.written"]
-    publishes: ["tests.failing", "tests.passing", "LOOP_COMPLETE"]
+    name: "Tester"
+    triggers:
+      - task.start
+      - code.written
+    publishes:
+      - tests.failing
+      - tests.passing
     instructions: |
-      You are the TESTER hat. Your job is to write and run tests.
-      
-      Rules:
-      1. Write tests FIRST before any implementation
-      2. Tests should cover all acceptance criteria
-      3. Run tests and report results
-      
-      When tests are written and failing (RED phase):
-      - Output: EVENT: tests.failing
-      
-      When tests pass (GREEN phase complete):
-      - Output: EVENT: tests.passing
-      
-      When all tests pass and task is complete:
-      - Output: EVENT: LOOP_COMPLETE
+      あなたはテスターです。
+      - task.start: 要件に基づいてテストを作成してください。テストは失敗することを確認し、tests.failing を出力してください。
+      - code.written: 実装後、テストを再実行してください。全テスト通過なら tests.passing、失敗なら tests.failing を出力してください。
 
   implementer:
-    name: "🔨 Implementer"
-    triggers: ["tests.failing"]
-    publishes: ["code.written"]
+    name: "Implementer"
+    triggers:
+      - tests.failing
+    publishes:
+      - code.written
     instructions: |
-      You are the IMPLEMENTER hat. Your job is to make tests pass.
-      
-      Rules:
-      1. Write MINIMAL code to make failing tests pass
-      2. Do NOT add features not covered by tests
-      3. Do NOT refactor yet - just make it work
-      
-      When implementation is done:
-      - Output: EVENT: code.written
+      あなたは実装者です。
+      失敗しているテストを通すための最小限のコードを実装してください。
+      実装完了後、code.written を出力してください。
 
   refactorer:
-    name: "✨ Refactorer"
-    triggers: ["tests.passing"]
-    publishes: ["code.written", "LOOP_COMPLETE"]
+    name: "Refactorer"
+    triggers:
+      - tests.passing
+    publishes:
+      - code.written
+      - LOOP_COMPLETE
     instructions: |
-      You are the REFACTORER hat. Your job is to clean up code.
-      
-      Rules:
-      1. Improve code quality WITHOUT changing behavior
-      2. Run tests after each change to ensure they still pass
-      3. Apply DRY, SOLID principles where appropriate
-      
-      When refactoring is done and tests still pass:
-      - If more improvements needed: EVENT: code.written
-      - If clean and complete: EVENT: LOOP_COMPLETE
-
-gates:
-  after_plan: false
-  after_implementation: false
-  before_pr: true
-
-state:
-  use_github_labels: true
-  use_scratchpad: true
+      あなたはリファクタラーです。
+      テストが通っている状態で、コードの品質を向上させてください。
+      - リファクタリングが必要な場合: code.written を出力してください。
+      - 完了した場合: LOOP_COMPLETE を出力してください。
