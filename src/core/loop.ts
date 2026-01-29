@@ -1,6 +1,6 @@
 import { OrchestratorError } from "./errors.js";
 import { EventBus } from "./event.js";
-import { extractEventFromOutput, HatSystem } from "./hat.js";
+import { extractEventFromOutput, type HatSystem } from "./hat.js";
 import type { HatDefinition } from "./types.js";
 
 /**
