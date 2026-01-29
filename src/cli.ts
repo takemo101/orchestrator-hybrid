@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { Command } from "commander";
 
 import { ClaudeAdapter } from "./adapters/claude";
@@ -243,8 +243,9 @@ async function executeIssue(
 		return await sessionManager.getOutput(sessionId);
 	};
 
+	const issueAgentDir = join(".agent", `issue-${issueNumber}`);
+
 	const runner = async (ctx: IterationContext): Promise<string> => {
-		// Hat情報をプロンプトに反映
 		const hatContext: HatContext | undefined = ctx.activeHat
 			? {
 					hatName: ctx.activeHat.name,
@@ -253,8 +254,8 @@ async function executeIssue(
 			: undefined;
 
 		const prompt = promptGenerator.generate(issue, hatContext);
-		mkdirSync(".agent", { recursive: true });
-		const promptPath = ".agent/PROMPT.md";
+		mkdirSync(issueAgentDir, { recursive: true });
+		const promptPath = resolve(issueAgentDir, "PROMPT.md");
 		writeFileSync(promptPath, prompt);
 
 		if (ctx.iteration > 1 || ctx.activeHat) {
@@ -520,6 +521,8 @@ export function createProgram(): Command {
 				return await sessionManager.getOutput(sessionId);
 			};
 
+			const issueAgentDir = join(workingDir, ".agent", `issue-${issueNumber}`);
+
 			const runner = async (ctx: IterationContext): Promise<string> => {
 				const hatContext: HatContext | undefined = ctx.activeHat
 					? {
@@ -529,9 +532,8 @@ export function createProgram(): Command {
 					: undefined;
 
 				const prompt = promptGenerator.generate(issue, hatContext);
-				const agentDir = join(workingDir, ".agent");
-				mkdirSync(agentDir, { recursive: true });
-				const promptPath = join(agentDir, "PROMPT.md");
+				mkdirSync(issueAgentDir, { recursive: true });
+				const promptPath = resolve(issueAgentDir, "PROMPT.md");
 				writeFileSync(promptPath, prompt);
 
 				const sessionOptions = { cwd: workingDir };

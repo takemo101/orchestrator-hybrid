@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { OrchestratorError } from "./errors";
 import type { WorktreeConfig } from "./types";
 
@@ -96,7 +97,7 @@ export class WorktreeManager {
 	 */
 	async create(issueNumber: number): Promise<WorktreeInfo> {
 		const branch = `feature/issue-${issueNumber}`;
-		const worktreePath = `${this.config.base_dir}/issue-${issueNumber}`;
+		const worktreePath = resolve(this.config.base_dir, `issue-${issueNumber}`);
 
 		// 既存チェック
 		if (await this.exists(issueNumber)) {
@@ -150,7 +151,7 @@ export class WorktreeManager {
 			throw new WorktreeRunningError(issueNumber);
 		}
 
-		const worktreePath = `${this.config.base_dir}/issue-${issueNumber}`;
+		const worktreePath = resolve(this.config.base_dir, `issue-${issueNumber}`);
 
 		// worktree削除
 		await this.exec(["git", "worktree", "remove", worktreePath, "--force"]);

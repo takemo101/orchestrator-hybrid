@@ -40,7 +40,7 @@ describe("WorktreeManager", () => {
 
 			expect(result.issueNumber).toBe(42);
 			expect(result.branch).toBe("feature/issue-42");
-			expect(result.path).toBe(".worktrees/issue-42");
+			expect(result.path).toEndWith(".worktrees/issue-42");
 		});
 
 		test("既存ブランチがある場合、そのブランチでworktreeを作成する", async () => {
@@ -57,13 +57,13 @@ describe("WorktreeManager", () => {
 			const manager = createManager({ exec: execFn });
 			await manager.create(42);
 
-			expect(execFn).toHaveBeenCalledWith([
-				"git",
-				"worktree",
-				"add",
-				".worktrees/issue-42",
-				"feature/issue-42",
-			]);
+			const calls = execFn.mock.calls;
+			const worktreeAddCall = calls.find(
+				(call) => call[0][0] === "git" && call[0][1] === "worktree" && call[0][2] === "add",
+			);
+			expect(worktreeAddCall).toBeDefined();
+			expect(worktreeAddCall![0][3]).toEndWith(".worktrees/issue-42");
+			expect(worktreeAddCall![0][4]).toBe("feature/issue-42");
 		});
 
 		test("worktreeが既に存在する場合、既存情報を返す", async () => {
@@ -199,13 +199,13 @@ branch refs/heads/main
 			const manager = createManager({ exec: execFn });
 			await manager.remove(42);
 
-			expect(execFn).toHaveBeenCalledWith([
-				"git",
-				"worktree",
-				"remove",
-				".worktrees/issue-42",
-				"--force",
-			]);
+			const calls = execFn.mock.calls;
+			const removeCall = calls.find(
+				(call) => call[0][0] === "git" && call[0][1] === "worktree" && call[0][2] === "remove",
+			);
+			expect(removeCall).toBeDefined();
+			expect(removeCall![0][3]).toEndWith(".worktrees/issue-42");
+			expect(removeCall![0][4]).toBe("--force");
 			expect(execFn).toHaveBeenCalledWith(["git", "worktree", "prune"]);
 		});
 
