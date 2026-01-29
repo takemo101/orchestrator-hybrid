@@ -1,17 +1,16 @@
-version: "1.0"
+# Simple preset - Hatなしの単純ループ
+#
+# AIバックエンドが LOOP_COMPLETE を出力するまで反復実行。
+# 用途:
+# - 単発のスクリプト作成
+# - バグ調査
+# - 自由度の高い対話型開発
 
-backend:
-  type: claude
+preset: simple
 
-loop:
-  max_iterations: 100
-  completion_promise: "LOOP_COMPLETE"
+# Hatシステム無効（単純ループ）
+hats: {}
 
-gates:
-  after_plan: false
-  after_implementation: false
-  before_pr: true
-
-state:
-  use_github_labels: true
-  use_scratchpad: true
+# ループ設定（デフォルト値を使用）
+# max_iterations: 100
+# completion_keyword: LOOP_COMPLETE
