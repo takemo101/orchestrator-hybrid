@@ -16,6 +16,7 @@ import { ApprovalGate, ApprovalGateError } from "./gates/approval";
 import { fetchIssue } from "./input/github";
 import { PromptGenerator } from "./input/prompt";
 import { PRCreateError, PRCreator } from "./output/pr";
+import { type IssueStatus, StatusLabelManager } from "./output/status-label";
 
 function getBackendAdapter(backendType: string): IBackendAdapter {
 	if (backendType === "opencode") {
@@ -23,6 +24,27 @@ function getBackendAdapter(backendType: string): IBackendAdapter {
 	}
 	return new ClaudeAdapter();
 }
+
+/**
+ * デフォルトのコマンドエグゼキュータ（gh CLI経由）
+ */
+const defaultCommandExecutor = {
+	async exec(
+		command: string,
+		args: string[],
+	): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+		const proc = Bun.spawn([command, ...args], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const [stdout, stderr] = await Promise.all([
+			new Response(proc.stdout).text(),
+			new Response(proc.stderr).text(),
+		]);
+		const exitCode = await proc.exited;
+		return { exitCode, stdout, stderr };
+	},
+};
 
 function mergeOptionsWithConfig(
 	cliOptions: Record<string, unknown>,
@@ -90,6 +112,22 @@ async function getCurrentBranch(): Promise<string | undefined> {
 }
 
 /**
+ * ステータスラベルを安全に更新する（エラーでも処理を続行）
+ */
+async function safeUpdateStatus(
+	statusManager: StatusLabelManager | undefined,
+	issueNumber: number,
+	status: IssueStatus,
+): Promise<void> {
+	if (!statusManager) return;
+	try {
+		await statusManager.syncStatus(issueNumber, status);
+	} catch (error) {
+		console.warn(`Warning: Failed to update status label to '${status}': ${error}`);
+	}
+}
+
+/**
  * 単一Issueの実行処理
  */
 interface ExecuteIssueOptions {
@@ -98,17 +136,21 @@ interface ExecuteIssueOptions {
 	maxIterations: number;
 	createPr: boolean;
 	draft: boolean;
+	statusLabelManager?: StatusLabelManager;
 }
 
 async function executeIssue(
 	issueNumber: number,
 	options: ExecuteIssueOptions,
 ): Promise<{ success: boolean; iterations: number }> {
-	const { backend, sessionManager, maxIterations, createPr, draft } = options;
+	const { backend, sessionManager, maxIterations, createPr, draft, statusLabelManager } = options;
 
 	console.log(`\n${"=".repeat(60)}`);
 	console.log(`Executing Issue #${issueNumber}...`);
 	console.log(`${"=".repeat(60)}`);
+
+	// ステータスを running に更新
+	await safeUpdateStatus(statusLabelManager, issueNumber, "running");
 
 	const issue = await fetchIssue(issueNumber).catch((error) => {
 		console.error(`Failed to fetch Issue #${issueNumber}: ${error}`);
@@ -116,6 +158,7 @@ async function executeIssue(
 	});
 
 	if (!issue) {
+		await safeUpdateStatus(statusLabelManager, issueNumber, "failed");
 		return { success: false, iterations: 0 };
 	}
 
@@ -164,6 +207,9 @@ async function executeIssue(
 		if (result.success) {
 			console.log(`\nIssue #${issueNumber} completed after ${result.iterations} iterations.`);
 
+			// ステータスを completed に更新
+			await safeUpdateStatus(statusLabelManager, issueNumber, "completed");
+
 			// PR自動作成
 			if (createPr) {
 				console.log("\nCreating PR...");
@@ -178,6 +224,8 @@ async function executeIssue(
 							draft,
 						});
 						console.log(`PR created: ${prResult.url}`);
+						// ステータスを pr-created に更新
+						await safeUpdateStatus(statusLabelManager, issueNumber, "pr-created");
 					} catch (error) {
 						if (error instanceof PRCreateError) {
 							if (error.message === "No changes to create PR") {
@@ -191,12 +239,17 @@ async function executeIssue(
 					}
 				}
 			}
+		} else {
+			// ステータスを failed に更新
+			await safeUpdateStatus(statusLabelManager, issueNumber, "failed");
 		}
 
 		return { success: result.success, iterations: result.iterations };
 	} catch (error) {
 		console.error(`Loop terminated for Issue #${issueNumber}: ${error}`);
 		await sessionManager.kill(sessionId).catch(() => {});
+		// ステータスを failed に更新
+		await safeUpdateStatus(statusLabelManager, issueNumber, "failed");
 		return { success: false, iterations: 0 };
 	}
 }
@@ -227,6 +280,7 @@ export function createProgram(): Command {
 			false,
 		)
 		.option("--no-worktree", "Disable worktree isolation", false)
+		.option("--no-labels", "Disable status label updates", false)
 		.option("--session-manager <type>", "Session manager (auto, native, tmux, zellij)")
 		.action(async (cliOptions) => {
 			// --resolve-deps と --ignore-deps の排他チェック
@@ -250,6 +304,12 @@ export function createProgram(): Command {
 
 			const options = mergeOptionsWithConfig(cliOptions, config);
 			const issueNumber = cliOptions.issue;
+
+			// StatusLabelManager の初期化（--no-labels で無効化可能）
+			const labelsEnabled = cliOptions.labels !== false;
+			const statusLabelManager = labelsEnabled
+				? new StatusLabelManager(defaultCommandExecutor, "orch")
+				: undefined;
 
 			// 依存関係解決
 			if (options.resolveDeps) {
@@ -286,6 +346,7 @@ export function createProgram(): Command {
 						maxIterations: options.maxIterations,
 						createPr: options.createPr,
 						draft: options.draft,
+						statusLabelManager,
 					});
 
 					if (!result.success && depIssueNumber !== issueNumber) {
@@ -350,6 +411,9 @@ export function createProgram(): Command {
 				`Starting session ${sessionId} with ${backend.getName()} backend (${options.sessionManager})...`,
 			);
 
+			// ステータスを running に更新
+			await safeUpdateStatus(statusLabelManager, issueNumber, "running");
+
 			const session = await sessionManager.create(
 				sessionId,
 				backend.getCommand(),
@@ -387,6 +451,9 @@ export function createProgram(): Command {
 
 				if (result.success) {
 					console.log(`\nCompleted after ${result.iterations} iterations.`);
+
+					// ステータスを completed に更新
+					await safeUpdateStatus(statusLabelManager, issueNumber, "completed");
 
 					// Post-completion承認ゲート
 					try {
@@ -444,6 +511,8 @@ export function createProgram(): Command {
 									draft: options.draft,
 								});
 								console.log(`PR created: ${prResult.url}`);
+								// ステータスを pr-created に更新
+								await safeUpdateStatus(statusLabelManager, issueNumber, "pr-created");
 							} catch (error) {
 								if (error instanceof PRCreateError) {
 									if (error.message === "No changes to create PR") {
@@ -457,10 +526,15 @@ export function createProgram(): Command {
 							}
 						}
 					}
+				} else {
+					// ステータスを failed に更新
+					await safeUpdateStatus(statusLabelManager, issueNumber, "failed");
 				}
 			} catch (error) {
 				console.error(`Loop terminated: ${error}`);
 				await sessionManager.kill(sessionId).catch(() => {});
+				// ステータスを failed に更新
+				await safeUpdateStatus(statusLabelManager, issueNumber, "failed");
 			}
 		});
 
@@ -583,8 +657,21 @@ export function createProgram(): Command {
 		.description("Initialize configuration file")
 		.option("-p, --preset <name>", "Initialize with preset (simple, tdd)")
 		.option("--labels", "Create status labels in repository")
-		.action(async (_options) => {
+		.action(async (cliOptions) => {
 			console.log("Initializing...");
+
+			// --labels オプション時にステータスラベルを作成
+			if (cliOptions.labels) {
+				console.log("Creating status labels in repository...");
+				const statusLabelManager = new StatusLabelManager(defaultCommandExecutor, "orch");
+				try {
+					await statusLabelManager.ensureLabelsExist();
+					console.log("Status labels created successfully.");
+				} catch (error) {
+					console.error(`Failed to create status labels: ${error}`);
+					process.exit(1);
+				}
+			}
 		});
 
 	return program;
