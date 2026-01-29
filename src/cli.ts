@@ -82,6 +82,7 @@ function mergeOptionsWithConfig(
 	config: OrchestratorConfig,
 ): {
 	backend: string;
+	model: string | undefined;
 	auto: boolean;
 	createPr: boolean;
 	draft: boolean;
@@ -96,6 +97,7 @@ function mergeOptionsWithConfig(
 
 	return {
 		backend: (cliOptions.backend as string | undefined) ?? config.backend,
+		model: (cliOptions.model as string | undefined) ?? config.model,
 		auto: (cliOptions.auto as boolean | undefined) ?? config.auto,
 		createPr: (cliOptions.createPr as boolean | undefined) ?? config.create_pr,
 		draft: (cliOptions.draft as boolean | undefined) ?? false,
@@ -199,6 +201,7 @@ async function getCurrentBranch(): Promise<string | undefined> {
  */
 interface ExecuteIssueOptions {
 	backend: IBackendAdapter;
+	backendOptions: BackendOptions;
 	sessionManager: Awaited<ReturnType<typeof createSessionManager>>;
 	maxIterations: number;
 	createPr: boolean;
@@ -211,8 +214,16 @@ async function executeIssue(
 	issueNumber: number,
 	options: ExecuteIssueOptions,
 ): Promise<{ success: boolean; iterations: number }> {
-	const { backend, sessionManager, maxIterations, createPr, draft, hatSystem, statusLabelManager } =
-		options;
+	const {
+		backend,
+		backendOptions,
+		sessionManager,
+		maxIterations,
+		createPr,
+		draft,
+		hatSystem,
+		statusLabelManager,
+	} = options;
 
 	console.log(`\n${"=".repeat(60)}`);
 	console.log(`Executing Issue #${issueNumber}...`);
@@ -270,7 +281,11 @@ async function executeIssue(
 			console.log(`Starting session ${sessionId} with ${backend.getName()} backend...`);
 		}
 
-		await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
+		await sessionManager.create(
+			sessionId,
+			backend.getCommand(),
+			backend.getArgs(promptPath, backendOptions),
+		);
 
 		console.log(`Waiting for AI to complete...`);
 		return await waitForSessionEnd();
@@ -347,7 +362,8 @@ export function createProgram(): Command {
 		.option("--create-pr", "Create PR after completion")
 		.option("--draft", "Create PR as draft")
 		.option("-p, --preset <name>", "Preset to use (simple, tdd)")
-		.option("-b, --backend <type>", "Backend type (claude, opencode)")
+		.option("-b, --backend <type>", "Backend type (claude, opencode, pi)")
+		.option("--model <name>", "AI model name")
 		.option("-m, --max-iterations <number>", "Max loop iterations", Number.parseInt)
 		.option("--resolve-deps", "Resolve dependent issues first", false)
 		.option(
@@ -418,12 +434,14 @@ export function createProgram(): Command {
 				}
 
 				const backend = getBackendAdapter(options.backend);
+				const backendOptions: BackendOptions = { model: options.model };
 				const sessionManager = await createSessionManager(options.sessionManager);
 
 				// 依存Issueを順次実行
 				for (const depIssueNumber of executionOrder) {
 					const result = await executeIssue(depIssueNumber, {
 						backend,
+						backendOptions,
 						sessionManager,
 						maxIterations: options.maxIterations,
 						createPr: options.createPr,
@@ -487,6 +505,7 @@ export function createProgram(): Command {
 			}
 
 			const backend = getBackendAdapter(options.backend);
+			const backendOptions: BackendOptions = { model: options.model };
 			const sessionManager = await createSessionManager(options.sessionManager);
 			const sessionId = String(issueNumber);
 
@@ -549,14 +568,14 @@ export function createProgram(): Command {
 					await sessionManager.create(
 						sessionId,
 						backend.getCommand(),
-						backend.getArgs(promptPath),
+						backend.getArgs(promptPath, backendOptions),
 						sessionOptions,
 					);
 				} else {
 					const session = await sessionManager.create(
 						sessionId,
 						backend.getCommand(),
-						backend.getArgs(promptPath),
+						backend.getArgs(promptPath, backendOptions),
 						sessionOptions,
 					);
 					console.log(`Session created: ${session.id} (${session.type})`);

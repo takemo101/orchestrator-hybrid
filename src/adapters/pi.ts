@@ -1,20 +1,20 @@
 import type { BackendOptions, IBackendAdapter } from "./interface";
 
-export class OpenCodeAdapter implements IBackendAdapter {
+export class PiAdapter implements IBackendAdapter {
 	getCommand(): string {
-		return "opencode";
+		return "pi";
 	}
 
 	getArgs(promptPath: string, options?: BackendOptions): string[] {
-		const args = ["run"];
+		const args = ["--print"];
 		if (options?.model) {
 			args.push("--model", options.model);
 		}
-		args.push("--file", promptPath, "--", "Execute the task in the attached file");
+		args.push(`@${promptPath}`);
 		return args;
 	}
 
 	getName(): string {
-		return "opencode";
+		return "pi";
 	}
 }

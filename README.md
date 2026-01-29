@@ -25,7 +25,7 @@ GitHub Issue → AIエージェント自動実行 → 完了検出 → PR作成
 
 - [Bun](https://bun.sh/) 1.0以上
 - `gh` (GitHub CLI) がインストール・認証済み
-- `claude` または `opencode` がインストール済み
+- `claude`、`opencode`、または `pi` がインストール済み
 
 ### インストール
 
@@ -99,7 +99,7 @@ bun run dev run --issue <Issue番号> [オプション]
 | `--ignore-deps` | - | 依存関係を無視（v1.3.0+） | false |
 | `--report [パス]` | - | 実行レポートを生成 | .agent/report.md |
 | `--preset <名前>` | `-p` | プリセット設定を使用 | - |
-| `--backend <種類>` | `-b` | バックエンド: `claude` / `opencode` | claude |
+| `--backend <種類>` | `-b` | バックエンド: `claude` / `opencode` / `pi` | claude |
 | `--max-iterations <数>` | `-m` | 最大反復回数 | 100 |
 | `--config <パス>` | `-c` | 設定ファイルのパス | orch.yml |
 | `--verbose` | `-v` | 詳細ログを出力 | false |
@@ -315,7 +315,7 @@ version: "1.0"
 
 # バックエンド設定
 backend:
-  type: claude                    # claude | opencode
+  type: claude                    # claude | opencode | pi
   model: claude-sonnet-4-20250514 # オプション
 
 # ループ設定

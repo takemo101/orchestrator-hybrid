@@ -31,6 +31,23 @@ describe("ClaudeAdapter", () => {
 			expect(args).toContain("--print");
 			expect(args).toContain(".agent/PROMPT.md");
 		});
+
+		it("should include --model when model option is provided", async () => {
+			const { ClaudeAdapter } = await import("./claude");
+			const adapter = new ClaudeAdapter();
+			const args = adapter.getArgs(".agent/PROMPT.md", { model: "sonnet" });
+
+			expect(args).toContain("--model");
+			expect(args).toContain("sonnet");
+		});
+
+		it("should not include --model when model option is undefined", async () => {
+			const { ClaudeAdapter } = await import("./claude");
+			const adapter = new ClaudeAdapter();
+			const args = adapter.getArgs(".agent/PROMPT.md", {});
+
+			expect(args).not.toContain("--model");
+		});
 	});
 
 	describe("getName", () => {

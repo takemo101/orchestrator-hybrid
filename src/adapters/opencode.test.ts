@@ -30,6 +30,23 @@ describe("OpenCodeAdapter", () => {
 
 			expect(args.some((arg: string) => arg.includes(".agent/PROMPT.md"))).toBe(true);
 		});
+
+		it("should include --model when model option is provided", async () => {
+			const { OpenCodeAdapter } = await import("./opencode");
+			const adapter = new OpenCodeAdapter();
+			const args = adapter.getArgs(".agent/PROMPT.md", { model: "claude-opus-4" });
+
+			expect(args).toContain("--model");
+			expect(args).toContain("claude-opus-4");
+		});
+
+		it("should not include --model when model option is undefined", async () => {
+			const { OpenCodeAdapter } = await import("./opencode");
+			const adapter = new OpenCodeAdapter();
+			const args = adapter.getArgs(".agent/PROMPT.md", {});
+
+			expect(args).not.toContain("--model");
+		});
 	});
 
 	describe("getName", () => {

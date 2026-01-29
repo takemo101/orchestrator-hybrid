@@ -37,7 +37,9 @@ export type SessionConfig = z.infer<typeof SessionConfigSchema>;
  */
 export const OrchestratorConfigSchema = z.object({
 	/** AIバックエンド */
-	backend: z.enum(["claude", "opencode"]).default("claude"),
+	backend: z.enum(["claude", "opencode", "pi"]).default("claude"),
+	/** AIモデル名（オプション） */
+	model: z.string().optional(),
 	/** 承認ゲート自動化 */
 	auto: z.boolean().default(false),
 	/** PR自動作成 */
