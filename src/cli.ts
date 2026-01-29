@@ -93,14 +93,22 @@ export function createProgram(): Command {
 
 			const loopEngine = new LoopEngine();
 
-			const runner = async (_iteration: number): Promise<string> => {
-				const running = await sessionManager.isRunning(sessionId);
-				if (!running) {
-					return await sessionManager.getOutput(sessionId);
+			const waitForSessionEnd = async (): Promise<string> => {
+				const pollInterval = 2000;
+				while (await sessionManager.isRunning(sessionId)) {
+					await new Promise((resolve) => setTimeout(resolve, pollInterval));
+				}
+				return await sessionManager.getOutput(sessionId);
+			};
+
+			const runner = async (iteration: number): Promise<string> => {
+				if (iteration > 1) {
+					console.log(`\nIteration ${iteration}: Restarting session...`);
+					await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
 				}
 
-				await new Promise((resolve) => setTimeout(resolve, 1000));
-				return await sessionManager.getOutput(sessionId, 50);
+				console.log(`Waiting for AI to complete...`);
+				return await waitForSessionEnd();
 			};
 
 			let result: LoopResult;
@@ -115,7 +123,7 @@ export function createProgram(): Command {
 				}
 			} catch (error) {
 				console.error(`Loop terminated: ${error}`);
-				await sessionManager.kill(sessionId);
+				await sessionManager.kill(sessionId).catch(() => {});
 			}
 		});
 
