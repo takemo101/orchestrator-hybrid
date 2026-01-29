@@ -67,31 +67,23 @@ export class TmuxSessionManager implements ISessionManager {
 			await this.kill(id);
 		}
 
-		// tmux new-session + set-option を同時実行（レースコンディション回避）
-		const result = await runTmux([
-			"new-session",
-			"-d",
-			"-s",
-			sessionName,
-			"-x",
-			"200",
-			"-y",
-			"50",
-			";",
-			"set-option",
-			"-t",
-			sessionName,
-			"remain-on-exit",
-			"on",
-			";",
-			"send-keys",
-			"-t",
-			sessionName,
-			fullCommand,
-			"Enter",
-		]);
-		if (result.exitCode !== 0) {
-			throw new SessionError(`Failed to create tmux session: ${result.stderr}`, { sessionId: id });
+		// tmux new-session + set-option + send-keys を同時実行（レースコンディション回避）
+		// シェル経由で実行（Bun.spawnは';'を引数として渡すため）
+		const tmuxCommand = [
+			`tmux new-session -d -s ${sessionName} -x 200 -y 50`,
+			`tmux set-option -t ${sessionName} remain-on-exit on`,
+			`tmux send-keys -t ${sessionName} ${JSON.stringify(fullCommand)} Enter`,
+		].join(" && ");
+
+		const proc = Bun.spawn(["sh", "-c", tmuxCommand], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const stderr = await new Response(proc.stderr).text();
+		const exitCode = await proc.exited;
+
+		if (exitCode !== 0) {
+			throw new SessionError(`Failed to create tmux session: ${stderr}`, { sessionId: id });
 		}
 
 		return {
