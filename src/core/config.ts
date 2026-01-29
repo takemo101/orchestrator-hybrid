@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ZodError } from "zod";
+import { getAvailablePresetNames, getEmbeddedPreset } from "./embedded-presets.js";
 import {
 	type HatDefinition,
 	HatDefinitionSchema,
@@ -48,11 +49,14 @@ export class ConfigValidationError extends Error {
  */
 export class PresetNotFoundError extends Error {
 	readonly presetName: string;
+	readonly availablePresets: string[];
 
 	constructor(presetName: string) {
-		super(`Preset not found: ${presetName}`);
+		const available = getAvailablePresetNames();
+		super(`Preset '${presetName}' not found.\nAvailable presets: ${available.join(", ")}`);
 		this.name = "PresetNotFoundError";
 		this.presetName = presetName;
+		this.availablePresets = available;
 	}
 }
 
@@ -116,6 +120,10 @@ function findPresetPath(presetName: string): string | null {
 /**
  * プリセット設定を読み込む
  *
+ * 検索順序:
+ * 1. ファイルシステム（CWD/presets/, 実行ファイル/presets/）
+ * 2. 組み込みプリセット（バイナリ実行時のフォールバック）
+ *
  * @param presetName - プリセット名
  * @returns プリセット設定（生のオブジェクト）
  * @throws {PresetNotFoundError} プリセットが見つからない場合
@@ -123,12 +131,17 @@ function findPresetPath(presetName: string): string | null {
 export function loadPreset(presetName: string): Record<string, unknown> {
 	const presetPath = findPresetPath(presetName);
 
-	if (!presetPath) {
-		throw new PresetNotFoundError(presetName);
+	if (presetPath) {
+		const content = readFileSync(presetPath, "utf-8");
+		return parseYaml(content) as Record<string, unknown>;
 	}
 
-	const content = readFileSync(presetPath, "utf-8");
-	return parseYaml(content) as Record<string, unknown>;
+	const embedded = getEmbeddedPreset(presetName);
+	if (embedded) {
+		return embedded;
+	}
+
+	throw new PresetNotFoundError(presetName);
 }
 
 /**
