@@ -2,7 +2,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ZodError } from "zod";
-import { type HatDefinition, HatDefinitionSchema, type OrchestratorConfig, OrchestratorConfigSchema } from "./types.js";
+import {
+	type HatDefinition,
+	HatDefinitionSchema,
+	type OrchestratorConfig,
+	OrchestratorConfigSchema,
+} from "./types.js";
 
 /**
  * 設定ファイル検証エラー

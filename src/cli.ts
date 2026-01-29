@@ -269,8 +269,7 @@ export function createProgram(): Command {
 			const issueNumber = cliOptions.issue;
 
 			// HatSystemの初期化（Hat定義がある場合のみ）
-			const hatSystem =
-				Object.keys(hats).length > 0 ? new HatSystem(hats) : undefined;
+			const hatSystem = Object.keys(hats).length > 0 ? new HatSystem(hats) : undefined;
 
 			// 依存関係解決
 			if (options.resolveDeps) {
