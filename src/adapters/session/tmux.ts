@@ -68,10 +68,24 @@ export class TmuxSessionManager implements ISessionManager {
 		}
 
 		// tmux new-session でセッション作成
-		const result = await runTmux(["new-session", "-d", "-s", sessionName, fullCommand]);
+		// remain-on-exit: コマンド終了後もセッションを保持（出力取得のため）
+		const result = await runTmux([
+			"new-session",
+			"-d",
+			"-s",
+			sessionName,
+			"-x",
+			"200",
+			"-y",
+			"50",
+			fullCommand,
+		]);
 		if (result.exitCode !== 0) {
 			throw new SessionError(`Failed to create tmux session: ${result.stderr}`, { sessionId: id });
 		}
+
+		// セッションにremain-on-exitを設定
+		await runTmux(["set-option", "-t", sessionName, "remain-on-exit", "on"]);
 
 		return {
 			id,
@@ -188,8 +202,16 @@ export class TmuxSessionManager implements ISessionManager {
 
 	async isRunning(id: string): Promise<boolean> {
 		const sessionName = this.getSessionName(id);
-		const result = await runTmux(["has-session", "-t", sessionName]);
-		return result.exitCode === 0;
+
+		// セッション存在確認
+		const hasSession = await runTmux(["has-session", "-t", sessionName]);
+		if (hasSession.exitCode !== 0) {
+			return false;
+		}
+
+		// ペイン内のプロセスが実行中か確認 (pane_dead=0なら実行中)
+		const paneStatus = await runTmux(["display-message", "-t", sessionName, "-p", "#{pane_dead}"]);
+		return paneStatus.stdout.trim() === "0";
 	}
 
 	async kill(id: string): Promise<void> {
