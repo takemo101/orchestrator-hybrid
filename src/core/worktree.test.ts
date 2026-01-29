@@ -1,6 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { WorktreeConfig } from "./types";
-import { WorktreeCreateError, WorktreeManager, WorktreeRunningError } from "./worktree";
+import {
+	WorktreeCreateError,
+	WorktreeManager,
+	WorktreeNotFoundError,
+	WorktreeRemoveError,
+	WorktreeRunningError,
+} from "./worktree";
 
 /**
  * WorktreeManager テスト
@@ -191,6 +197,7 @@ branch refs/heads/main
 	describe("remove", () => {
 		test("worktreeを削除する（running以外）", async () => {
 			const execFn = mockExec([
+				{ stdout: PORCELAIN_OUTPUT, stderr: "", exitCode: 0 }, // list (for exists check) - issue-42 exists
 				{ stdout: "", stderr: "", exitCode: 0 }, // gh issue view (no orch:running label)
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree remove
 				{ stdout: "", stderr: "", exitCode: 0 }, // worktree prune
@@ -209,8 +216,19 @@ branch refs/heads/main
 			expect(execFn).toHaveBeenCalledWith(["git", "worktree", "prune"]);
 		});
 
+		test("存在しないworktreeを削除しようとするとWorktreeNotFoundErrorをスローする", async () => {
+			const execFn = mockExec([
+				{ stdout: PORCELAIN_OUTPUT, stderr: "", exitCode: 0 }, // list - issue-999 does not exist
+			]);
+
+			const manager = createManager({ exec: execFn });
+
+			await expect(manager.remove(999)).rejects.toThrow(WorktreeNotFoundError);
+		});
+
 		test("実行中のworktreeは削除できない（orch:running）", async () => {
 			const execFn = mockExec([
+				{ stdout: PORCELAIN_OUTPUT, stderr: "", exitCode: 0 }, // list - issue-42 exists
 				{ stdout: "orch:running\nenhancement", stderr: "", exitCode: 0 }, // gh issue view with orch:running
 			]);
 
@@ -220,7 +238,10 @@ branch refs/heads/main
 		});
 
 		test("WorktreeRunningErrorにIssue番号が含まれる", async () => {
-			const execFn = mockExec([{ stdout: "orch:running", stderr: "", exitCode: 0 }]);
+			const execFn = mockExec([
+				{ stdout: PORCELAIN_OUTPUT, stderr: "", exitCode: 0 }, // list - issue-42 exists
+				{ stdout: "orch:running", stderr: "", exitCode: 0 }, // gh issue view with orch:running
+			]);
 
 			const manager = createManager({ exec: execFn });
 
@@ -230,6 +251,37 @@ branch refs/heads/main
 			} catch (e) {
 				expect(e).toBeInstanceOf(WorktreeRunningError);
 				expect((e as WorktreeRunningError).issueNumber).toBe(42);
+			}
+		});
+
+		test("git worktree removeが失敗した場合WorktreeRemoveErrorをスローする", async () => {
+			const execFn = mockExec([
+				{ stdout: PORCELAIN_OUTPUT, stderr: "", exitCode: 0 }, // list - issue-42 exists
+				{ stdout: "", stderr: "", exitCode: 0 }, // gh issue view (no orch:running label)
+				{ stdout: "", stderr: "fatal: '.worktrees/issue-42' is not a valid worktree", exitCode: 1 }, // worktree remove fails
+			]);
+
+			const manager = createManager({ exec: execFn });
+
+			await expect(manager.remove(42)).rejects.toThrow(WorktreeRemoveError);
+		});
+
+		test("WorktreeRemoveErrorにIssue番号とエラー原因が含まれる", async () => {
+			const execFn = mockExec([
+				{ stdout: PORCELAIN_OUTPUT, stderr: "", exitCode: 0 }, // list - issue-42 exists
+				{ stdout: "", stderr: "", exitCode: 0 }, // gh issue view (no orch:running label)
+				{ stdout: "", stderr: "fatal: worktree error", exitCode: 128 }, // worktree remove fails
+			]);
+
+			const manager = createManager({ exec: execFn });
+
+			try {
+				await manager.remove(42);
+				expect.unreachable("Should have thrown");
+			} catch (e) {
+				expect(e).toBeInstanceOf(WorktreeRemoveError);
+				expect((e as WorktreeRemoveError).issueNumber).toBe(42);
+				expect((e as WorktreeRemoveError).message).toContain("fatal: worktree error");
 			}
 		});
 	});

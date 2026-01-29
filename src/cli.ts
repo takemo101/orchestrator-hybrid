@@ -4,8 +4,9 @@ import { join, resolve } from "node:path";
 import { Command } from "commander";
 
 import { ClaudeAdapter } from "./adapters/claude";
-import type { IBackendAdapter } from "./adapters/interface";
+import type { BackendOptions, IBackendAdapter } from "./adapters/interface";
 import { OpenCodeAdapter } from "./adapters/opencode";
+import { PiAdapter } from "./adapters/pi";
 import { createSessionManager, type SessionManagerType } from "./adapters/session";
 import type { Session } from "./adapters/session/interface";
 import { loadConfigWithHats, PresetNotFoundError } from "./core/config";
@@ -20,6 +21,7 @@ import {
 	type WorktreeInfo,
 	WorktreeManager,
 	WorktreeNotFoundError,
+	WorktreeRemoveError,
 	WorktreeRunningError,
 } from "./core/worktree";
 import { ApprovalGate, ApprovalGateError } from "./gates/approval";
@@ -31,6 +33,9 @@ import { type IssueStatus, StatusLabelManager } from "./output/status-label";
 function getBackendAdapter(backendType: string): IBackendAdapter {
 	if (backendType === "opencode") {
 		return new OpenCodeAdapter();
+	}
+	if (backendType === "pi") {
+		return new PiAdapter();
 	}
 	return new ClaudeAdapter();
 }
@@ -844,6 +849,10 @@ export function createProgram(): Command {
 				}
 				if (error instanceof WorktreeNotFoundError) {
 					console.error(`Error: Worktree for Issue #${issue} not found.`);
+					process.exit(1);
+				}
+				if (error instanceof WorktreeRemoveError) {
+					console.error(`Error: Failed to remove worktree for Issue #${issue}: ${error.cause}`);
 					process.exit(1);
 				}
 				console.error(`Failed to remove worktree: ${error}`);

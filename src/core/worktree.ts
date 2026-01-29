@@ -45,6 +45,22 @@ export class WorktreeNotFoundError extends OrchestratorError {
 }
 
 /**
+ * Worktree削除エラー
+ */
+export class WorktreeRemoveError extends OrchestratorError {
+	readonly issueNumber: number;
+
+	constructor(issueNumber: number, cause?: Error) {
+		super(
+			`Failed to remove worktree for issue #${issueNumber}${cause ? `: ${cause.message}` : ""}`,
+		);
+		this.name = "WorktreeRemoveError";
+		this.issueNumber = issueNumber;
+		this.cause = cause;
+	}
+}
+
+/**
  * Worktree情報
  */
 export interface WorktreeInfo {
@@ -143,8 +159,16 @@ export class WorktreeManager {
 	 *
 	 * @param issueNumber Issue番号
 	 * @throws WorktreeRunningError 実行中のworktreeを削除しようとした場合
+	 * @throws WorktreeNotFoundError worktreeが存在しない場合
+	 * @throws WorktreeRemoveError 削除に失敗した場合
 	 */
 	async remove(issueNumber: number): Promise<void> {
+		// 存在チェック
+		const exists = await this.exists(issueNumber);
+		if (!exists) {
+			throw new WorktreeNotFoundError(issueNumber);
+		}
+
 		// 実行中チェック
 		const isRunning = await this.isIssueRunning(issueNumber);
 		if (isRunning) {
@@ -154,7 +178,16 @@ export class WorktreeManager {
 		const worktreePath = resolve(this.config.base_dir, `issue-${issueNumber}`);
 
 		// worktree削除
-		await this.exec(["git", "worktree", "remove", worktreePath, "--force"]);
+		const removeResult = await this.exec(["git", "worktree", "remove", worktreePath, "--force"]);
+		if (removeResult.exitCode !== 0) {
+			throw new WorktreeRemoveError(
+				issueNumber,
+				new Error(
+					removeResult.stderr ||
+						`git worktree remove failed with exit code ${removeResult.exitCode}`,
+				),
+			);
+		}
 
 		// プルーニング
 		await this.exec(["git", "worktree", "prune"]);
