@@ -13,6 +13,7 @@ import { LoopEngine, type LoopResult } from "./core/loop";
 import type { OrchestratorConfig } from "./core/types";
 import { fetchIssue } from "./input/github";
 import { PromptGenerator } from "./input/prompt";
+import { PRCreateError, PRCreator } from "./output/pr";
 
 function getBackendAdapter(backendType: string): IBackendAdapter {
 	if (backendType === "opencode") {
@@ -28,6 +29,7 @@ function mergeOptionsWithConfig(
 	backend: string;
 	auto: boolean;
 	createPr: boolean;
+	draft: boolean;
 	maxIterations: number;
 	preset: string;
 	sessionManager: SessionManagerType;
@@ -36,6 +38,7 @@ function mergeOptionsWithConfig(
 		backend: (cliOptions.backend as string | undefined) ?? config.backend,
 		auto: (cliOptions.auto as boolean | undefined) ?? config.auto,
 		createPr: (cliOptions.createPr as boolean | undefined) ?? config.create_pr,
+		draft: (cliOptions.draft as boolean | undefined) ?? false,
 		maxIterations: (cliOptions.maxIterations as number | undefined) ?? config.max_iterations,
 		preset: (cliOptions.preset as string | undefined) ?? config.preset,
 		sessionManager: ((cliOptions.sessionManager as string | undefined) ??
@@ -61,6 +64,27 @@ function formatSessionTable(sessions: Session[]): string {
 	return [header, separator, ...rows].join("\n");
 }
 
+/**
+ * 現在のGitブランチ名を取得する
+ * @returns ブランチ名。取得失敗時はundefined
+ */
+async function getCurrentBranch(): Promise<string | undefined> {
+	try {
+		const proc = Bun.spawn(["git", "rev-parse", "--abbrev-ref", "HEAD"], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const stdout = await new Response(proc.stdout).text();
+		const exitCode = await proc.exited;
+		if (exitCode === 0) {
+			return stdout.trim();
+		}
+		return undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 export function createProgram(): Command {
 	const program = new Command();
 
@@ -76,6 +100,7 @@ export function createProgram(): Command {
 		.option("-c, --config <path>", "Config file path")
 		.option("-a, --auto", "Auto-approve all gates")
 		.option("--create-pr", "Create PR after completion")
+		.option("--draft", "Create PR as draft")
 		.option("-p, --preset <name>", "Preset to use (simple, tdd)")
 		.option("-b, --backend <type>", "Backend type (claude, opencode)")
 		.option("-m, --max-iterations <number>", "Max loop iterations", Number.parseInt)
@@ -146,6 +171,34 @@ export function createProgram(): Command {
 
 				if (result.success) {
 					console.log(`\nCompleted after ${result.iterations} iterations.`);
+
+					// PR自動作成
+					if (options.createPr) {
+						console.log("\nCreating PR...");
+						const prCreator = new PRCreator();
+						const branchName = await getCurrentBranch();
+
+						if (!branchName) {
+							console.error("Failed to get current branch name. Skipping PR creation.");
+						} else {
+							try {
+								const prResult = await prCreator.create(issueNumber, branchName, issue.title, {
+									draft: options.draft,
+								});
+								console.log(`PR created: ${prResult.url}`);
+							} catch (error) {
+								if (error instanceof PRCreateError) {
+									if (error.message === "No changes to create PR") {
+										console.log("No changes to create PR. Skipping.");
+									} else {
+										console.error(`Failed to create PR: ${error.message}`);
+									}
+								} else {
+									console.error(`Failed to create PR: ${error}`);
+								}
+							}
+						}
+					}
 				}
 			} catch (error) {
 				console.error(`Loop terminated: ${error}`);
