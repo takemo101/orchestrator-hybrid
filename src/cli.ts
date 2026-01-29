@@ -77,7 +77,7 @@ export function createProgram(): Command {
 
 			const backend = getBackendAdapter(options.backend);
 			const sessionManager = await createSessionManager(sessionManagerType);
-			const sessionId = `orch-${issueNumber}`;
+			const sessionId = String(issueNumber);
 
 			console.log(
 				`Starting session ${sessionId} with ${backend.getName()} backend (${sessionManagerType})...`,
@@ -135,7 +135,7 @@ export function createProgram(): Command {
 			const sessionManager = await createSessionManager("auto");
 
 			if (options.issue) {
-				const sessionId = `orch-${options.issue}`;
+				const sessionId = String(options.issue);
 				const running = await sessionManager.isRunning(sessionId);
 				console.log(`Issue #${options.issue}: ${running ? "running" : "not running"}`);
 			} else {
@@ -156,7 +156,7 @@ export function createProgram(): Command {
 
 			let sessionId: string;
 			if (issue) {
-				sessionId = `orch-${issue}`;
+				sessionId = String(issue);
 			} else {
 				const sessions = await sessionManager.list();
 				if (sessions.length === 0) {
@@ -193,15 +193,15 @@ export function createProgram(): Command {
 		.argument("<issue>", "Issue number to attach", Number.parseInt)
 		.action(async (issue) => {
 			const sessionManager = await createSessionManager("auto");
-			const sessionId = `orch-${issue}`;
+			const sessionId = String(issue);
 
 			const running = await sessionManager.isRunning(sessionId);
 			if (!running) {
-				console.error(`Session ${sessionId} is not running.`);
+				console.error(`Session for Issue #${issue} is not running.`);
 				process.exit(1);
 			}
 
-			console.log(`Attaching to ${sessionId}...`);
+			console.log(`Attaching to Issue #${issue}...`);
 			await sessionManager.attach(sessionId);
 		});
 
@@ -211,16 +211,16 @@ export function createProgram(): Command {
 		.argument("<issue>", "Issue number to kill", Number.parseInt)
 		.action(async (issue) => {
 			const sessionManager = await createSessionManager("auto");
-			const sessionId = `orch-${issue}`;
+			const sessionId = String(issue);
 
 			const running = await sessionManager.isRunning(sessionId);
 			if (!running) {
-				console.log(`Session ${sessionId} is not running.`);
+				console.log(`Session for Issue #${issue} is not running.`);
 				return;
 			}
 
 			await sessionManager.kill(sessionId);
-			console.log(`Session ${sessionId} killed.`);
+			console.log(`Session for Issue #${issue} killed.`);
 		});
 
 	program
