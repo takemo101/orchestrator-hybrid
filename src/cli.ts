@@ -1,5 +1,41 @@
 #!/usr/bin/env bun
+import { mkdirSync, writeFileSync } from "node:fs";
 import { Command } from "commander";
+
+import { ClaudeAdapter } from "./adapters/claude";
+import type { IBackendAdapter } from "./adapters/interface";
+import { OpenCodeAdapter } from "./adapters/opencode";
+import { createSessionManager, type SessionManagerType } from "./adapters/session";
+import type { Session } from "./adapters/session/interface";
+import { LogMonitor } from "./core/log-monitor";
+import { LoopEngine, type LoopResult } from "./core/loop";
+import { fetchIssue } from "./input/github";
+import { PromptGenerator } from "./input/prompt";
+
+function getBackendAdapter(backendType: string): IBackendAdapter {
+	if (backendType === "opencode") {
+		return new OpenCodeAdapter();
+	}
+	return new ClaudeAdapter();
+}
+
+function formatSessionTable(sessions: Session[]): string {
+	if (sessions.length === 0) {
+		return "No active sessions.";
+	}
+
+	const header = "ID\t\tType\tStatus\t\tCommand\t\tStarted";
+	const separator = "-".repeat(80);
+	const rows = sessions.map((s) => {
+		const elapsed = Math.floor((Date.now() - s.startTime.getTime()) / 1000);
+		const minutes = Math.floor(elapsed / 60);
+		const seconds = elapsed % 60;
+		const duration = `${minutes}m ${seconds}s ago`;
+		return `${s.id}\t${s.type}\t${s.status}\t\t${s.command}\t\t${duration}`;
+	});
+
+	return [header, separator, ...rows].join("\n");
+}
 
 export function createProgram(): Command {
 	const program = new Command();
@@ -22,7 +58,65 @@ export function createProgram(): Command {
 		.option("--no-worktree", "Disable worktree isolation", false)
 		.option("--session-manager <type>", "Session manager (auto, native, tmux, zellij)", "auto")
 		.action(async (options) => {
-			console.log(`Running Issue #${options.issue}...`);
+			const issueNumber = options.issue;
+			const sessionManagerType = options.sessionManager as SessionManagerType;
+
+			console.log(`Fetching Issue #${issueNumber}...`);
+			const issue = await fetchIssue(issueNumber).catch((error) => {
+				console.error(`Failed to fetch Issue #${issueNumber}: ${error}`);
+				process.exit(1);
+			});
+
+			console.log(`Generating prompt for: ${issue.title}`);
+			const promptGenerator = new PromptGenerator();
+			const prompt = promptGenerator.generate(issue);
+
+			mkdirSync(".agent", { recursive: true });
+			const promptPath = ".agent/PROMPT.md";
+			writeFileSync(promptPath, prompt);
+
+			const backend = getBackendAdapter(options.backend);
+			const sessionManager = await createSessionManager(sessionManagerType);
+			const sessionId = `orch-${issueNumber}`;
+
+			console.log(
+				`Starting session ${sessionId} with ${backend.getName()} backend (${sessionManagerType})...`,
+			);
+
+			const session = await sessionManager.create(
+				sessionId,
+				backend.getCommand(),
+				backend.getArgs(promptPath),
+			);
+
+			console.log(`Session created: ${session.id} (${session.type})`);
+
+			const loopEngine = new LoopEngine();
+
+			const runner = async (_iteration: number): Promise<string> => {
+				const running = await sessionManager.isRunning(sessionId);
+				if (!running) {
+					return await sessionManager.getOutput(sessionId);
+				}
+
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+				return await sessionManager.getOutput(sessionId, 50);
+			};
+
+			let result: LoopResult;
+			try {
+				result = await loopEngine.run(runner, {
+					maxIterations: options.maxIterations,
+					completionKeyword: "LOOP_COMPLETE",
+				});
+
+				if (result.success) {
+					console.log(`\nCompleted after ${result.iterations} iterations.`);
+				}
+			} catch (error) {
+				console.error(`Loop terminated: ${error}`);
+				await sessionManager.kill(sessionId);
+			}
 		});
 
 	program
@@ -30,7 +124,16 @@ export function createProgram(): Command {
 		.description("Show current execution status")
 		.option("-i, --issue <number>", "Show status for specific Issue", Number.parseInt)
 		.action(async (options) => {
-			console.log("Status:", options.issue ? `Issue #${options.issue}` : "all");
+			const sessionManager = await createSessionManager("auto");
+
+			if (options.issue) {
+				const sessionId = `orch-${options.issue}`;
+				const running = await sessionManager.isRunning(sessionId);
+				console.log(`Issue #${options.issue}: ${running ? "running" : "not running"}`);
+			} else {
+				const sessions = await sessionManager.list();
+				console.log(formatSessionTable(sessions));
+			}
 		});
 
 	program
@@ -39,15 +142,41 @@ export function createProgram(): Command {
 		.argument("[issue]", "Issue number (optional)", Number.parseInt)
 		.option("-f, --follow", "Follow log output in realtime", false)
 		.option("-n, --lines <number>", "Number of lines to show", Number.parseInt, 100)
-		.action(async (issue, _options) => {
-			console.log(`Logs for ${issue ? `Issue #${issue}` : "current session"}`);
+		.action(async (issue, options) => {
+			const sessionManager = await createSessionManager("auto");
+			const logMonitor = new LogMonitor(sessionManager);
+
+			let sessionId: string;
+			if (issue) {
+				sessionId = `orch-${issue}`;
+			} else {
+				const sessions = await sessionManager.list();
+				if (sessions.length === 0) {
+					console.log("No active sessions.");
+					return;
+				}
+				sessionId = sessions[0].id;
+				console.log(`Showing logs for session: ${sessionId}`);
+			}
+
+			process.on("SIGINT", () => {
+				logMonitor.stop();
+				process.exit(0);
+			});
+
+			await logMonitor.showLogs(sessionId, {
+				follow: options.follow,
+				lines: options.lines,
+			});
 		});
 
 	program
 		.command("sessions")
 		.description("List all active sessions")
 		.action(async () => {
-			console.log("Active sessions:");
+			const sessionManager = await createSessionManager("auto");
+			const sessions = await sessionManager.list();
+			console.log(formatSessionTable(sessions));
 		});
 
 	program
@@ -55,7 +184,17 @@ export function createProgram(): Command {
 		.description("Attach to a running session")
 		.argument("<issue>", "Issue number to attach", Number.parseInt)
 		.action(async (issue) => {
-			console.log(`Attaching to Issue #${issue}...`);
+			const sessionManager = await createSessionManager("auto");
+			const sessionId = `orch-${issue}`;
+
+			const running = await sessionManager.isRunning(sessionId);
+			if (!running) {
+				console.error(`Session ${sessionId} is not running.`);
+				process.exit(1);
+			}
+
+			console.log(`Attaching to ${sessionId}...`);
+			await sessionManager.attach(sessionId);
 		});
 
 	program
@@ -63,7 +202,17 @@ export function createProgram(): Command {
 		.description("Kill a running session")
 		.argument("<issue>", "Issue number to kill", Number.parseInt)
 		.action(async (issue) => {
-			console.log(`Killing session for Issue #${issue}...`);
+			const sessionManager = await createSessionManager("auto");
+			const sessionId = `orch-${issue}`;
+
+			const running = await sessionManager.isRunning(sessionId);
+			if (!running) {
+				console.log(`Session ${sessionId} is not running.`);
+				return;
+			}
+
+			await sessionManager.kill(sessionId);
+			console.log(`Session ${sessionId} killed.`);
 		});
 
 	program
