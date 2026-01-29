@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ZodError } from "zod";
 import {
@@ -79,18 +79,32 @@ export function validateConfig(rawConfig: unknown, configPath?: string): Orchest
  * プリセットファイルのパスを解決する
  *
  * 以下の順序で検索:
- * 1. プロジェクトルートの presets/<name>.yml
- * 2. プロジェクトルートの presets/<name>.yaml
+ * 1. 現在の作業ディレクトリの presets/<name>.yml
+ * 2. 現在の作業ディレクトリの presets/<name>.yaml
+ * 3. 実行ファイルと同階層の presets/<name>.yml
+ * 4. 実行ファイルと同階層の presets/<name>.yaml
  *
  * @param presetName - プリセット名（simple, tdd等）
  * @returns プリセットファイルのパス。見つからない場合はnull
  */
 function findPresetPath(presetName: string): string | null {
-	const baseDir = resolve("presets");
 	const candidates = [`${presetName}.yml`, `${presetName}.yaml`];
 
+	// 1. 現在の作業ディレクトリから検索
+	const cwdBaseDir = resolve("presets");
 	for (const candidate of candidates) {
-		const fullPath = join(baseDir, candidate);
+		const fullPath = join(cwdBaseDir, candidate);
+		if (existsSync(fullPath)) {
+			return fullPath;
+		}
+	}
+
+	// 2. 実行ファイルの場所から検索（バイナリ実行時対応）
+	// process.execPath は compiled binary の実際のパスを返す
+	const execDir = dirname(process.execPath);
+	const execBaseDir = join(execDir, "presets");
+	for (const candidate of candidates) {
+		const fullPath = join(execBaseDir, candidate);
 		if (existsSync(fullPath)) {
 			return fullPath;
 		}
