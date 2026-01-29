@@ -23,13 +23,12 @@ describe("PiAdapter", () => {
 	});
 
 	describe("getArgs", () => {
-		it("should return args with --print and @-prefixed prompt path", async () => {
+		it("should return args with @-prefixed prompt path", async () => {
 			const { PiAdapter } = await import("./pi");
 			const adapter = new PiAdapter();
 			const args = adapter.getArgs(".agent/PROMPT.md");
 
-			expect(args).toContain("--print");
-			expect(args.some((arg: string) => arg.includes("@.agent/PROMPT.md"))).toBe(true);
+			expect(args).toEqual(["@.agent/PROMPT.md"]);
 		});
 
 		it("should include --model when model option is provided", async () => {
