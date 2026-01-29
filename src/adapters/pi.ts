@@ -6,7 +6,7 @@ export class PiAdapter implements IBackendAdapter {
 	}
 
 	getArgs(promptPath: string, options?: BackendOptions): string[] {
-		const args: string[] = [];
+		const args = ["-p"];
 		if (options?.model) {
 			args.push("--model", options.model);
 		}
