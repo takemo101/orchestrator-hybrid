@@ -61,9 +61,9 @@ export class TmuxSessionManager implements ISessionManager {
 		const sessionName = this.getSessionName(id);
 		const fullCommand = [command, ...args].join(" ");
 
-		// 既存セッションがあれば停止
-		const existing = await this.isRunning(id);
-		if (existing) {
+		// 既存セッションがあれば停止（dead paneも含む）
+		const sessionExists = await this.sessionExists(id);
+		if (sessionExists) {
 			await this.kill(id);
 		}
 
@@ -200,16 +200,21 @@ export class TmuxSessionManager implements ISessionManager {
 		await proc.exited;
 	}
 
+	async sessionExists(id: string): Promise<boolean> {
+		const sessionName = this.getSessionName(id);
+		const result = await runTmux(["has-session", "-t", sessionName]);
+		return result.exitCode === 0;
+	}
+
 	async isRunning(id: string): Promise<boolean> {
 		const sessionName = this.getSessionName(id);
 
-		// セッション存在確認
 		const hasSession = await runTmux(["has-session", "-t", sessionName]);
 		if (hasSession.exitCode !== 0) {
 			return false;
 		}
 
-		// ペイン内のプロセスが実行中か確認 (pane_dead=0なら実行中)
+		// pane_dead=0なら実行中、1なら終了済み（remain-on-exitで残っている）
 		const paneStatus = await runTmux(["display-message", "-t", sessionName, "-p", "#{pane_dead}"]);
 		return paneStatus.stdout.trim() === "0";
 	}
