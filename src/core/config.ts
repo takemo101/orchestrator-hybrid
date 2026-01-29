@@ -150,7 +150,7 @@ function mergeConfig(
  * 設定ファイルを読み込む
  *
  * @param configPath - 設定ファイルのパス（省略時はデフォルトを検索）
- * @param presetName - プリセット名（省略時は設定ファイルのpresetを使用）
+ * @param presetName - プリセット名（CLI引数で指定。省略時は設定ファイルのpresetを使用）
  * @returns 検証済みの設定オブジェクト
  * @throws {ConfigValidationError} 検証エラー
  * @throws {PresetNotFoundError} プリセットが見つからない場合
@@ -172,6 +172,12 @@ export function loadConfig(configPath?: string, presetName?: string): Orchestrat
 	if (effectivePresetName) {
 		const presetConfig = loadPreset(effectivePresetName);
 		rawConfig = mergeConfig(rawConfig, presetConfig);
+
+		// CLI引数でプリセットが指定された場合、その値を強制適用
+		// （設定ファイルのpresetがマージで上書きされないようにする）
+		if (presetName) {
+			rawConfig.preset = presetName;
+		}
 	}
 
 	return validateConfig(rawConfig, path ?? undefined);
