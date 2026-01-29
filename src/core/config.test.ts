@@ -1,18 +1,29 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { ConfigValidationError, loadConfig, validateConfig } from "./config.js";
+import {
+	ConfigValidationError,
+	loadConfig,
+	loadPreset,
+	PresetNotFoundError,
+	validateConfig,
+} from "./config.js";
 
 const TEST_DIR = "/tmp/orch-config-test";
 
 describe("config", () => {
+	const originalCwd = process.cwd();
+
 	beforeEach(() => {
 		if (existsSync(TEST_DIR)) {
 			rmSync(TEST_DIR, { recursive: true });
 		}
 		mkdirSync(TEST_DIR, { recursive: true });
+		// テストディレクトリに移動してorch.ymlを検索させない
+		process.chdir(TEST_DIR);
 	});
 
 	afterEach(() => {
+		process.chdir(originalCwd);
 		if (existsSync(TEST_DIR)) {
 			rmSync(TEST_DIR, { recursive: true });
 		}
@@ -70,7 +81,8 @@ describe("config", () => {
 
 	describe("loadConfig", () => {
 		test("should return defaults when no config file", () => {
-			const config = loadConfig(`${TEST_DIR}/nonexistent.yml`);
+			// TEST_DIR内でorch.ymlがないことを確認
+			const config = loadConfig();
 			expect(config.backend).toBe("claude");
 			expect(config.auto).toBe(false);
 		});
@@ -94,6 +106,81 @@ max_iterations: 30
 			const configPath = `${TEST_DIR}/bad.yml`;
 			writeFileSync(configPath, "backend: invalid\n");
 			expect(() => loadConfig(configPath)).toThrow(ConfigValidationError);
+		});
+	});
+
+	describe("loadPreset", () => {
+		beforeEach(() => {
+			// プリセットを検索するためにオリジナルディレクトリに戻る
+			process.chdir(originalCwd);
+		});
+
+		test("should load simple preset", () => {
+			const preset = loadPreset("simple");
+			expect(preset).toBeDefined();
+			expect(preset.preset).toBe("simple");
+		});
+
+		test("should load tdd preset", () => {
+			const preset = loadPreset("tdd");
+			expect(preset).toBeDefined();
+			expect(preset.preset).toBe("tdd");
+			expect(preset.hats).toBeDefined();
+		});
+
+		test("should throw PresetNotFoundError for unknown preset", () => {
+			expect(() => loadPreset("nonexistent")).toThrow(PresetNotFoundError);
+		});
+
+		test("PresetNotFoundError should contain preset name", () => {
+			try {
+				loadPreset("nonexistent");
+				expect(true).toBe(false); // should not reach
+			} catch (error) {
+				expect(error).toBeInstanceOf(PresetNotFoundError);
+				if (error instanceof PresetNotFoundError) {
+					expect(error.presetName).toBe("nonexistent");
+				}
+			}
+		});
+	});
+
+	describe("loadConfig with preset", () => {
+		beforeEach(() => {
+			// プリセットを検索するためにオリジナルディレクトリに戻る
+			process.chdir(originalCwd);
+		});
+
+		test("should apply preset when specified via argument", () => {
+			// 存在しない設定ファイルを指定してデフォルト + プリセットのみ適用
+			const config = loadConfig("/nonexistent/path/orch.yml", "simple");
+			expect(config.preset).toBe("simple");
+		});
+
+		test("should apply tdd preset", () => {
+			// 存在しない設定ファイルを指定してデフォルト + プリセットのみ適用
+			const config = loadConfig("/nonexistent/path/orch.yml", "tdd");
+			expect(config.preset).toBe("tdd");
+		});
+
+		test("should merge user config with preset", () => {
+			const configPath = `${TEST_DIR}/orch-merge.yml`;
+			writeFileSync(
+				configPath,
+				`backend: opencode
+max_iterations: 50
+`,
+			);
+			const config = loadConfig(configPath, "simple");
+			// ユーザー設定が優先
+			expect(config.backend).toBe("opencode");
+			expect(config.max_iterations).toBe(50);
+			// プリセットから
+			expect(config.preset).toBe("simple");
+		});
+
+		test("should throw PresetNotFoundError for unknown preset via argument", () => {
+			expect(() => loadConfig(undefined, "nonexistent")).toThrow(PresetNotFoundError);
 		});
 	});
 

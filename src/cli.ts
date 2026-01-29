@@ -7,7 +7,7 @@ import type { IBackendAdapter } from "./adapters/interface";
 import { OpenCodeAdapter } from "./adapters/opencode";
 import { createSessionManager, type SessionManagerType } from "./adapters/session";
 import type { Session } from "./adapters/session/interface";
-import { loadConfig } from "./core/config";
+import { loadConfig, PresetNotFoundError } from "./core/config";
 import { LogMonitor } from "./core/log-monitor";
 import { LoopEngine, type LoopResult } from "./core/loop";
 import type { OrchestratorConfig } from "./core/types";
@@ -108,7 +108,19 @@ export function createProgram(): Command {
 		.option("--no-worktree", "Disable worktree isolation", false)
 		.option("--session-manager <type>", "Session manager (auto, native, tmux, zellij)")
 		.action(async (cliOptions) => {
-			const config = loadConfig(cliOptions.config);
+			// プリセットを考慮して設定を読み込み
+			let config: OrchestratorConfig;
+			try {
+				config = loadConfig(cliOptions.config, cliOptions.preset);
+			} catch (error) {
+				if (error instanceof PresetNotFoundError) {
+					console.error(`Error: Preset '${error.presetName}' not found.`);
+					console.error("Available presets: simple, tdd");
+					process.exit(1);
+				}
+				throw error;
+			}
+
 			const options = mergeOptionsWithConfig(cliOptions, config);
 			const issueNumber = cliOptions.issue;
 
@@ -119,6 +131,10 @@ export function createProgram(): Command {
 			});
 
 			console.log(`Generating prompt for: ${issue.title}`);
+			if (options.preset !== "simple") {
+				console.log(`Using preset: ${options.preset}`);
+			}
+
 			const promptGenerator = new PromptGenerator();
 			const prompt = promptGenerator.generate(issue);
 
