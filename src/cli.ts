@@ -8,6 +8,7 @@ import { OpenCodeAdapter } from "./adapters/opencode";
 import { createSessionManager, type SessionManagerType } from "./adapters/session";
 import type { Session } from "./adapters/session/interface";
 import { loadConfig, PresetNotFoundError } from "./core/config";
+import { CircularDependencyError, DependencyResolver } from "./core/dependency";
 import { LogMonitor } from "./core/log-monitor";
 import { LoopEngine, type LoopResult } from "./core/loop";
 import type { OrchestratorConfig } from "./core/types";
@@ -33,6 +34,7 @@ function mergeOptionsWithConfig(
 	maxIterations: number;
 	preset: string;
 	sessionManager: SessionManagerType;
+	resolveDeps: boolean;
 } {
 	return {
 		backend: (cliOptions.backend as string | undefined) ?? config.backend,
@@ -43,6 +45,7 @@ function mergeOptionsWithConfig(
 		preset: (cliOptions.preset as string | undefined) ?? config.preset,
 		sessionManager: ((cliOptions.sessionManager as string | undefined) ??
 			config.session.manager) as SessionManagerType,
+		resolveDeps: (cliOptions.resolveDeps as boolean | undefined) ?? false,
 	};
 }
 
@@ -85,6 +88,118 @@ async function getCurrentBranch(): Promise<string | undefined> {
 	}
 }
 
+/**
+ * 単一Issueの実行処理
+ */
+interface ExecuteIssueOptions {
+	backend: IBackendAdapter;
+	sessionManager: Awaited<ReturnType<typeof createSessionManager>>;
+	maxIterations: number;
+	createPr: boolean;
+	draft: boolean;
+}
+
+async function executeIssue(
+	issueNumber: number,
+	options: ExecuteIssueOptions,
+): Promise<{ success: boolean; iterations: number }> {
+	const { backend, sessionManager, maxIterations, createPr, draft } = options;
+
+	console.log(`\n${"=".repeat(60)}`);
+	console.log(`Executing Issue #${issueNumber}...`);
+	console.log(`${"=".repeat(60)}`);
+
+	const issue = await fetchIssue(issueNumber).catch((error) => {
+		console.error(`Failed to fetch Issue #${issueNumber}: ${error}`);
+		return null;
+	});
+
+	if (!issue) {
+		return { success: false, iterations: 0 };
+	}
+
+	console.log(`Generating prompt for: ${issue.title}`);
+
+	const promptGenerator = new PromptGenerator();
+	const prompt = promptGenerator.generate(issue);
+
+	mkdirSync(".agent", { recursive: true });
+	const promptPath = ".agent/PROMPT.md";
+	writeFileSync(promptPath, prompt);
+
+	const sessionId = String(issueNumber);
+
+	console.log(`Starting session ${sessionId} with ${backend.getName()} backend...`);
+
+	await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
+
+	const loopEngine = new LoopEngine();
+
+	const waitForSessionEnd = async (): Promise<string> => {
+		const pollInterval = 2000;
+		while (await sessionManager.isRunning(sessionId)) {
+			await new Promise((resolve) => setTimeout(resolve, pollInterval));
+		}
+		return await sessionManager.getOutput(sessionId);
+	};
+
+	const runner = async (iteration: number): Promise<string> => {
+		if (iteration > 1) {
+			console.log(`\nIteration ${iteration}: Restarting session...`);
+			await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
+		}
+
+		console.log(`Waiting for AI to complete...`);
+		return await waitForSessionEnd();
+	};
+
+	let result: LoopResult;
+	try {
+		result = await loopEngine.run(runner, {
+			maxIterations,
+			completionKeyword: "LOOP_COMPLETE",
+		});
+
+		if (result.success) {
+			console.log(`\nIssue #${issueNumber} completed after ${result.iterations} iterations.`);
+
+			// PR自動作成
+			if (createPr) {
+				console.log("\nCreating PR...");
+				const prCreator = new PRCreator();
+				const branchName = await getCurrentBranch();
+
+				if (!branchName) {
+					console.error("Failed to get current branch name. Skipping PR creation.");
+				} else {
+					try {
+						const prResult = await prCreator.create(issueNumber, branchName, issue.title, {
+							draft,
+						});
+						console.log(`PR created: ${prResult.url}`);
+					} catch (error) {
+						if (error instanceof PRCreateError) {
+							if (error.message === "No changes to create PR") {
+								console.log("No changes to create PR. Skipping.");
+							} else {
+								console.error(`Failed to create PR: ${error.message}`);
+							}
+						} else {
+							console.error(`Failed to create PR: ${error}`);
+						}
+					}
+				}
+			}
+		}
+
+		return { success: result.success, iterations: result.iterations };
+	} catch (error) {
+		console.error(`Loop terminated for Issue #${issueNumber}: ${error}`);
+		await sessionManager.kill(sessionId).catch(() => {});
+		return { success: false, iterations: 0 };
+	}
+}
+
 export function createProgram(): Command {
 	const program = new Command();
 
@@ -105,9 +220,16 @@ export function createProgram(): Command {
 		.option("-b, --backend <type>", "Backend type (claude, opencode)")
 		.option("-m, --max-iterations <number>", "Max loop iterations", Number.parseInt)
 		.option("--resolve-deps", "Resolve dependent issues first", false)
+		.option("--ignore-deps", "Ignore dependency resolution (mutually exclusive with --resolve-deps)", false)
 		.option("--no-worktree", "Disable worktree isolation", false)
 		.option("--session-manager <type>", "Session manager (auto, native, tmux, zellij)")
 		.action(async (cliOptions) => {
+			// --resolve-deps と --ignore-deps の排他チェック
+			if (cliOptions.resolveDeps && cliOptions.ignoreDeps) {
+				console.error("Error: --resolve-deps and --ignore-deps are mutually exclusive.");
+				process.exit(1);
+			}
+
 			// プリセットを考慮して設定を読み込み
 			let config: OrchestratorConfig;
 			try {
@@ -124,6 +246,56 @@ export function createProgram(): Command {
 			const options = mergeOptionsWithConfig(cliOptions, config);
 			const issueNumber = cliOptions.issue;
 
+			// 依存関係解決
+			if (options.resolveDeps) {
+				console.log(`Resolving dependencies for Issue #${issueNumber}...`);
+
+				const dependencyResolver = new DependencyResolver({
+					fetchIssue,
+				});
+
+				let executionOrder: number[];
+				try {
+					executionOrder = await dependencyResolver.resolveOrder(issueNumber);
+				} catch (error) {
+					if (error instanceof CircularDependencyError) {
+						console.error(`Error: ${error.message}`);
+						console.error("Please review the dependency relationships in your Issues.");
+						process.exit(1);
+					}
+					throw error;
+				}
+
+				if (executionOrder.length > 1) {
+					console.log(`Execution order: ${executionOrder.map((n) => `#${n}`).join(" -> ")}`);
+				}
+
+				const backend = getBackendAdapter(options.backend);
+				const sessionManager = await createSessionManager(options.sessionManager);
+
+				// 依存Issueを順次実行
+				for (const depIssueNumber of executionOrder) {
+					const result = await executeIssue(depIssueNumber, {
+						backend,
+						sessionManager,
+						maxIterations: options.maxIterations,
+						createPr: options.createPr,
+						draft: options.draft,
+					});
+
+					if (!result.success && depIssueNumber !== issueNumber) {
+						console.error(`\nDependency Issue #${depIssueNumber} failed. Stopping execution.`);
+						process.exit(1);
+					}
+				}
+
+				console.log(`\n${"=".repeat(60)}`);
+				console.log("All issues completed successfully!");
+				console.log(`${"=".repeat(60)}`);
+				return;
+			}
+
+			// 通常の単一Issue実行（依存解決なし）
 			console.log(`Fetching Issue #${issueNumber}...`);
 			const issue = await fetchIssue(issueNumber).catch((error) => {
 				console.error(`Failed to fetch Issue #${issueNumber}: ${error}`);
