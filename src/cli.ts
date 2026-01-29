@@ -7,14 +7,16 @@ import type { IBackendAdapter } from "./adapters/interface";
 import { OpenCodeAdapter } from "./adapters/opencode";
 import { createSessionManager, type SessionManagerType } from "./adapters/session";
 import type { Session } from "./adapters/session/interface";
-import { loadConfig, PresetNotFoundError } from "./core/config";
+import { loadConfigWithHats, PresetNotFoundError } from "./core/config";
 import { CircularDependencyError, DependencyResolver } from "./core/dependency";
+import { EventBus } from "./core/event";
+import { HatSystem } from "./core/hat";
 import { LogMonitor } from "./core/log-monitor";
-import { LoopEngine, type LoopResult } from "./core/loop";
-import type { OrchestratorConfig } from "./core/types";
+import { type IterationContext, LoopEngine, type LoopResult } from "./core/loop";
+import type { HatDefinition, OrchestratorConfig } from "./core/types";
 import { ApprovalGate, ApprovalGateError } from "./gates/approval";
 import { fetchIssue } from "./input/github";
-import { PromptGenerator } from "./input/prompt";
+import { type HatContext, PromptGenerator } from "./input/prompt";
 import { PRCreateError, PRCreator } from "./output/pr";
 
 function getBackendAdapter(backendType: string): IBackendAdapter {
@@ -98,13 +100,14 @@ interface ExecuteIssueOptions {
 	maxIterations: number;
 	createPr: boolean;
 	draft: boolean;
+	hatSystem?: HatSystem;
 }
 
 async function executeIssue(
 	issueNumber: number,
 	options: ExecuteIssueOptions,
 ): Promise<{ success: boolean; iterations: number }> {
-	const { backend, sessionManager, maxIterations, createPr, draft } = options;
+	const { backend, sessionManager, maxIterations, createPr, draft, hatSystem } = options;
 
 	console.log(`\n${"=".repeat(60)}`);
 	console.log(`Executing Issue #${issueNumber}...`);
@@ -122,19 +125,12 @@ async function executeIssue(
 	console.log(`Generating prompt for: ${issue.title}`);
 
 	const promptGenerator = new PromptGenerator();
-	const prompt = promptGenerator.generate(issue);
-
-	mkdirSync(".agent", { recursive: true });
-	const promptPath = ".agent/PROMPT.md";
-	writeFileSync(promptPath, prompt);
-
 	const sessionId = String(issueNumber);
 
-	console.log(`Starting session ${sessionId} with ${backend.getName()} backend...`);
-
-	await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
-
-	const loopEngine = new LoopEngine();
+	// HatSystem有効時は初期イベントを設定
+	const hasHats = hatSystem && hatSystem.getAllHats().length > 0;
+	const eventBus = new EventBus();
+	const loopEngine = new LoopEngine(eventBus, hasHats ? hatSystem : undefined);
 
 	const waitForSessionEnd = async (): Promise<string> => {
 		const pollInterval = 2000;
@@ -144,11 +140,28 @@ async function executeIssue(
 		return await sessionManager.getOutput(sessionId);
 	};
 
-	const runner = async (iteration: number): Promise<string> => {
-		if (iteration > 1) {
-			console.log(`\nIteration ${iteration}: Restarting session...`);
-			await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
+	const runner = async (ctx: IterationContext): Promise<string> => {
+		// Hat情報をプロンプトに反映
+		const hatContext: HatContext | undefined = ctx.activeHat
+			? {
+					hatName: ctx.activeHat.name,
+					hatInstructions: ctx.activeHat.instructions,
+				}
+			: undefined;
+
+		const prompt = promptGenerator.generate(issue, hatContext);
+		mkdirSync(".agent", { recursive: true });
+		const promptPath = ".agent/PROMPT.md";
+		writeFileSync(promptPath, prompt);
+
+		if (ctx.iteration > 1 || ctx.activeHat) {
+			const hatInfo = ctx.activeHat ? ` [${ctx.activeHat.name}]` : "";
+			console.log(`\nIteration ${ctx.iteration}${hatInfo}: Starting session...`);
+		} else {
+			console.log(`Starting session ${sessionId} with ${backend.getName()} backend...`);
 		}
+
+		await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
 
 		console.log(`Waiting for AI to complete...`);
 		return await waitForSessionEnd();
@@ -159,6 +172,7 @@ async function executeIssue(
 		result = await loopEngine.run(runner, {
 			maxIterations,
 			completionKeyword: "LOOP_COMPLETE",
+			initialEvent: hasHats ? "task.start" : undefined,
 		});
 
 		if (result.success) {
@@ -237,8 +251,11 @@ export function createProgram(): Command {
 
 			// プリセットを考慮して設定を読み込み
 			let config: OrchestratorConfig;
+			let hats: Record<string, HatDefinition>;
 			try {
-				config = loadConfig(cliOptions.config, cliOptions.preset);
+				const result = loadConfigWithHats(cliOptions.config, cliOptions.preset);
+				config = result.config;
+				hats = result.hats;
 			} catch (error) {
 				if (error instanceof PresetNotFoundError) {
 					console.error(`Error: Preset '${error.presetName}' not found.`);
@@ -250,6 +267,9 @@ export function createProgram(): Command {
 
 			const options = mergeOptionsWithConfig(cliOptions, config);
 			const issueNumber = cliOptions.issue;
+
+			// HatSystemの初期化（Hat定義がある場合のみ）
+			const hatSystem = Object.keys(hats).length > 0 ? new HatSystem(hats) : undefined;
 
 			// 依存関係解決
 			if (options.resolveDeps) {
@@ -286,6 +306,7 @@ export function createProgram(): Command {
 						maxIterations: options.maxIterations,
 						createPr: options.createPr,
 						draft: options.draft,
+						hatSystem,
 					});
 
 					if (!result.success && depIssueNumber !== issueNumber) {
@@ -315,17 +336,17 @@ export function createProgram(): Command {
 			if (options.preset !== "simple") {
 				console.log(`Using preset: ${options.preset}`);
 			}
-
-			const promptGenerator = new PromptGenerator();
-			const prompt = promptGenerator.generate(issue);
-
-			mkdirSync(".agent", { recursive: true });
-			const promptPath = ".agent/PROMPT.md";
-			writeFileSync(promptPath, prompt);
+			if (hatSystem) {
+				const hatCount = hatSystem.getAllHats().length;
+				console.log(`Hat system enabled with ${hatCount} hat(s)`);
+			}
 
 			// Pre-loop承認ゲート
+			const promptGenerator = new PromptGenerator();
+			const initialPrompt = promptGenerator.generate(issue);
+
 			try {
-				const preLoopContext = `Issue #${issueNumber}: ${issue.title}\n\nPrompt preview:\n${prompt.substring(0, 500)}${prompt.length > 500 ? "..." : ""}`;
+				const preLoopContext = `Issue #${issueNumber}: ${issue.title}\n\nPrompt preview:\n${initialPrompt.substring(0, 500)}${initialPrompt.length > 500 ? "..." : ""}`;
 				const preLoopResult = await approvalGate.ask("pre-loop", preLoopContext);
 				if (!preLoopResult.approved) {
 					console.log("Pre-loop gate rejected. Aborting execution.");
@@ -350,15 +371,10 @@ export function createProgram(): Command {
 				`Starting session ${sessionId} with ${backend.getName()} backend (${options.sessionManager})...`,
 			);
 
-			const session = await sessionManager.create(
-				sessionId,
-				backend.getCommand(),
-				backend.getArgs(promptPath),
-			);
-
-			console.log(`Session created: ${session.id} (${session.type})`);
-
-			const loopEngine = new LoopEngine();
+			// HatSystem有効時は初期イベントを設定
+			const hasHats = hatSystem && hatSystem.getAllHats().length > 0;
+			const eventBus = new EventBus();
+			const loopEngine = new LoopEngine(eventBus, hasHats ? hatSystem : undefined);
 
 			const waitForSessionEnd = async (): Promise<string> => {
 				const pollInterval = 2000;
@@ -368,10 +384,31 @@ export function createProgram(): Command {
 				return await sessionManager.getOutput(sessionId);
 			};
 
-			const runner = async (iteration: number): Promise<string> => {
-				if (iteration > 1) {
-					console.log(`\nIteration ${iteration}: Restarting session...`);
+			const runner = async (ctx: IterationContext): Promise<string> => {
+				// Hat情報をプロンプトに反映
+				const hatContext: HatContext | undefined = ctx.activeHat
+					? {
+							hatName: ctx.activeHat.name,
+							hatInstructions: ctx.activeHat.instructions,
+						}
+					: undefined;
+
+				const prompt = promptGenerator.generate(issue, hatContext);
+				mkdirSync(".agent", { recursive: true });
+				const promptPath = ".agent/PROMPT.md";
+				writeFileSync(promptPath, prompt);
+
+				if (ctx.iteration > 1) {
+					const hatInfo = ctx.activeHat ? ` [${ctx.activeHat.name}]` : "";
+					console.log(`\nIteration ${ctx.iteration}${hatInfo}: Restarting session...`);
 					await sessionManager.create(sessionId, backend.getCommand(), backend.getArgs(promptPath));
+				} else {
+					const session = await sessionManager.create(
+						sessionId,
+						backend.getCommand(),
+						backend.getArgs(promptPath),
+					);
+					console.log(`Session created: ${session.id} (${session.type})`);
 				}
 
 				console.log(`Waiting for AI to complete...`);
@@ -383,6 +420,7 @@ export function createProgram(): Command {
 				result = await loopEngine.run(runner, {
 					maxIterations: options.maxIterations,
 					completionKeyword: "LOOP_COMPLETE",
+					initialEvent: hasHats ? "task.start" : undefined,
 				});
 
 				if (result.success) {

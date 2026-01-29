@@ -1,7 +1,10 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { EventEntry } from "./event";
 import { EventBus } from "./event";
+import { HatSystem } from "./hat";
+import type { IterationContext } from "./loop";
 import { LoopEngine, LoopError, MaxIterationsReachedError } from "./loop";
+import type { HatDefinition } from "./types";
 
 // ============================================================
 // EventBus テスト
@@ -181,8 +184,8 @@ describe("LoopEngine", () => {
 	describe("run", () => {
 		test("LOOP_COMPLETE検出時にsuccessで終了する", async () => {
 			const engine = new LoopEngine();
-			const runner = mock((i: number) =>
-				Promise.resolve(i === 2 ? "Done. LOOP_COMPLETE" : "Working..."),
+			const runner = mock((ctx: IterationContext) =>
+				Promise.resolve(ctx.iteration === 2 ? "Done. LOOP_COMPLETE" : "Working..."),
 			);
 
 			const result = await engine.run(runner, { maxIterations: 10 });
@@ -266,9 +269,9 @@ describe("LoopEngine", () => {
 		test("デフォルトの最大反復回数は100", async () => {
 			const engine = new LoopEngine();
 			let callCount = 0;
-			const runner = mock((i: number) => {
+			const runner = mock((ctx: IterationContext) => {
 				callCount++;
-				if (i === 100) return Promise.resolve("LOOP_COMPLETE");
+				if (ctx.iteration === 100) return Promise.resolve("LOOP_COMPLETE");
 				return Promise.resolve("working");
 			});
 
@@ -383,6 +386,187 @@ describe("LoopEngine", () => {
 			const engine = new LoopEngine();
 
 			expect(engine.getEventBus()).toBeInstanceOf(EventBus);
+		});
+	});
+
+	describe("Hat統合", () => {
+		const createTddHats = (): Record<string, HatDefinition> => ({
+			tester: {
+				name: "Tester",
+				triggers: ["task.start", "code.written"],
+				publishes: ["tests.failing", "tests.passing"],
+				instructions: "テストを書いてください",
+			},
+			implementer: {
+				name: "Implementer",
+				triggers: ["tests.failing"],
+				publishes: ["code.written"],
+				instructions: "テストを通す実装をしてください",
+			},
+			refactorer: {
+				name: "Refactorer",
+				triggers: ["tests.passing"],
+				publishes: ["LOOP_COMPLETE"],
+				instructions: "リファクタリングしてください",
+			},
+		});
+
+		test("HatSystemを渡してLoopEngineを初期化できる", () => {
+			const hatSystem = new HatSystem(createTddHats());
+			const engine = new LoopEngine(undefined, hatSystem);
+
+			expect(engine.getHatSystem()).toBe(hatSystem);
+		});
+
+		test("HatSystem未指定時はundefinedを返す", () => {
+			const engine = new LoopEngine();
+			expect(engine.getHatSystem()).toBeUndefined();
+		});
+
+		test("initialEventに基づいてHatが選択される", async () => {
+			const hatSystem = new HatSystem(createTddHats());
+			const bus = new EventBus();
+			const engine = new LoopEngine(bus, hatSystem);
+
+			const contexts: IterationContext[] = [];
+			const runner = mock((ctx: IterationContext) => {
+				contexts.push({ ...ctx });
+				return Promise.resolve("LOOP_COMPLETE");
+			});
+
+			await engine.run(runner, { maxIterations: 5, initialEvent: "task.start" });
+
+			expect(contexts[0].activeHat?.name).toBe("Tester");
+			expect(contexts[0].currentEvent).toBe("task.start");
+		});
+
+		test("出力からイベントを抽出してHatを切り替える", async () => {
+			const hatSystem = new HatSystem(createTddHats());
+			const bus = new EventBus();
+			const engine = new LoopEngine(bus, hatSystem);
+
+			const contexts: IterationContext[] = [];
+			const runner = mock((ctx: IterationContext) => {
+				contexts.push({ ...ctx });
+				if (ctx.iteration === 1) return Promise.resolve("EVENT: tests.failing");
+				if (ctx.iteration === 2) return Promise.resolve("EVENT: code.written");
+				if (ctx.iteration === 3) return Promise.resolve("EVENT: tests.passing");
+				return Promise.resolve("LOOP_COMPLETE");
+			});
+
+			await engine.run(runner, { maxIterations: 10, initialEvent: "task.start" });
+
+			// 1回目: task.start -> Tester
+			expect(contexts[0].activeHat?.name).toBe("Tester");
+			expect(contexts[0].currentEvent).toBe("task.start");
+
+			// 2回目: tests.failing -> Implementer
+			expect(contexts[1].activeHat?.name).toBe("Implementer");
+			expect(contexts[1].currentEvent).toBe("tests.failing");
+
+			// 3回目: code.written -> Tester
+			expect(contexts[2].activeHat?.name).toBe("Tester");
+			expect(contexts[2].currentEvent).toBe("code.written");
+
+			// 4回目: tests.passing -> Refactorer
+			expect(contexts[3].activeHat?.name).toBe("Refactorer");
+			expect(contexts[3].currentEvent).toBe("tests.passing");
+		});
+
+		test("hat.activatedイベントが発行される", async () => {
+			const hatSystem = new HatSystem(createTddHats());
+			const bus = new EventBus();
+			const engine = new LoopEngine(bus, hatSystem);
+			const events: EventEntry[] = [];
+
+			bus.on("hat.activated", (e) => events.push(e));
+
+			const runner = mock(() => Promise.resolve("LOOP_COMPLETE"));
+			await engine.run(runner, { maxIterations: 5, initialEvent: "task.start" });
+
+			expect(events).toHaveLength(1);
+			expect(events[0].payload?.hatName).toBe("Tester");
+		});
+
+		test("抽出されたイベントがEventBusに発行される", async () => {
+			const hatSystem = new HatSystem(createTddHats());
+			const bus = new EventBus();
+			const engine = new LoopEngine(bus, hatSystem);
+			const events: string[] = [];
+
+			bus.on("*", (e) => events.push(e.topic));
+
+			const runner = mock((ctx: IterationContext) => {
+				if (ctx.iteration === 1) return Promise.resolve("EVENT: tests.failing");
+				return Promise.resolve("LOOP_COMPLETE");
+			});
+
+			await engine.run(runner, { maxIterations: 5, initialEvent: "task.start" });
+
+			expect(events).toContain("task.start");
+			expect(events).toContain("tests.failing");
+		});
+
+		test("マッチするHatがない場合はactiveHatがundefined", async () => {
+			const hatSystem = new HatSystem(createTddHats());
+			const engine = new LoopEngine(undefined, hatSystem);
+
+			const contexts: IterationContext[] = [];
+			const runner = mock((ctx: IterationContext) => {
+				contexts.push({ ...ctx });
+				return Promise.resolve("LOOP_COMPLETE");
+			});
+
+			await engine.run(runner, { maxIterations: 5, initialEvent: "unknown.event" });
+
+			expect(contexts[0].activeHat).toBeUndefined();
+		});
+
+		test("HatSystemなしでもcontextにHat情報は含まれない", async () => {
+			const engine = new LoopEngine();
+
+			const contexts: IterationContext[] = [];
+			const runner = mock((ctx: IterationContext) => {
+				contexts.push({ ...ctx });
+				return Promise.resolve("LOOP_COMPLETE");
+			});
+
+			await engine.run(runner, { maxIterations: 5 });
+
+			expect(contexts[0].activeHat).toBeUndefined();
+		});
+
+		test("TDDサイクルの完全なフロー", async () => {
+			const hatSystem = new HatSystem(createTddHats());
+			const bus = new EventBus();
+			const engine = new LoopEngine(bus, hatSystem);
+
+			const hatSequence: string[] = [];
+			const runner = mock((ctx: IterationContext) => {
+				hatSequence.push(ctx.activeHat?.name ?? "none");
+				// TDDサイクルをシミュレート
+				switch (ctx.iteration) {
+					case 1:
+						return Promise.resolve("テストを書きました\nEVENT: tests.failing");
+					case 2:
+						return Promise.resolve("実装しました\nEVENT: code.written");
+					case 3:
+						return Promise.resolve("テストが通りました\nEVENT: tests.passing");
+					case 4:
+						return Promise.resolve("リファクタリング完了\nLOOP_COMPLETE");
+					default:
+						return Promise.resolve("working");
+				}
+			});
+
+			const result = await engine.run(runner, {
+				maxIterations: 10,
+				initialEvent: "task.start",
+			});
+
+			expect(result.success).toBe(true);
+			expect(result.iterations).toBe(4);
+			expect(hatSequence).toEqual(["Tester", "Implementer", "Tester", "Refactorer"]);
 		});
 	});
 });

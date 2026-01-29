@@ -1,5 +1,7 @@
 import { OrchestratorError } from "./errors.js";
 import { EventBus } from "./event.js";
+import { extractEventFromOutput, type HatSystem } from "./hat.js";
+import type { HatDefinition } from "./types.js";
 
 /**
  * ループ実行エンジンエラー
@@ -36,6 +38,8 @@ export interface LoopOptions {
 	completionKeyword?: string;
 	/** 中断シグナル */
 	signal?: AbortSignal;
+	/** 初期イベント（Hat切り替えの起点） */
+	initialEvent?: string;
 }
 
 /**
@@ -51,15 +55,27 @@ export interface LoopResult {
 }
 
 /**
+ * Hat情報を含むイテレーションコンテキスト
+ */
+export interface IterationContext {
+	/** イテレーション番号（1始まり） */
+	iteration: number;
+	/** 現在アクティブなHat（Hatシステム有効時） */
+	activeHat?: HatDefinition;
+	/** 現在のイベントトピック（Hatシステム有効時） */
+	currentEvent?: string;
+}
+
+/**
  * ループ内で各イテレーションを実行する関数の型。
  *
  * LoopEngineはAIバックエンドの具体的な実行方法を知らない。
  * 呼び出し元がこの関数を通じてバックエンド実行を注入する。
  *
- * @param iteration - 現在のイテレーション番号（1始まり）
+ * @param context - イテレーションコンテキスト（Hat情報を含む）
  * @returns イテレーションの出力文字列
  */
-export type IterationRunner = (iteration: number) => Promise<string>;
+export type IterationRunner = (context: IterationContext) => Promise<string>;
 
 /**
  * ループ実行エンジン
@@ -67,14 +83,17 @@ export type IterationRunner = (iteration: number) => Promise<string>;
  * AIバックエンドを反復実行し、LOOP_COMPLETEキーワードの検出
  * または最大反復回数到達まで繰り返す。
  *
+ * v3.0.0: HatSystemと連携し、イベントに基づいてHatを切り替える。
  * バックエンドの具体的な実行はIterationRunner関数で抽象化し、
  * ISessionManagerとの連携は呼び出し元が担当する。
  */
 export class LoopEngine {
 	private readonly eventBus: EventBus;
+	private readonly hatSystem?: HatSystem;
 
-	constructor(eventBus?: EventBus) {
+	constructor(eventBus?: EventBus, hatSystem?: HatSystem) {
 		this.eventBus = eventBus ?? new EventBus();
+		this.hatSystem = hatSystem;
 	}
 
 	/**
@@ -92,8 +111,14 @@ export class LoopEngine {
 		const signal = options.signal;
 
 		let lastOutput = "";
+		let currentEvent = options.initialEvent ?? "task.start";
 
 		this.eventBus.emit("loop.start", "LoopEngine", { maxIterations });
+
+		// 初期イベントを発行（Hatシステム連携用）
+		if (this.hatSystem && currentEvent) {
+			this.eventBus.emit(currentEvent, "LoopEngine", { type: "initial" });
+		}
 
 		for (let i = 1; i <= maxIterations; i++) {
 			// 中断チェック
@@ -102,11 +127,30 @@ export class LoopEngine {
 				return { success: false, iterations: i - 1, lastOutput };
 			}
 
-			this.eventBus.emit("iteration.start", "LoopEngine", { iteration: i });
+			// 現在のイベントに一致するHatを検索
+			const activeHat = this.hatSystem?.findHatByTrigger(currentEvent) ?? undefined;
+
+			if (activeHat) {
+				this.eventBus.emit("hat.activated", "LoopEngine", {
+					iteration: i,
+					hatName: activeHat.name,
+					trigger: currentEvent,
+				});
+			}
+
+			this.eventBus.emit("iteration.start", "LoopEngine", {
+				iteration: i,
+				activeHat: activeHat?.name,
+				currentEvent,
+			});
 
 			let output: string;
 			try {
-				output = await runner(i);
+				output = await runner({
+					iteration: i,
+					activeHat,
+					currentEvent,
+				});
 			} catch (error) {
 				this.eventBus.emit("iteration.error", "LoopEngine", {
 					iteration: i,
@@ -120,9 +164,13 @@ export class LoopEngine {
 
 			lastOutput = output;
 
+			// 出力からイベントを抽出
+			const extractedEvent = extractEventFromOutput(output);
+
 			this.eventBus.emit("iteration.end", "LoopEngine", {
 				iteration: i,
 				outputLength: output.length,
+				extractedEvent,
 			});
 
 			// 完了キーワード検出（大文字小文字区別なし）
@@ -132,6 +180,15 @@ export class LoopEngine {
 					keyword: completionKeyword,
 				});
 				return { success: true, iterations: i, lastOutput: output };
+			}
+
+			// 抽出されたイベントがあれば次のイベントとして使用
+			if (extractedEvent && extractedEvent !== "LOOP_COMPLETE") {
+				this.eventBus.emit(extractedEvent, "LoopEngine", {
+					iteration: i,
+					source: "ai_output",
+				});
+				currentEvent = extractedEvent;
 			}
 		}
 
@@ -145,5 +202,12 @@ export class LoopEngine {
 	 */
 	getEventBus(): EventBus {
 		return this.eventBus;
+	}
+
+	/**
+	 * Hatシステムを取得する
+	 */
+	getHatSystem(): HatSystem | undefined {
+		return this.hatSystem;
 	}
 }
